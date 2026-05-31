@@ -1,0 +1,11 @@
+const router = require('express').Router()
+const { authenticate, requireAdmin } = require('../middleware/auth')
+const ctrl = require('../controllers/productController')
+router.get('/', ctrl.listProducts)
+router.get('/categories', ctrl.listCategories)
+router.get('/:slug', ctrl.getProduct)
+router.post('/', authenticate, requireAdmin, ctrl.createProduct)
+router.put('/:id', authenticate, requireAdmin, ctrl.updateProduct)
+router.delete('/:id', authenticate, requireAdmin, ctrl.deleteProduct)
+router.put('/variants/:id/stock', authenticate, requireAdmin, ctrl.updateVariantStock)
+module.exports = router

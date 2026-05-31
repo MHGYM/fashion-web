@@ -1,0 +1,10 @@
+const router = require('express').Router()
+const { authenticate, requireAdmin } = require('../middleware/auth')
+const ctrl = require('../controllers/orderController')
+router.post('/', authenticate, ctrl.createOrder)
+router.get('/mine', authenticate, ctrl.myOrders)
+router.get('/mine/:id', authenticate, ctrl.getOrder)
+router.get('/admin', authenticate, requireAdmin, ctrl.adminListOrders)
+router.get('/admin/:id', authenticate, requireAdmin, ctrl.adminGetOrder)
+router.put('/admin/:id/status', authenticate, requireAdmin, ctrl.adminUpdateOrderStatus)
+module.exports = router

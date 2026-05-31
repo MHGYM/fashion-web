@@ -1,0 +1,10 @@
+const router = require('express').Router()
+const { authenticate } = require('../middleware/auth')
+const ctrl = require('../controllers/cartController')
+router.use(authenticate)
+router.get('/', ctrl.getCart)
+router.post('/', ctrl.addToCart)
+router.put('/:id', ctrl.updateCartItem)
+router.delete('/:id', ctrl.removeFromCart)
+router.delete('/', ctrl.clearCart)
+module.exports = router
