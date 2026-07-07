@@ -1,7 +1,7 @@
 require('dotenv').config()
 const { createClient } = require('@libsql/client')
 
-const db = createClient({ url: process.env.DATABASE_URL || 'file:./summerfits.db' })
+const db = createClient({ url: process.env.DATABASE_URL || 'file:./seasonfits.db' })
 
 async function migrate() {
   await db.executeMultiple(`

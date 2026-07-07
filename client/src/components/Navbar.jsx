@@ -13,7 +13,7 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-inner">
-        <Link to="/" className="navbar-logo">Summer<span>Fits</span></Link>
+        <Link to="/" className="navbar-logo">Season<span>Fits</span></Link>
 
         <div className="navbar-links">
           <Link to="/shop">Shop</Link>

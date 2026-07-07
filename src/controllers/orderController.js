@@ -1,6 +1,10 @@
 const db = require('../db')
 
-const createOrder = async (req, res) => {
+/** Wraps async handlers so thrown errors reach Express error middleware */
+const wrap = fn => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next)
+
+const createOrder = wrap(async (req, res) => {
   const { shipping_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_postal, shipping_country, notes } = req.body
 
   if (!shipping_name || !shipping_email || !shipping_address || !shipping_city || !shipping_postal)
@@ -48,9 +52,9 @@ const createOrder = async (req, res) => {
   await db.execute({ sql: 'DELETE FROM cart_items WHERE user_id = ?', args: [req.user.id] })
 
   res.status(201).json({ order_id: order.id, total, message: 'Bestelling geplaatst!' })
-}
+})
 
-const myOrders = async (req, res) => {
+const myOrders = wrap(async (req, res) => {
   const r = await db.execute({
     sql: `SELECT o.*, GROUP_CONCAT(oi.name || ' (' || oi.size || ') x' || oi.quantity, ', ') as items_summary
           FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
@@ -58,19 +62,19 @@ const myOrders = async (req, res) => {
     args: [req.user.id]
   })
   res.json(r.rows)
-}
+})
 
-const getOrder = async (req, res) => {
+const getOrder = wrap(async (req, res) => {
   const r = await db.execute({ sql: 'SELECT * FROM orders WHERE id = ? AND user_id = ?', args: [req.params.id, req.user.id] })
   const order = r.rows[0]
   if (!order) return res.status(404).json({ error: 'Bestelling niet gevonden.' })
   const items = await db.execute({ sql: 'SELECT * FROM order_items WHERE order_id = ?', args: [order.id] })
   res.json({ ...order, items: items.rows })
-}
+})
 
 // ── Admin ────────────────────────────────────────────────────────────────────
 
-const adminListOrders = async (req, res) => {
+const adminListOrders = wrap(async (req, res) => {
   const { status } = req.query
   let sql = `SELECT o.*, u.first_name || ' ' || u.last_name as customer_name
              FROM orders o LEFT JOIN users u ON u.id = o.user_id`
@@ -79,20 +83,20 @@ const adminListOrders = async (req, res) => {
   sql += ` ORDER BY o.created_at DESC`
   const r = await db.execute({ sql, args })
   res.json(r.rows)
-}
+})
 
-const adminGetOrder = async (req, res) => {
+const adminGetOrder = wrap(async (req, res) => {
   const r = await db.execute({ sql: 'SELECT o.*, u.email as customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?', args: [req.params.id] })
   const order = r.rows[0]
   if (!order) return res.status(404).json({ error: 'Niet gevonden.' })
   const items = await db.execute({ sql: 'SELECT * FROM order_items WHERE order_id = ?', args: [order.id] })
   res.json({ ...order, items: items.rows })
-}
+})
 
-const adminUpdateOrderStatus = async (req, res) => {
+const adminUpdateOrderStatus = wrap(async (req, res) => {
   const { status } = req.body
   await db.execute({ sql: `UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?`, args: [status, req.params.id] })
   res.json({ message: 'Status bijgewerkt.' })
-}
+})
 
 module.exports = { createOrder, myOrders, getOrder, adminListOrders, adminGetOrder, adminUpdateOrderStatus }

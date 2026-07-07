@@ -3,37 +3,41 @@ import { Link } from 'react-router-dom'
 import api from '../api'
 import ProductCard from '../components/ProductCard'
 
-const CATEGORIES = [
-  {
-    label: 'T-Shirts',
-    slug: 't-shirts',
-    img: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80',
-  },
-  {
-    label: 'Schoenen',
-    slug: 'schoenen',
-    img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-  },
-  {
-    label: 'Jassen',
-    slug: 'jassen',
-    img: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80',
-  },
-  {
-    label: 'Tassen',
-    slug: 'tassen',
-    img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
-  },
-]
+// Fallback afbeeldingen per slug als er nog geen admin-foto is ingesteld
+const CAT_FALLBACK = {
+  't-shirts':      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80',
+  'hoodies':       'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=800&q=80',
+  'schoenen':      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
+  'jassen':        'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80',
+  'tassen':        'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
+  'shorts':        'https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=800&q=80',
+  'joggingbroeken':'https://images.unsplash.com/photo-1512374382149-233c42b6a83b?w=800&q=80',
+  'accessoires':   'https://images.unsplash.com/photo-1523779917675-b6ed3a42a561?w=800&q=80',
+}
+const DEFAULT_CAT_IMG = 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&q=80'
+
+const HERO_DEFAULTS = {
+  hero_image:   'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1920&q=80',
+  hero_overline:'Nieuwe collectie — 2025',
+  hero_heading: 'DEFINE YOUR STYLE',
+  hero_cta:     'Koop Nu',
+}
 
 export default function HomePage() {
-  const [featured, setFeatured] = useState([])
-  const [sale, setSale] = useState([])
+  const [featured,    setFeatured]    = useState([])
+  const [sale,        setSale]        = useState([])
+  const [categories,  setCategories]  = useState([])
+  const [hero,        setHero]        = useState(HERO_DEFAULTS)
 
   useEffect(() => {
     api.get('/products?featured=1').then(r => setFeatured(r.data.slice(0, 4))).catch(() => {})
     api.get('/products?sale=1').then(r => setSale(r.data.slice(0, 4))).catch(() => {})
+    api.get('/products/categories').then(r => setCategories(r.data)).catch(() => {})
+    api.get('/products/homepage-settings').then(r => setHero(s => ({ ...s, ...r.data }))).catch(() => {})
   }, [])
+
+  // Heading: gebruik | als regelafbreking
+  const headingLines = (hero.hero_heading || '').split('|')
 
   return (
     <div className="homepage">
@@ -42,13 +46,17 @@ export default function HomePage() {
       <section className="hero-full">
         <div
           className="hero-full-bg"
-          style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1920&q=80)' }}
+          style={{ backgroundImage: `url(${hero.hero_image})` }}
         />
         <div className="hero-full-overlay" />
         <div className="hero-full-content">
-          <p className="hero-overline">Nieuwe collectie — 2025</p>
-          <h1 className="hero-heading">DEFINE<br />YOUR<br />STYLE</h1>
-          <Link to="/shop" className="hero-cta">Koop Nu</Link>
+          <p className="hero-overline">{hero.hero_overline}</p>
+          <h1 className="hero-heading">
+            {headingLines.map((line, i) => (
+              <span key={i}>{line}{i < headingLines.length - 1 && <br/>}</span>
+            ))}
+          </h1>
+          <Link to="/shop" className="hero-cta">{hero.hero_cta}</Link>
         </div>
         <div className="hero-scroll-hint">
           <span>SCROLL</span>
@@ -57,21 +65,26 @@ export default function HomePage() {
       </section>
 
       {/* ── Categorieën ──────────────────────────── */}
-      <section className="categories-section">
-        <div className="categories-label">Shop per categorie</div>
-        <div className="categories-grid">
-          {CATEGORIES.map(cat => (
-            <Link key={cat.slug} to={`/shop?category=${cat.slug}`} className="category-block">
-              <div className="category-block-img" style={{ backgroundImage: `url(${cat.img})` }} />
-              <div className="category-block-overlay" />
-              <div className="category-block-footer">
-                <span className="category-block-name">{cat.label}</span>
-                <span className="category-block-arrow">→</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {categories.length > 0 && (
+        <section className="categories-section">
+          <div className="categories-label">Shop per categorie</div>
+          <div className="categories-grid">
+            {categories.map(cat => {
+              const img = cat.image_url || CAT_FALLBACK[cat.slug] || DEFAULT_CAT_IMG
+              return (
+                <Link key={cat.slug} to={`/shop?category=${cat.slug}`} className="category-block">
+                  <div className="category-block-img" style={{ backgroundImage: `url(${img})` }} />
+                  <div className="category-block-overlay" />
+                  <div className="category-block-footer">
+                    <span className="category-block-name">{cat.name}</span>
+                    <span className="category-block-arrow">→</span>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── Nieuw binnen ─────────────────────────── */}
       {featured.length > 0 && (
@@ -92,7 +105,7 @@ export default function HomePage() {
       <section className="promo-banner">
         <div className="promo-banner-text">
           <p className="promo-overline">Limited Drop</p>
-          <h2 className="promo-heading">DE ZOMER­COLLECTIE<br />IS ER.</h2>
+          <h2 className="promo-heading">DE SEIZOENS­COLLECTIE<br />IS ER.</h2>
           <Link to="/shop" className="promo-cta">Ontdek nu</Link>
         </div>
         <div

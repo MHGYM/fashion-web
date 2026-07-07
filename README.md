@@ -1,4 +1,4 @@
-# SummerFits Webwinkel
+# SeasonFits Webwinkel
 
 Een professionele kledingwebshop gebouwd met Node.js + React.
 
@@ -19,7 +19,7 @@ npm run dev        # start op poort 5174
 ```
 
 ## Admin inloggen
-- E-mail: admin@summerfits.nl
+- E-mail: admin@seasonfits.nl
 - Wachtwoord: admin123
 
 ## Pagina's

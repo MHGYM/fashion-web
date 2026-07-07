@@ -1,16 +1,16 @@
 require('dotenv').config()
 const bcrypt = require('bcryptjs')
 const { createClient } = require('@libsql/client')
-const db = createClient({ url: process.env.DATABASE_URL || 'file:./summerfits.db' })
+const db = createClient({ url: process.env.DATABASE_URL || 'file:./seasonfits.db' })
 
 async function seed() {
   // Admin account
   const hash = await bcrypt.hash('admin123', 12)
   await db.execute({
     sql: `INSERT OR IGNORE INTO users (email,password,first_name,last_name,role) VALUES (?,?,?,?,'admin')`,
-    args: ['admin@summerfits.nl', hash, 'Mohammed', 'Admin']
+    args: ['admin@seasonfits.nl', hash, 'Mohammed', 'Admin']
   })
-  console.log('Admin: admin@summerfits.nl / admin123')
+  console.log('Admin: admin@seasonfits.nl / admin123')
 
   // Voorbeeldproducten
   const products = [
