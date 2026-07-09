@@ -17,6 +17,7 @@ export default function Navbar() {
 
         <div className="navbar-links">
           <Link to="/shop">Shop</Link>
+          <Link to="/scholen">Scholen</Link>
           <Link to="/shop?gender=men">Heren</Link>
           <Link to="/shop?gender=women">Dames</Link>
           <Link to="/shop?sale=1">Sale 🔥</Link>
@@ -30,6 +31,7 @@ export default function Navbar() {
           {user ? (
             <div style={{ position:'relative', display:'flex', gap:8 }}>
               {user.role === 'admin' && <Link to="/admin" className="btn btn-sm btn-outline">Admin</Link>}
+              {user.role === 'school' && <Link to="/dashboard" className="btn btn-sm btn-outline">Dashboard</Link>}
               <Link to="/account" className="btn btn-sm btn-outline">
                 <User size={16} /> {user.first_name}
               </Link>
@@ -45,7 +47,7 @@ export default function Navbar() {
 
       {menuOpen && (
         <div className="navbar-mobile-menu">
-          {[['/', 'Home'], ['/shop', 'Shop'], ['/shop?gender=men', 'Heren'], ['/shop?gender=women', 'Dames'], ['/shop?sale=1', 'Sale']].map(([to, label]) => (
+          {[['/', 'Home'], ['/shop', 'Shop'], ['/scholen', 'Scholen'], ['/shop?gender=men', 'Heren'], ['/shop?gender=women', 'Dames'], ['/shop?sale=1', 'Sale']].map(([to, label]) => (
             <Link key={to} to={to} onClick={() => setMenuOpen(false)}>{label}</Link>
           ))}
           {user ? (

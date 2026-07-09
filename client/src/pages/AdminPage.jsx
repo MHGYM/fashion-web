@@ -3,18 +3,21 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingBag, Tag, Home, Image as ImageIcon,
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp,
-  ArrowLeft, Eye, EyeOff, Search, RefreshCw, Star
+  ArrowLeft, Eye, EyeOff, Search, RefreshCw, Star, Shield, CalendarClock, Percent
 } from 'lucide-react'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
+import AdminSchools from './admin/AdminSchools'
+import AdminDrops   from './admin/AdminDrops'
+import AdminCodes   from './admin/AdminCodes'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CLOTHING_SIZES = ['XS','S','M','L','XL','XXL']
 const SHOE_SIZES     = ['36','37','38','39','40','41','42','43','44','45','46']
 
-const STATUS_OPTS  = ['pending','processing','shipped','delivered','cancelled']
-const STATUS_NL    = { pending:'In behandeling', processing:'Verwerkt', shipped:'Verzonden', delivered:'Afgeleverd', cancelled:'Geannuleerd' }
-const STATUS_COLOR = { pending:'#f59e0b', processing:'#3b82f6', shipped:'#8b5cf6', delivered:'#22c55e', cancelled:'#ef4444' }
+const STATUS_OPTS  = ['awaiting_payment','pending','processing','shipped','delivered','cancelled']
+const STATUS_NL    = { awaiting_payment:'Wacht op betaling', pending:'In behandeling', processing:'Verwerkt', shipped:'Verzonden', delivered:'Afgeleverd', cancelled:'Geannuleerd' }
+const STATUS_COLOR = { awaiting_payment:'#9ca3af', pending:'#f59e0b', processing:'#3b82f6', shipped:'#8b5cf6', delivered:'#22c55e', cancelled:'#ef4444' }
 
 function statusStyle(s) {
   return { display:'inline-block', padding:'3px 10px', borderRadius:100, fontSize:'0.7rem', fontWeight:700, letterSpacing:'0.04em', background: STATUS_COLOR[s]+'22', color: STATUS_COLOR[s] }
@@ -75,6 +78,9 @@ export default function AdminPage() {
             { key:'products',  icon:<Package size={16}/>,         label:'Producten' },
             { key:'categories',icon:<Tag size={16}/>,             label:'Categorieën' },
             { key:'orders',    icon:<ShoppingBag size={16}/>,     label:'Bestellingen' },
+            { key:'schools',   icon:<Shield size={16}/>,          label:'Scholen' },
+            { key:'drops',     icon:<CalendarClock size={16}/>,   label:'Drops' },
+            { key:'codes',     icon:<Percent size={16}/>,         label:'Kortingscodes' },
             { key:'homepage',  icon:<Home size={16}/>,            label:'Homepage' },
           ].map(({ key, icon, label }) => (
             <button key={key} onClick={() => setTab(key)}
@@ -102,6 +108,9 @@ export default function AdminPage() {
             {tab === 'products'   && <ProductsTab  products={products} categories={categories} onRefresh={loadAll}/>}
             {tab === 'categories' && <CategoriesTab categories={categories} onRefresh={refreshCategories}/>}
             {tab === 'orders'     && <OrdersTab orders={orders} onStatusChange={async (id,s) => { await api.put(`/orders/admin/${id}/status`,{status:s}); loadAll() }}/>}
+            {tab === 'schools'    && <AdminSchools/>}
+            {tab === 'drops'      && <AdminDrops/>}
+            {tab === 'codes'      && <AdminCodes/>}
             {tab === 'homepage'   && <HomepageSection/>}
           </>
         )}
@@ -270,11 +279,19 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
 
   const [form, setForm] = useState({
     name:'', description:'', price:'', sale_price:'',
-    category_id:'', gender:'unisex', featured:false, active:true
+    category_id:'', gender:'unisex', featured:false, active:true,
+    school_id:'', drop_id:''
   })
   const [images,   setImages]   = useState([])
   const [sizeType, setSizeType] = useState('clothing')
   const [variants, setVariants] = useState([])
+  const [schools,  setSchools]  = useState([])
+  const [drops,    setDrops]    = useState([])
+
+  useEffect(() => {
+    api.get('/schools/admin').then(r => setSchools(r.data)).catch(() => {})
+    api.get('/drops').then(r => setDrops(r.data)).catch(() => {})
+  }, [])
 
   // Initialiseer varianten op basis van sizeType
   const initVariants = (type) => {
@@ -286,7 +303,7 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
     if (productId) {
       api.get(`/products/admin-detail/${productId}`).then(r => {
         const p = r.data
-        setForm({ name:p.name, description:p.description||'', price:p.price, sale_price:p.sale_price||'', category_id:p.category_id||'', gender:p.gender||'unisex', featured:!!p.featured, active:p.active!==0 })
+        setForm({ name:p.name, description:p.description||'', price:p.price, sale_price:p.sale_price||'', category_id:p.category_id||'', gender:p.gender||'unisex', featured:!!p.featured, active:p.active!==0, school_id:p.school_id||'', drop_id:p.drop_id||'' })
         setImages(p.images || [])
         // Detecteer size type van bestaande varianten
         const isShoe = p.variants?.some(v => !isNaN(v.size))
@@ -334,7 +351,7 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
   const save = async () => {
     if (!form.name.trim() || !form.price) return alert('Naam en prijs zijn verplicht.')
     setSaving(true)
-    const payload = { ...form, price: parseFloat(form.price), sale_price: form.sale_price ? parseFloat(form.sale_price) : null, category_id: form.category_id || null }
+    const payload = { ...form, price: parseFloat(form.price), sale_price: form.sale_price ? parseFloat(form.sale_price) : null, category_id: form.category_id || null, school_id: form.school_id || null, drop_id: form.drop_id || null }
     const activeVariants = variants.filter(v => v.active).map(v => ({ size:v.size, stock:v.stock, color:null }))
     const imgUrls        = images.map(i => i.url)
     try {
@@ -382,6 +399,20 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
               <FormGroup label="Omschrijving">
                 <textarea className="input" rows={3} value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} placeholder="Productomschrijving…" style={{ resize:'vertical' }}/>
               </FormGroup>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+                <FormGroup label="School (clubcollectie)">
+                  <select className="input" value={form.school_id} onChange={e => setForm(f=>({...f,school_id:e.target.value}))}>
+                    <option value="">Algemeen assortiment (alle shops)</option>
+                    {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </FormGroup>
+                <FormGroup label="Drop (seizoenscollectie)">
+                  <select className="input" value={form.drop_id} onChange={e => setForm(f=>({...f,drop_id:e.target.value}))}>
+                    <option value="">Geen drop</option>
+                    {drops.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </FormGroup>
+              </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'1rem' }}>
                 <FormGroup label="Geslacht">
                   <select className="input" value={form.gender} onChange={e => setForm(f=>({...f,gender:e.target.value}))}>

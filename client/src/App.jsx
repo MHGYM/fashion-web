@@ -11,6 +11,11 @@ import CheckoutPage from './pages/CheckoutPage'
 import AccountPage from './pages/AccountPage'
 import AdminPage   from './pages/AdminPage'
 import AuthPage    from './pages/AuthPage'
+import SchoolsPage from './pages/SchoolsPage'
+import SchoolShopPage from './pages/SchoolShopPage'
+import SchoolDashboardPage from './pages/SchoolDashboardPage'
+import MockPayPage from './pages/MockPayPage'
+import PaymentReturnPage from './pages/PaymentReturnPage'
 
 function App() {
   return (
@@ -27,6 +32,11 @@ function App() {
               <Route path="/checkout"    element={<CheckoutPage />} />
               <Route path="/account"     element={<AccountPage />} />
               <Route path="/admin"       element={<AdminPage />} />
+              <Route path="/scholen"     element={<SchoolsPage />} />
+              <Route path="/s/:slug"     element={<SchoolShopPage />} />
+              <Route path="/dashboard"   element={<SchoolDashboardPage />} />
+              <Route path="/betalen/mock/:paymentId" element={<MockPayPage />} />
+              <Route path="/bestelling/:id/status"   element={<PaymentReturnPage />} />
               <Route path="/login"       element={<AuthPage mode="login" />} />
               <Route path="/register"    element={<AuthPage mode="register" />} />
               <Route path="*"            element={<Navigate to="/" />} />

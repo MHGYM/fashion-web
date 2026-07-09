@@ -9,13 +9,14 @@ const wrap = fn => (req, res, next) =>
 // ── Public ────────────────────────────────────────────────────────────────────
 
 const listProducts = wrap(async (req, res) => {
-  const { category, gender, featured, search, sale, active } = req.query
+  const { category, gender, featured, search, sale, active, school } = req.query
   let sql = `
-    SELECT p.*, c.name as category_name, c.slug as category_slug,
+    SELECT p.*, c.name as category_name, c.slug as category_slug, s.name as school_name,
       (SELECT url FROM product_images WHERE product_id = p.id ORDER BY sort_order LIMIT 1) as image,
       (SELECT SUM(pv.stock) FROM product_variants pv WHERE pv.product_id = p.id) as total_stock
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN schools    s ON s.id = p.school_id
     WHERE 1=1
   `
   const args = []
@@ -23,6 +24,12 @@ const listProducts = wrap(async (req, res) => {
   if (active === 'all')     { /* geen filter */ }
   else if (active === '0')  { sql += ' AND p.active = 0' }
   else                      { sql += ' AND p.active = 1' }
+
+  // School-filter: publiek toont standaard alleen het algemene assortiment;
+  // admin (active=all) of expliciet school-param toont meer
+  if (school === 'all' || active === 'all') { /* geen filter */ }
+  else if (school)                          { sql += ' AND p.school_id = ?'; args.push(school) }
+  else                                      { sql += ' AND p.school_id IS NULL' }
 
   if (category)                   { sql += ' AND c.slug = ?';                                     args.push(category) }
   if (gender && gender !== 'all') { sql += ` AND (p.gender = ? OR p.gender = 'unisex')`;          args.push(gender) }
@@ -73,13 +80,13 @@ const getProductAdmin = wrap(async (req, res) => {
 })
 
 const createProduct = wrap(async (req, res) => {
-  const { name, description, price, sale_price, category_id, gender, featured, active, variants, images } = req.body
+  const { name, description, price, sale_price, category_id, gender, featured, active, variants, images, school_id, drop_id } = req.body
   if (!name || !price) return res.status(400).json({ error: 'Naam en prijs zijn verplicht.' })
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now()
   const r = await db.execute({
-    sql: 'INSERT INTO products (name,slug,description,price,sale_price,category_id,gender,featured,active) VALUES (?,?,?,?,?,?,?,?,?) RETURNING *',
-    args: [name, slug, description || null, price, sale_price || null, category_id || null, gender || 'unisex', featured ? 1 : 0, active === false || active === 0 ? 0 : 1]
+    sql: 'INSERT INTO products (name,slug,description,price,sale_price,category_id,gender,featured,active,school_id,drop_id) VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING *',
+    args: [name, slug, description || null, price, sale_price || null, category_id || null, gender || 'unisex', featured ? 1 : 0, active === false || active === 0 ? 0 : 1, school_id || null, drop_id || null]
   })
   const product = r.rows[0]
 
@@ -98,11 +105,11 @@ const createProduct = wrap(async (req, res) => {
 
 const updateProduct = wrap(async (req, res) => {
   const { id } = req.params
-  const { name, description, price, sale_price, category_id, gender, featured, active } = req.body
+  const { name, description, price, sale_price, category_id, gender, featured, active, school_id, drop_id } = req.body
   if (!name || !price) return res.status(400).json({ error: 'Naam en prijs zijn verplicht.' })
   await db.execute({
-    sql: 'UPDATE products SET name=?,description=?,price=?,sale_price=?,category_id=?,gender=?,featured=?,active=? WHERE id=?',
-    args: [name, description || null, price, sale_price || null, category_id || null, gender || 'unisex', featured ? 1 : 0, active === false || active === 0 ? 0 : 1, id]
+    sql: 'UPDATE products SET name=?,description=?,price=?,sale_price=?,category_id=?,gender=?,featured=?,active=?,school_id=?,drop_id=? WHERE id=?',
+    args: [name, description || null, price, sale_price || null, category_id || null, gender || 'unisex', featured ? 1 : 0, active === false || active === 0 ? 0 : 1, school_id || null, drop_id || null, id]
   })
   res.json({ message: 'Product bijgewerkt.' })
 })

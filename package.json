@@ -5,7 +5,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "migrate": "node src/migrate.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "seed:platform": "node src/seedPlatform.js"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

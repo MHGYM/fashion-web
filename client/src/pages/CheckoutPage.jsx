@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check } from 'lucide-react'
+import { Tag, X } from 'lucide-react'
 import api from '../api'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +9,9 @@ export default function CheckoutPage() {
   const { items, total, fetchCart } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
+
+  const schoolSlug = localStorage.getItem('sf_school') || null
+  const schoolName = localStorage.getItem('sf_school_name') || null
 
   const [form, setForm] = useState({
     shipping_name:    user ? `${user.first_name} ${user.last_name}` : '',
@@ -20,37 +23,55 @@ export default function CheckoutPage() {
     shipping_country: 'NL',
     notes: '',
   })
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
-  const [done,    setDone]    = useState(null)
+  const [loading, setLoading]   = useState(false)
+  const [error,   setError]     = useState('')
+
+  // Kortingscode
+  const [codeInput, setCodeInput] = useState('')
+  const [code, setCode]           = useState(null)   // { code, discount_pct, fighter_name }
+  const [codeBusy, setCodeBusy]   = useState(false)
+  const [codeError, setCodeError] = useState('')
 
   const set = (k, v) => setForm(f => ({...f, [k]: v}))
-  const shipping = total >= 50 ? 0 : 4.95
-  const orderTotal = total + shipping
+
+  const discount   = code ? Math.round(total * (code.discount_pct / 100) * 100) / 100 : 0
+  const shipping   = total - discount >= 50 ? 0 : 4.95
+  const orderTotal = total - discount + shipping
+
+  const applyCode = async () => {
+    if (!codeInput.trim()) return
+    setCodeBusy(true); setCodeError('')
+    try {
+      const r = await api.post('/discounts/validate', { code: codeInput })
+      setCode(r.data); setCodeInput('')
+    } catch (e) {
+      setCodeError(e.response?.data?.error || 'Ongeldige code.')
+    }
+    setCodeBusy(false)
+  }
 
   const submit = async () => {
     setError(''); setLoading(true)
     try {
-      const r = await api.post('/orders', form)
-      setDone(r.data)
+      const r = await api.post('/orders', {
+        ...form,
+        school_slug:   schoolSlug,
+        discount_code: code?.code || null,
+      })
       fetchCart()
+      // Door naar de betaalomgeving (Mollie of mock)
+      if (r.data.checkout_url) {
+        if (r.data.mock) navigate(r.data.checkout_url)
+        else window.location.href = r.data.checkout_url
+      } else {
+        navigate(`/bestelling/${r.data.order_id}/status`)
+      }
+      return
     } catch(e) {
       setError(e.response?.data?.error || 'Fout bij plaatsen bestelling.')
     }
     setLoading(false)
   }
-
-  if (done) return (
-    <div style={{ maxWidth:520, margin:'4rem auto', padding:'2rem', textAlign:'center' }}>
-      <div style={{ width:72, height:72, background:'#d1fae5', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 1.5rem' }}>
-        <Check size={36} color="#16a34a" strokeWidth={2.5}/>
-      </div>
-      <h1 style={{ fontSize:'1.6rem', fontWeight:800, marginBottom:'0.5rem' }}>Bestelling geplaatst!</h1>
-      <p style={{ color:'var(--text-muted)', marginBottom:'0.5rem' }}>Bestelnummer <strong>#{done.order_id}</strong></p>
-      <p style={{ color:'var(--text-muted)', marginBottom:'2rem' }}>We sturen een bevestiging naar <strong>{form.shipping_email}</strong>.</p>
-      <button className="btn btn-black btn-lg" onClick={() => navigate('/shop')}>Verder winkelen</button>
-    </div>
-  )
 
   if (!items.length) { navigate('/cart'); return null }
 
@@ -98,7 +119,9 @@ export default function CheckoutPage() {
 
           <div className="checkout-section">
             <h3>Betaling</h3>
-            <p style={{ color:'var(--text-muted)', fontSize:'0.9rem' }}>Betaalopties worden binnenkort toegevoegd. Je ontvangt een betaallink per e-mail.</p>
+            <p style={{ color:'var(--text-muted)', fontSize:'0.9rem' }}>
+              Je rekent veilig af via iDEAL. Na het plaatsen van je bestelling word je doorgestuurd naar de betaalomgeving.
+            </p>
           </div>
         </div>
 
@@ -106,12 +129,41 @@ export default function CheckoutPage() {
         <div>
           <div className="cart-summary">
             <h3>Jouw bestelling</h3>
+            {schoolName && (
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', background:'#f0f9ff', border:'1px solid #bae6fd', borderRadius:6, fontSize:'0.8rem', color:'#0369a1', marginBottom:'0.75rem' }}>
+                Je bestelt via <strong>{schoolName}</strong> — zij verdienen mee aan deze bestelling 💪
+              </div>
+            )}
             {items.map(item => (
               <div key={item.id} className="summary-row">
                 <span style={{ fontSize:'0.85rem' }}>{item.name} ({item.size}) ×{item.quantity}</span>
                 <span style={{ fontWeight:600 }}>€{((item.sale_price||item.price)*item.quantity).toFixed(2)}</span>
               </div>
             ))}
+
+            {/* Kortingscode */}
+            {code ? (
+              <div className="summary-row" style={{ color:'#16a34a' }}>
+                <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <Tag size={14}/> {code.code} (−{code.discount_pct}%)
+                  <button onClick={() => setCode(null)} title="Verwijder code" style={{ background:'none', border:'none', cursor:'pointer', color:'#999', display:'flex' }}><X size={13}/></button>
+                </span>
+                <span style={{ fontWeight:600 }}>−€{discount.toFixed(2)}</span>
+              </div>
+            ) : (
+              <div style={{ margin:'0.5rem 0' }}>
+                <div style={{ display:'flex', gap:6 }}>
+                  <input className="input" value={codeInput} onChange={e => setCodeInput(e.target.value.toUpperCase())}
+                    placeholder="Kortingscode" style={{ fontSize:'0.82rem' }}
+                    onKeyDown={e => e.key === 'Enter' && applyCode()}/>
+                  <button className="btn btn-outline" onClick={applyCode} disabled={codeBusy} style={{ fontSize:'0.8rem', whiteSpace:'nowrap' }}>
+                    {codeBusy ? '…' : 'Toepassen'}
+                  </button>
+                </div>
+                {codeError && <p style={{ color:'var(--error, #dc2626)', fontSize:'0.75rem', marginTop:4 }}>{codeError}</p>}
+              </div>
+            )}
+
             <div className="summary-row">
               <span>Verzending</span>
               <span style={{ color: shipping===0 ? 'var(--success)' : 'inherit', fontWeight:600 }}>{shipping===0 ? 'Gratis' : `€${shipping.toFixed(2)}`}</span>
@@ -122,7 +174,7 @@ export default function CheckoutPage() {
             </div>
             {error && <p style={{ color:'var(--error)', fontSize:'0.85rem', marginTop:'0.75rem' }}>{error}</p>}
             <button className="btn btn-primary btn-full btn-lg" style={{ marginTop:'1rem' }} onClick={submit} disabled={loading}>
-              {loading ? 'Bezig…' : `Bestelling plaatsen · €${orderTotal.toFixed(2)}`}
+              {loading ? 'Bezig…' : `Afrekenen · €${orderTotal.toFixed(2)}`}
             </button>
           </div>
         </div>

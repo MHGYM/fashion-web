@@ -1,11 +1,15 @@
 const db = require('../db')
+const mollie = require('../services/mollie')
+
+const BTW = 0.21
 
 /** Wraps async handlers so thrown errors reach Express error middleware */
 const wrap = fn => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next)
 
 const createOrder = wrap(async (req, res) => {
-  const { shipping_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_postal, shipping_country, notes } = req.body
+  const { shipping_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_postal, shipping_country, notes,
+          school_slug, discount_code } = req.body
 
   if (!shipping_name || !shipping_email || !shipping_address || !shipping_city || !shipping_postal)
     return res.status(400).json({ error: 'Vul alle bezorggegevens in.' })
@@ -28,12 +32,50 @@ const createOrder = wrap(async (req, res) => {
     if (item.stock < item.quantity) return res.status(400).json({ error: `${item.name} (${item.size}) heeft niet genoeg voorraad.` })
   }
 
-  const total = items.reduce((sum, i) => sum + (i.sale_price || i.price) * i.quantity, 0)
+  const subtotal = items.reduce((sum, i) => sum + (i.sale_price || i.price) * i.quantity, 0)
+
+  // ── School (storefront-attributie) ──────────────────────────────────────
+  let school = null
+  if (school_slug) {
+    const sR = await db.execute({ sql: 'SELECT * FROM schools WHERE slug = ? AND active = 1', args: [school_slug] })
+    school = sR.rows[0] || null
+  }
+
+  // ── Kortingscode ────────────────────────────────────────────────────────
+  let code = null, discountAmount = 0
+  if (discount_code) {
+    const cR = await db.execute({
+      sql: 'SELECT * FROM discount_codes WHERE UPPER(code) = ? AND active = 1',
+      args: [discount_code.trim().toUpperCase()]
+    })
+    code = cR.rows[0] || null
+    if (!code) return res.status(400).json({ error: 'Ongeldige kortingscode.' })
+    if (code.max_uses && code.times_used >= code.max_uses)
+      return res.status(400).json({ error: 'Deze kortingscode is niet meer geldig.' })
+    discountAmount = Math.round(subtotal * (code.discount_pct / 100) * 100) / 100
+    // Code van een vechter koppelt de order ook aan zijn school (als er nog geen school is)
+    if (!school && code.school_id) {
+      const sR = await db.execute({ sql: 'SELECT * FROM schools WHERE id = ? AND active = 1', args: [code.school_id] })
+      school = sR.rows[0] || null
+    }
+  }
+
+  const shippingCost = subtotal - discountAmount >= 50 ? 0 : 4.95
+  const total = Math.round((subtotal - discountAmount + shippingCost) * 100) / 100
+
+  // ── Commissies (over goederenwaarde ex btw, na korting) ─────────────────
+  const baseExVat = (subtotal - discountAmount) / (1 + BTW)
+  const schoolCommission  = school ? Math.round(baseExVat * (school.commission_pct / 100) * 100) / 100 : 0
+  const fighterCommission = code   ? Math.round(baseExVat * (code.commission_pct   / 100) * 100) / 100 : 0
 
   const orderR = await db.execute({
-    sql: `INSERT INTO orders (user_id,total,shipping_name,shipping_email,shipping_phone,shipping_address,shipping_city,shipping_postal,shipping_country,notes,status)
-          VALUES (?,?,?,?,?,?,?,?,?,?,'pending') RETURNING *`,
-    args: [req.user.id, total, shipping_name, shipping_email, shipping_phone||null, shipping_address, shipping_city, shipping_postal, shipping_country||'NL', notes||null]
+    sql: `INSERT INTO orders (user_id,total,subtotal,shipping_cost,discount_code,discount_amount,
+            school_id,school_commission,fighter_commission,
+            shipping_name,shipping_email,shipping_phone,shipping_address,shipping_city,shipping_postal,shipping_country,notes,status)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'awaiting_payment') RETURNING *`,
+    args: [req.user.id, total, subtotal, shippingCost, code ? code.code : null, discountAmount,
+           school ? school.id : null, schoolCommission, fighterCommission,
+           shipping_name, shipping_email, shipping_phone||null, shipping_address, shipping_city, shipping_postal, shipping_country||'NL', notes||null]
   })
   const order = orderR.rows[0]
 
@@ -51,7 +93,27 @@ const createOrder = wrap(async (req, res) => {
   // Winkelwagen legen
   await db.execute({ sql: 'DELETE FROM cart_items WHERE user_id = ?', args: [req.user.id] })
 
-  res.status(201).json({ order_id: order.id, total, message: 'Bestelling geplaatst!' })
+  // ── Betaling aanmaken (Mollie of mock) ──────────────────────────────────
+  const frontend = (process.env.FRONTEND_URL || 'http://localhost:5174').replace(/\/$/, '')
+  const payment = await mollie.createPayment({
+    amount:      total,
+    description: `Bestelling #${order.id} — SeasonFits`,
+    redirectUrl: `${frontend}/bestelling/${order.id}/status`,
+    orderId:     order.id,
+  })
+
+  await db.execute({
+    sql: `UPDATE orders SET payment_id = ?, payment_method = ? WHERE id = ?`,
+    args: [payment.id, payment.mock ? 'mock' : 'mollie', order.id]
+  })
+
+  res.status(201).json({
+    order_id:     order.id,
+    total,
+    checkout_url: payment.checkoutUrl,
+    mock:         payment.mock,
+    message:      'Bestelling aangemaakt — rond de betaling af.',
+  })
 })
 
 const myOrders = wrap(async (req, res) => {
@@ -76,8 +138,8 @@ const getOrder = wrap(async (req, res) => {
 
 const adminListOrders = wrap(async (req, res) => {
   const { status } = req.query
-  let sql = `SELECT o.*, u.first_name || ' ' || u.last_name as customer_name
-             FROM orders o LEFT JOIN users u ON u.id = o.user_id`
+  let sql = `SELECT o.*, u.first_name || ' ' || u.last_name as customer_name, s.name as school_name
+             FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN schools s ON s.id = o.school_id`
   const args = []
   if (status) { sql += ` WHERE o.status = ?`; args.push(status) }
   sql += ` ORDER BY o.created_at DESC`

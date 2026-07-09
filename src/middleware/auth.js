@@ -22,4 +22,11 @@ const requireAdmin = (req, res, next) => {
   next()
 }
 
-module.exports = { authenticate, optionalAuth, requireAdmin }
+/** School-admin (rol 'school') of platform-admin */
+const requireSchool = (req, res, next) => {
+  if (req.user?.role !== 'school' && req.user?.role !== 'admin')
+    return res.status(403).json({ error: 'Geen toegang.' })
+  next()
+}
+
+module.exports = { authenticate, optionalAuth, requireAdmin, requireSchool }

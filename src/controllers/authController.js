@@ -3,7 +3,7 @@ const jwt    = require('jsonwebtoken')
 const db     = require('../db')
 
 const sign = (user) => jwt.sign(
-  { id: user.id, email: user.email, role: user.role },
+  { id: user.id, email: user.email, role: user.role, school_id: user.school_id || null },
   process.env.JWT_SECRET, { expiresIn: '30d' }
 )
 
@@ -19,7 +19,7 @@ const register = async (req, res) => {
     args: [email.toLowerCase(), hash, first_name, last_name, phone || null]
   })
   const user = r.rows[0]
-  res.status(201).json({ token: sign(user), user: { id: user.id, email: user.email, first_name: user.first_name, last_name: user.last_name, role: user.role } })
+  res.status(201).json({ token: sign(user), user: { id: user.id, email: user.email, first_name: user.first_name, last_name: user.last_name, role: user.role, school_id: user.school_id || null } })
 }
 
 const login = async (req, res) => {
@@ -28,11 +28,11 @@ const login = async (req, res) => {
   const user = r.rows[0]
   if (!user || !(await bcrypt.compare(password, user.password)))
     return res.status(401).json({ error: 'Ongeldig e-mail of wachtwoord.' })
-  res.json({ token: sign(user), user: { id: user.id, email: user.email, first_name: user.first_name, last_name: user.last_name, role: user.role } })
+  res.json({ token: sign(user), user: { id: user.id, email: user.email, first_name: user.first_name, last_name: user.last_name, role: user.role, school_id: user.school_id || null } })
 }
 
 const me = async (req, res) => {
-  const r = await db.execute({ sql: 'SELECT id,email,first_name,last_name,phone,address,city,postal_code,country,role FROM users WHERE id = ?', args: [req.user.id] })
+  const r = await db.execute({ sql: 'SELECT id,email,first_name,last_name,phone,address,city,postal_code,country,role,school_id FROM users WHERE id = ?', args: [req.user.id] })
   if (!r.rows[0]) return res.status(404).json({ error: 'Niet gevonden.' })
   res.json(r.rows[0])
 }
