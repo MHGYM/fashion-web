@@ -1,7 +1,6 @@
 const db = require('../db')
 const mollie = require('../services/mollie')
-
-const BTW = 0.21
+const { APP_URL, BTW_PCT, FREE_SHIPPING_THRESHOLD, SHIPPING_COST } = require('../config')
 
 /** Wraps async handlers so thrown errors reach Express error middleware */
 const wrap = fn => (req, res, next) =>
@@ -60,11 +59,11 @@ const createOrder = wrap(async (req, res) => {
     }
   }
 
-  const shippingCost = subtotal - discountAmount >= 50 ? 0 : 4.95
+  const shippingCost = subtotal - discountAmount >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST
   const total = Math.round((subtotal - discountAmount + shippingCost) * 100) / 100
 
   // ── Commissies (over goederenwaarde ex btw, na korting) ─────────────────
-  const baseExVat = (subtotal - discountAmount) / (1 + BTW)
+  const baseExVat = (subtotal - discountAmount) / (1 + BTW_PCT)
   const schoolCommission  = school ? Math.round(baseExVat * (school.commission_pct / 100) * 100) / 100 : 0
   const fighterCommission = code   ? Math.round(baseExVat * (code.commission_pct   / 100) * 100) / 100 : 0
 
@@ -94,11 +93,10 @@ const createOrder = wrap(async (req, res) => {
   await db.execute({ sql: 'DELETE FROM cart_items WHERE user_id = ?', args: [req.user.id] })
 
   // ── Betaling aanmaken (Mollie of mock) ──────────────────────────────────
-  const frontend = (process.env.FRONTEND_URL || 'http://localhost:5174').replace(/\/$/, '')
   const payment = await mollie.createPayment({
     amount:      total,
-    description: `Bestelling #${order.id} — SeasonFits`,
-    redirectUrl: `${frontend}/bestelling/${order.id}/status`,
+    description: `Bestelling #${order.id} — FightMarketing`,
+    redirectUrl: `${APP_URL}/bestelling/${order.id}/status`,
     orderId:     order.id,
   })
 

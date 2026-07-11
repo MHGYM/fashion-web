@@ -17,10 +17,10 @@ const CAT_FALLBACK = {
 const DEFAULT_CAT_IMG = 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&q=80'
 
 const HERO_DEFAULTS = {
-  hero_image:   'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1920&q=80',
-  hero_overline:'Nieuwe collectie — 2025',
-  hero_heading: 'DEFINE YOUR STYLE',
-  hero_cta:     'Koop Nu',
+  hero_image:   'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80',
+  hero_overline:'Hét fight gear platform van Nederland',
+  hero_heading: 'JOUW CLUB.|JOUW GEAR.',
+  hero_cta:     'Ontdek de shop',
 }
 
 export default function HomePage() {

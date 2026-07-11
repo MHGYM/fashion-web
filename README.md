@@ -1,8 +1,11 @@
-# SeasonFits — Fight Gear Platform
+# FightMarketing — Fight Gear Platform
 
-Webshop + merchandise-platform voor vechtsportscholen, gebouwd met Node.js + React.
-Elke aangesloten school krijgt een eigen wit-label clubshop, verdient commissie over
-elke verkoop en volgt alles realtime in een eigen dashboard.
+**fightmarketing.nl** — hét overkoepelende merchandise-platform voor vechtsportscholen
+in Nederland. Elke aangesloten school krijgt een eigen clubshop in de eigen clubkleuren,
+verdient commissie over elke verkoop en volgt alles realtime in een eigen dashboard.
+Vechters verdienen mee via persoonlijke kortingscodes.
+
+Gebouwd met Node.js/Express (API) + React/Vite (client) + SQLite (libsql).
 
 ## Snel starten
 
@@ -21,15 +24,30 @@ npm install
 npm run dev             # start op poort 5174
 ```
 
-Bestaande database? Geen probleem — nieuwe tabellen en kolommen worden bij het
-starten van de server automatisch toegevoegd (`ensureSchema`).
+Bestaande database? Geen probleem — nieuwe tabellen, kolommen en indexes worden bij
+het starten van de server automatisch toegevoegd (`ensureSchema`).
 
 ## Inloggen
 
-| Rol            | E-mail               | Wachtwoord | Gaat naar    |
-|----------------|----------------------|------------|--------------|
-| Platform-admin | admin@seasonfits.nl  | admin123   | `/admin`     |
-| School (demo)  | beheer@mhgym.nl      | school123  | `/dashboard` |
+| Rol            | E-mail                  | Wachtwoord | Gaat naar    |
+|----------------|-------------------------|------------|--------------|
+| Platform-admin | admin@fightmarketing.nl | admin123   | `/admin`     |
+| School (demo)  | beheer@mhgym.nl         | school123  | `/dashboard` |
+
+> Bestond je database al vóór de rebrand? Dan heet het admin-account nog
+> `admin@seasonfits.nl` — bestaande accounts worden bewust niet aangepast.
+
+## .env-variabelen
+
+| Variabele        | Verplicht | Uitleg |
+|------------------|-----------|--------|
+| `PORT`           | nee       | API-poort (standaard 4000) |
+| `JWT_SECRET`     | **ja**    | Geheime sleutel voor login-tokens — kies iets langs en willekeurigs |
+| `DATABASE_URL`   | nee       | SQLite-bestand. Historische naam `seasonfits.db` is bewust behouden zodat bestaande data blijft werken |
+| `APP_URL`        | productie | Publieke site-URL (`https://fightmarketing.nl`) — gebruikt voor Mollie-redirects |
+| `BASE_URL`       | productie | Publieke API-URL voor Mollie-webhooks (Mollie weigert localhost) |
+| `MOLLIE_API_KEY` | nee       | Leeg = mock-modus; `test_...` of `live_...` = echte Mollie/iDEAL |
+| `SMTP_*`         | nee       | E-mailinstellingen (nog niet in gebruik) |
 
 ## Betalingen (Mollie)
 
@@ -39,12 +57,26 @@ starten van de server automatisch toegevoegd (`ensureSchema`).
 - **Met sleutel**: vul `MOLLIE_API_KEY=test_...` (of `live_...`) in `.env`. De
   checkout stuurt klanten dan naar de echte Mollie-omgeving (iDEAL etc.).
 - **Webhooks**: vul `BASE_URL` in met je publieke API-URL zodra de site live
-  staat (Mollie weigert localhost). Lokaal wordt de status ook zonder webhook
-  gesynct via de retourpagina.
+  staat. Lokaal wordt de status ook zonder webhook gesynct via de retourpagina.
+  Webhook-verificatie: de webhook ontvangt alleen een betaal-ID; de status wordt
+  altijd rechtstreeks bij Mollie opgehaald (aanbevolen Mollie-praktijk).
+
+## Deploy naar fightmarketing.nl
+
+1. Zet de API achter een publieke URL (bijv. `https://api.fightmarketing.nl`)
+   en de client-build (`cd client && npm run build` → `client/dist`) achter
+   `https://fightmarketing.nl`. Laat de host `/api` en `/uploads` naar de API
+   proxyen (zelfde paden als de Vite dev-proxy).
+2. Zet in `.env` op de server:
+   `APP_URL=https://fightmarketing.nl`, `BASE_URL=https://api.fightmarketing.nl`,
+   een sterke `JWT_SECRET` en je `MOLLIE_API_KEY`.
+3. `robots.txt` en `sitemap.xml` staan in `client/public/` en wijzen al naar
+   fightmarketing.nl.
+4. Persisteer het SQLite-bestand (volume/disk) en de map `uploads/`.
 
 ## Het platform
 
-- `/scholen` — overzicht van aangesloten scholen
+- `/scholen` — overzicht van aangesloten scholen + aansluit-CTA
 - `/s/:slug` — clubshop per school (eigen kleuren, logo, drop-countdown)
 - `/dashboard` — school-dashboard: omzet, commissie, best verkocht, codes van
   vechters aanmaken (klantgegevens blijven afgeschermd i.v.m. AVG)
@@ -58,6 +90,14 @@ starten van de server automatisch toegevoegd (`ensureSchema`).
    school-% (instelbaar per school) en vechter-% (instelbaar per code).
 3. Pas na betaling telt de order mee; bij mislukte betaling gaat de voorraad
    automatisch terug.
+
+## Rebrand-notities (SeasonFits → FightMarketing)
+
+Bewust **niet** hernoemd om data/sessies niet te breken:
+- `seasonfits.db` — bestandsnaam van de live database
+- `sf_token` / `sf_school` / `sf_school_name` — localStorage-keys (hernoemen
+  logt alle gebruikers uit)
+- Bestaande accounts en DB-inhoud (zoals `admin@seasonfits.nl` op oude installaties)
 
 ## Overige pagina's
 - `/` homepage · `/shop` alle producten · `/cart` winkelwagen ·

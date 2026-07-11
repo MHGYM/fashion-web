@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /account
+Disallow: /cart
+Disallow: /checkout
+Disallow: /betalen/
+Disallow: /bestelling/
+
+Sitemap: https://fightmarketing.nl/sitemap.xml

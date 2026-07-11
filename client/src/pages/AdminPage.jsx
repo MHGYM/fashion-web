@@ -70,7 +70,7 @@ export default function AdminPage() {
       <aside style={{ width:220, background:'#0a0a0a', borderRight:'1px solid #1a1a1a', display:'flex', flexDirection:'column', flexShrink:0 }}>
         <div style={{ padding:'1.5rem 1.25rem 1rem', borderBottom:'1px solid #1a1a1a' }}>
           <div style={{ fontSize:'0.65rem', letterSpacing:'0.2em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginBottom:4 }}>Beheer</div>
-          <div style={{ fontSize:'1rem', fontWeight:900, color:'#fff', letterSpacing:'0.06em', textTransform:'uppercase' }}>SeasonFits</div>
+          <div style={{ fontSize:'1rem', fontWeight:900, color:'#fff', letterSpacing:'0.06em', textTransform:'uppercase' }}>FightMarketing</div>
         </div>
         <nav style={{ padding:'0.75rem 0', flex:1 }}>
           {[

@@ -44,9 +44,9 @@ async function createPayment({ amount, description, redirectUrl, orderId }) {
     metadata:    { order_id: orderId },
   }
   // Webhook alleen meesturen als BASE_URL publiek bereikbaar is (Mollie weigert localhost)
-  const base = (process.env.BASE_URL || '').trim()
-  if (base && !/localhost|127\.0\.0\.1/.test(base)) {
-    body.webhookUrl = `${base.replace(/\/$/, '')}/api/payments/webhook`
+  const { BASE_URL } = require('../config')
+  if (BASE_URL && !/localhost|127\.0\.0\.1/.test(BASE_URL)) {
+    body.webhookUrl = `${BASE_URL}/api/payments/webhook`
   }
 
   const p = await mollieFetch('/payments', { method: 'POST', body: JSON.stringify(body) })

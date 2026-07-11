@@ -14,15 +14,17 @@ export default function SchoolsPage() {
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '3rem 1.5rem' }}>
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-        <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#999', marginBottom: 8 }}>Fight Gear Platform</div>
-        <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 10 }}>Onze scholen</h1>
-        <p style={{ color: 'var(--text-muted, #777)', maxWidth: 520, margin: '0 auto' }}>
-          Elke aangesloten vechtsportschool heeft een eigen shop met exclusieve clubgear. Steun jouw school met elke aankoop.
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#999', marginBottom: 8 }}>FightMarketing — Fight Gear Platform</div>
+        <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 10 }}>Aangesloten scholen</h1>
+        <p style={{ color: 'var(--text-muted, #777)', maxWidth: 560, margin: '0 auto' }}>
+          FightMarketing is hét overkoepelende platform voor vechtsportscholen in Nederland.
+          Elke aangesloten school heeft een eigen clubshop met exclusieve gear — en verdient
+          commissie over elke verkoop. Steun jouw school met elke aankoop.
         </p>
       </div>
 
       {schools === null ? (
-        <div style={{ textAlign: 'center', color: '#aaa', padding: '3rem' }}>Laden…</div>
+        <div style={{ textAlign: 'center', color: '#aaa', padding: '3rem' }} role="status">Laden…</div>
       ) : schools.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#aaa', padding: '3rem' }}>Nog geen scholen aangesloten.</div>
       ) : (
@@ -51,6 +53,20 @@ export default function SchoolsPage() {
           ))}
         </div>
       )}
+
+      {/* CTA: school aansluiten */}
+      <div style={{ marginTop: '4rem', textAlign: 'center', background: '#0a0a0a', color: '#fff', borderRadius: 12, padding: '3rem 1.5rem' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.6, marginBottom: 8 }}>Voor scholen</div>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 10 }}>Ook jouw school op FightMarketing?</h2>
+        <p style={{ opacity: 0.75, maxWidth: 480, margin: '0 auto 1.5rem', fontSize: '0.9rem' }}>
+          Eigen clubshop in jouw clubkleuren, merchandise per seizoensdrop, kortingscodes
+          voor je vechters — en commissie over elke verkoop. Zonder gedoe: wij regelen
+          productie, betalingen, verzending en klantenservice.
+        </p>
+        <a href="mailto:info@fightmarketing.nl?subject=School%20aansluiten%20bij%20FightMarketing" className="btn" style={{ background: '#fff', color: '#000', fontWeight: 700, padding: '0.75rem 1.75rem', borderRadius: 8, display: 'inline-block' }}>
+          Sluit je aan → info@fightmarketing.nl
+        </a>
+      </div>
     </div>
   )
 }

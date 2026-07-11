@@ -38,5 +38,5 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000
 ensureSchema()
-  .then(() => app.listen(PORT, () => console.log(`SeasonFits API draait op poort ${PORT}`)))
+  .then(() => app.listen(PORT, () => console.log(`FightMarketing API draait op poort ${PORT}`)))
   .catch(e => { console.error('Schema fout:', e); process.exit(1) })

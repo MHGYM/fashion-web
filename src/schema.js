@@ -57,6 +57,14 @@ const PATCHES = [
 ]
 
 const HOMEPAGE_DEFAULTS = [
+  ['hero_image',   'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80'],
+  ['hero_overline','Hét fight gear platform van Nederland'],
+  ['hero_heading', 'JOUW CLUB.|JOUW GEAR.'],
+  ['hero_cta',     'Ontdek de shop'],
+]
+
+// Oude SeasonFits-defaults → alleen overschrijven als de admin ze nooit aanpaste
+const LEGACY_HOMEPAGE_VALUES = [
   ['hero_image',   'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1920&q=80'],
   ['hero_overline','Nieuwe collectie — 2025'],
   ['hero_heading', 'DEFINE YOUR STYLE'],
@@ -72,6 +80,18 @@ async function ensureSchema() {
       await db.execute({
         sql:  'INSERT OR IGNORE INTO homepage_settings (key,value) VALUES (?,?)',
         args: [key, value],
+      })
+    } catch (_) {}
+  }
+  // Rebrand: vervang oude SeasonFits-defaults door FightMarketing-defaults,
+  // maar respecteer teksten die de admin zelf heeft aangepast
+  for (let i = 0; i < HOMEPAGE_DEFAULTS.length; i++) {
+    const [key, newValue] = HOMEPAGE_DEFAULTS[i]
+    const [, legacyValue] = LEGACY_HOMEPAGE_VALUES[i]
+    try {
+      await db.execute({
+        sql:  'UPDATE homepage_settings SET value = ? WHERE key = ? AND value = ?',
+        args: [newValue, key, legacyValue],
       })
     } catch (_) {}
   }

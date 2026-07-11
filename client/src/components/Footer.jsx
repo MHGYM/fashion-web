@@ -4,8 +4,8 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-inner">
         <div>
-          <div className="footer-logo">Season<span>Fits</span></div>
-          <p>Stijl voor elk seizoen. Kwaliteitskleding voor heren, dames en kids.</p>
+          <div className="footer-logo">Fight<span>Marketing</span></div>
+          <p>Hét merchandise-platform voor vechtsportscholen in Nederland. Officiële clubgear, per seizoen gedropt — jouw club verdient mee.</p>
         </div>
         <div>
           <h4>Shop</h4>
@@ -20,12 +20,13 @@ export default function Footer() {
           <h4>Klantenservice</h4>
           <ul>
             <li><Link to="/account">Mijn bestellingen</Link></li>
-            <li><a href="mailto:info@seasonfits.nl">Contact</a></li>
+            <li><Link to="/scholen">School aansluiten</Link></li>
+            <li><a href="mailto:info@fightmarketing.nl">Contact</a></li>
           </ul>
         </div>
       </div>
       <div className="footer-bottom">
-        <span>© {new Date().getFullYear()} SeasonFits</span>
+        <span>© {new Date().getFullYear()} FightMarketing — fightmarketing.nl</span>
         <span>Gemaakt met ❤️ in Nederland</span>
       </div>
     </footer>

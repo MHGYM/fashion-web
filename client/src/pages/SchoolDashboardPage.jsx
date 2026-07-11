@@ -91,7 +91,7 @@ export default function SchoolDashboardPage() {
           ])}
           empty="Nog geen betaalde bestellingen"/>
         <p style={{ fontSize: '0.72rem', color: '#aaa', padding: '0.75rem 1.25rem' }}>
-          Klantgegevens zijn niet zichtbaar (privacywetgeving) — verzending en klantenservice regelt SeasonFits.
+          Klantgegevens zijn niet zichtbaar (privacywetgeving) — verzending en klantenservice regelt FightMarketing.
         </p>
       </Panel>
 

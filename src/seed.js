@@ -8,13 +8,13 @@ async function seed() {
   const hash = await bcrypt.hash('admin123', 12)
   await db.execute({
     sql: `INSERT OR IGNORE INTO users (email,password,first_name,last_name,role) VALUES (?,?,?,?,'admin')`,
-    args: ['admin@seasonfits.nl', hash, 'Mohammed', 'Admin']
+    args: ['admin@fightmarketing.nl', hash, 'Mohammed', 'Admin']
   })
-  console.log('Admin: admin@seasonfits.nl / admin123')
+  console.log('Admin: admin@fightmarketing.nl / admin123')
 
   // Voorbeeldproducten
   const products = [
-    { name:'Summer Vibes T-shirt', cat:1, price:29.95, sale:null, gender:'unisex', featured:1, desc:'Luchtig katoenen t-shirt, perfect voor warme zomerdagen.', img:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600' },
+    { name:'Essentials Training T-shirt', cat:1, price:29.95, sale:null, gender:'unisex', featured:1, desc:'Luchtig katoenen t-shirt, perfect voor elke training.', img:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600' },
     { name:'Beach Boys Hoodie', cat:2, price:59.95, sale:44.95, gender:'men', featured:1, desc:'Zachte hoodie met zomerse print.', img:'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=600' },
     { name:'Sunset Shorts', cat:3, price:34.95, sale:null, gender:'men', featured:0, desc:'Comfortabele shorts voor strand en stad.', img:'https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=600' },
     { name:'Wave Rider Tee', cat:1, price:24.95, sale:19.95, gender:'women', featured:1, desc:'Stijlvol dames t-shirt met golvenprint.', img:'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600' },
