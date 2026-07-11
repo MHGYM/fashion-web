@@ -128,7 +128,7 @@ function DashboardTab({ stats, orders, products, onStatusChange }) {
       {/* Stats grid */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:'1rem', marginBottom:'2.5rem' }}>
         {[
-          { label:'Omzet',       value: stats ? `€${Number(stats.revenue).toFixed(2)}` : '—', sub:'excl. geannuleerd', color:'#000' },
+          { label:'Omzet',       value: stats ? `€${Number(stats.revenue).toFixed(2)}` : '—', sub:'betaalde bestellingen', color:'#000' },
           { label:'Bestellingen',value: stats?.orders ?? '—',   sub:'totaal',            color:'#3b82f6' },
           { label:'Producten',   value: stats?.products ?? '—', sub:'actief',             color:'#22c55e' },
           { label:'Klanten',     value: stats?.users ?? '—',    sub:'geregistreerd',      color:'#8b5cf6' },

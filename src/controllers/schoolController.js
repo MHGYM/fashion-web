@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs')
 const db = require('../db')
+const { isEmail, isStr, optStr, isNum, bad } = require('../middleware/validate')
 
 const wrap = fn => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next)
@@ -57,7 +58,13 @@ const adminListSchools = wrap(async (req, res) => {
 const createSchool = wrap(async (req, res) => {
   const { name, tagline, logo_url, hero_image, primary_color, contact_email, commission_pct, iban,
           admin_email, admin_password, admin_first_name, admin_last_name } = req.body
-  if (!name?.trim()) return res.status(400).json({ error: 'Naam is verplicht.' })
+  if (!isStr(name, 120))          return bad(res, 'Naam is verplicht (max 120 tekens).')
+  if (!optStr(tagline, 160) || !optStr(logo_url, 500) || !optStr(hero_image, 500) || !optStr(primary_color, 20) || !optStr(iban, 40))
+    return bad(res, 'Ongeldige invoer.')
+  if (contact_email && !isEmail(contact_email)) return bad(res, 'Ongeldig contact-e-mailadres.')
+  if (commission_pct != null && !isNum(commission_pct, 0, 50)) return bad(res, 'Commissie moet tussen 0 en 50% liggen.')
+  if (admin_email && !isEmail(admin_email)) return bad(res, 'Ongeldig e-mailadres voor de school-login.')
+  if (admin_password && admin_password.length < 8) return bad(res, 'Wachtwoord voor de school-login moet minimaal 8 tekens zijn.')
 
   let slug = slugify(name)
   const ex = await db.execute({ sql: 'SELECT id FROM schools WHERE slug = ?', args: [slug] })
@@ -86,7 +93,9 @@ const createSchool = wrap(async (req, res) => {
 
 const updateSchool = wrap(async (req, res) => {
   const { name, tagline, logo_url, hero_image, primary_color, contact_email, commission_pct, iban, active } = req.body
-  if (!name?.trim()) return res.status(400).json({ error: 'Naam is verplicht.' })
+  if (!isStr(name, 120))          return bad(res, 'Naam is verplicht (max 120 tekens).')
+  if (contact_email && !isEmail(contact_email)) return bad(res, 'Ongeldig contact-e-mailadres.')
+  if (commission_pct != null && !isNum(commission_pct, 0, 50)) return bad(res, 'Commissie moet tussen 0 en 50% liggen.')
   await db.execute({
     sql: `UPDATE schools SET name=?,tagline=?,logo_url=?,hero_image=?,primary_color=?,contact_email=?,commission_pct=?,iban=?,active=? WHERE id=?`,
     args: [name.trim(), tagline||null, logo_url||null, hero_image||null, primary_color||'#111111',
@@ -103,7 +112,8 @@ const deleteSchool = wrap(async (req, res) => {
 /** Extra school-login aanmaken voor bestaande school */
 const createSchoolLogin = wrap(async (req, res) => {
   const { email, password, first_name, last_name } = req.body
-  if (!email || !password) return res.status(400).json({ error: 'E-mail en wachtwoord zijn verplicht.' })
+  if (!isEmail(email)) return bad(res, 'Vul een geldig e-mailadres in.')
+  if (!isStr(password, 100) || password.length < 8) return bad(res, 'Wachtwoord moet minimaal 8 tekens zijn.')
   const ex = await db.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [email.toLowerCase()] })
   if (ex.rows[0]) return res.status(409).json({ error: 'E-mail is al in gebruik.' })
   const hash = await bcrypt.hash(password, 12)

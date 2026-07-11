@@ -218,7 +218,8 @@ const adminStats = wrap(async (req, res) => {
     db.execute('SELECT COUNT(*) as cnt FROM orders'),
     db.execute('SELECT COUNT(*) as cnt FROM products WHERE active = 1'),
     db.execute("SELECT COUNT(*) as cnt FROM users WHERE role = 'customer'"),
-    db.execute("SELECT COALESCE(SUM(total),0) as total FROM orders WHERE status != 'cancelled'"),
+    // Omzet = alleen daadwerkelijk betaalde bestellingen
+    db.execute("SELECT COALESCE(SUM(total),0) as total FROM orders WHERE paid_at IS NOT NULL AND status != 'cancelled'"),
   ])
   res.json({
     orders:   Number(ordersR.rows[0].cnt),

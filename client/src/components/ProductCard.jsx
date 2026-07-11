@@ -6,8 +6,8 @@ export default function ProductCard({ product }) {
     <div className="product-card" onClick={() => navigate(`/shop/${product.slug}`)}>
       <div className="product-card-img">
         {product.image
-          ? <img src={product.image} alt={product.name} />
-          : <div style={{ width:'100%', height:'100%', background:'linear-gradient(135deg,#f0ede8,#e8e4de)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'3rem' }}>👕</div>
+          ? <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+          : <div style={{ width:'100%', height:'100%', background:'linear-gradient(135deg,#f0ede8,#e8e4de)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'3rem' }} aria-hidden="true">👕</div>
         }
         {product.featured && !hasSale && <span className="product-card-badge">Nieuw</span>}
         {hasSale && <span className="product-card-badge sale">Sale</span>}

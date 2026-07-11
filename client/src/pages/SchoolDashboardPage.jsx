@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, RefreshCw, ExternalLink } from 'lucide-react'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
+import usePageTitle from '../hooks/usePageTitle'
 
 const eur = n => `€${Number(n || 0).toFixed(2)}`
 
 export default function SchoolDashboardPage() {
+  usePageTitle('Clubdashboard')
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [data, setData]   = useState(null)

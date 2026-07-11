@@ -34,8 +34,9 @@ het starten van de server automatisch toegevoegd (`ensureSchema`).
 | Platform-admin | admin@fightmarketing.nl | admin123   | `/admin`     |
 | School (demo)  | beheer@mhgym.nl         | school123  | `/dashboard` |
 
-> Bestond je database al vóór de rebrand? Dan heet het admin-account nog
-> `admin@seasonfits.nl` — bestaande accounts worden bewust niet aangepast.
+> Bestond je database al vóór de rebrand? Dan heet het oude admin-account nog
+> `admin@summerfits.nl` of `admin@seasonfits.nl` — bestaande accounts worden
+> bewust niet aangepast. `npm run seed` voegt het nieuwe admin-account toe.
 
 ## .env-variabelen
 

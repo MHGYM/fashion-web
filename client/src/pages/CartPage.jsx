@@ -1,8 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Trash2, ShoppingBag } from 'lucide-react'
 import { useCart } from '../context/CartContext'
+import usePageTitle from '../hooks/usePageTitle'
+import { FREE_SHIPPING_THRESHOLD, SHIPPING_COST } from '../config'
 
 export default function CartPage() {
+  usePageTitle('Winkelwagen')
   const { items, total, updateItem, removeItem } = useCart()
   const navigate = useNavigate()
 
@@ -38,12 +41,12 @@ export default function CartPage() {
                   €{((item.sale_price || item.price) * item.quantity).toFixed(2)}
                 </div>
                 <div className="qty-control">
-                  <button className="qty-btn" onClick={() => updateItem(item.id, item.quantity - 1)}>−</button>
+                  <button className="qty-btn" aria-label="Aantal verlagen" onClick={() => updateItem(item.id, item.quantity - 1)}>−</button>
                   <span style={{ fontWeight:600, minWidth:24, textAlign:'center' }}>{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => updateItem(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock}>+</button>
+                  <button className="qty-btn" aria-label="Aantal verhogen" onClick={() => updateItem(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock}>+</button>
                 </div>
               </div>
-              <button onClick={() => removeItem(item.id)} style={{ background:'none', border:'none', color:'var(--text-muted)', padding:4 }}>
+              <button onClick={() => removeItem(item.id)} aria-label={`${item.name} verwijderen uit winkelwagen`} style={{ background:'none', border:'none', color:'var(--text-muted)', padding:4, cursor:'pointer' }}>
                 <Trash2 size={18}/>
               </button>
             </div>
@@ -60,15 +63,15 @@ export default function CartPage() {
           ))}
           <div className="summary-row">
             <span>Verzendkosten</span>
-            <span style={{ color:'var(--success)', fontWeight:600 }}>{total >= 50 ? 'Gratis' : '€4,95'}</span>
+            <span style={{ color:'var(--success)', fontWeight:600 }}>{total >= FREE_SHIPPING_THRESHOLD ? 'Gratis' : `€${SHIPPING_COST.toFixed(2).replace('.', ',')}`}</span>
           </div>
           <div className="summary-row total">
             <span>Totaal</span>
-            <span>€{(total + (total >= 50 ? 0 : 4.95)).toFixed(2)}</span>
+            <span>€{(total + (total >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST)).toFixed(2)}</span>
           </div>
-          {total < 50 && (
+          {total < FREE_SHIPPING_THRESHOLD && (
             <div style={{ background:'var(--accent-light)', borderRadius:8, padding:'10px 12px', fontSize:'0.82rem', color:'var(--accent)', fontWeight:600, margin:'0.75rem 0' }}>
-              Nog €{(50-total).toFixed(2)} tot gratis verzending!
+              Nog €{(FREE_SHIPPING_THRESHOLD-total).toFixed(2)} tot gratis verzending!
             </div>
           )}
           <button className="btn btn-primary btn-full btn-lg" style={{ marginTop:'0.5rem' }} onClick={() => navigate('/checkout')}>

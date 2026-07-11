@@ -24,7 +24,7 @@ export default function Navbar() {
         </div>
 
         <div className="navbar-actions">
-          <button className="cart-btn" onClick={() => navigate('/cart')}>
+          <button className="cart-btn" aria-label={`Winkelwagen (${count} artikelen)`} onClick={() => navigate('/cart')}>
             <ShoppingBag size={22} />
             {count > 0 && <span className="cart-badge">{count}</span>}
           </button>
@@ -39,7 +39,7 @@ export default function Navbar() {
           ) : (
             <Link to="/login" className="btn btn-sm btn-black">Inloggen</Link>
           )}
-          <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="mobile-menu-btn" aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <X size={22}/> : <Menu size={22}/>}
           </button>
         </div>

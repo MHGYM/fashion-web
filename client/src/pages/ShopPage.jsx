@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import api from '../api'
 import ProductCard from '../components/ProductCard'
+import usePageTitle from '../hooks/usePageTitle'
 
 export default function ShopPage() {
+  usePageTitle('Shop')
   const [params, setParams] = useSearchParams()
   const [products, setProducts]     = useState([])
   const [categories, setCategories] = useState([])

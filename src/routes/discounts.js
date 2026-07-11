@@ -1,8 +1,9 @@
 const router = require('express').Router()
 const { authenticate, requireSchool } = require('../middleware/auth')
+const { codeLimiter } = require('../middleware/rateLimits')
 const ctrl = require('../controllers/discountController')
 
-router.post('/validate', ctrl.validate)
+router.post('/validate', codeLimiter, ctrl.validate)
 
 router.get   ('/',    authenticate, requireSchool, ctrl.list)
 router.post  ('/',    authenticate, requireSchool, ctrl.create)

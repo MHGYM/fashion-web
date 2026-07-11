@@ -1,6 +1,7 @@
 const db = require('../db')
 const mollie = require('../services/mollie')
 const { APP_URL, BTW_PCT, FREE_SHIPPING_THRESHOLD, SHIPPING_COST } = require('../config')
+const { isEmail, isStr, optStr, bad } = require('../middleware/validate')
 
 /** Wraps async handlers so thrown errors reach Express error middleware */
 const wrap = fn => (req, res, next) =>
@@ -10,8 +11,13 @@ const createOrder = wrap(async (req, res) => {
   const { shipping_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_postal, shipping_country, notes,
           school_slug, discount_code } = req.body
 
-  if (!shipping_name || !shipping_email || !shipping_address || !shipping_city || !shipping_postal)
-    return res.status(400).json({ error: 'Vul alle bezorggegevens in.' })
+  if (!isStr(shipping_name, 120) || !isStr(shipping_address, 200) || !isStr(shipping_city, 120) || !isStr(shipping_postal, 12))
+    return bad(res, 'Vul alle bezorggegevens in.')
+  if (!isEmail(shipping_email))          return bad(res, 'Vul een geldig e-mailadres in.')
+  if (!optStr(shipping_phone, 40))       return bad(res, 'Ongeldig telefoonnummer.')
+  if (!optStr(shipping_country, 2))      return bad(res, 'Ongeldige landcode.')
+  if (!optStr(notes, 1000))              return bad(res, 'Opmerking is te lang (max 1000 tekens).')
+  if (!optStr(school_slug, 80) || !optStr(discount_code, 40)) return bad(res, 'Ongeldige invoer.')
 
   // Haal winkelwagen op
   const cartR = await db.execute({
@@ -25,11 +31,6 @@ const createOrder = wrap(async (req, res) => {
   })
   const items = cartR.rows
   if (!items.length) return res.status(400).json({ error: 'Winkelwagen is leeg.' })
-
-  // Controleer voorraad
-  for (const item of items) {
-    if (item.stock < item.quantity) return res.status(400).json({ error: `${item.name} (${item.size}) heeft niet genoeg voorraad.` })
-  }
 
   const subtotal = items.reduce((sum, i) => sum + (i.sale_price || i.price) * i.quantity, 0)
 
@@ -67,38 +68,69 @@ const createOrder = wrap(async (req, res) => {
   const schoolCommission  = school ? Math.round(baseExVat * (school.commission_pct / 100) * 100) / 100 : 0
   const fighterCommission = code   ? Math.round(baseExVat * (code.commission_pct   / 100) * 100) / 100 : 0
 
-  const orderR = await db.execute({
-    sql: `INSERT INTO orders (user_id,total,subtotal,shipping_cost,discount_code,discount_amount,
-            school_id,school_commission,fighter_commission,
-            shipping_name,shipping_email,shipping_phone,shipping_address,shipping_city,shipping_postal,shipping_country,notes,status)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'awaiting_payment') RETURNING *`,
-    args: [req.user.id, total, subtotal, shippingCost, code ? code.code : null, discountAmount,
-           school ? school.id : null, schoolCommission, fighterCommission,
-           shipping_name, shipping_email, shipping_phone||null, shipping_address, shipping_city, shipping_postal, shipping_country||'NL', notes||null]
-  })
-  const order = orderR.rows[0]
+  // ── Order + voorraad + winkelwagen in één transactie ────────────────────
+  // De voorraad-afboeking is conditioneel (stock >= aantal), dus twee klanten
+  // kunnen nooit allebei het laatste exemplaar reserveren.
+  const tx = await db.transaction('write')
+  let order
+  try {
+    for (const item of items) {
+      const upd = await tx.execute({
+        sql: 'UPDATE product_variants SET stock = stock - ? WHERE id = ? AND stock >= ?',
+        args: [item.quantity, item.variant_id, item.quantity]
+      })
+      if (Number(upd.rowsAffected) === 0) {
+        const err = new Error(`${item.name} (${item.size}) heeft niet genoeg voorraad.`)
+        err.status = 400
+        throw err
+      }
+    }
 
-  for (const item of items) {
-    await db.execute({
-      sql: 'INSERT INTO order_items (order_id,variant_id,product_id,name,size,color,price,quantity) VALUES (?,?,?,?,?,?,?,?)',
-      args: [order.id, item.variant_id, item.product_id, item.name, item.size, item.color||null, item.sale_price||item.price, item.quantity]
+    const orderR = await tx.execute({
+      sql: `INSERT INTO orders (user_id,total,subtotal,shipping_cost,discount_code,discount_amount,
+              school_id,school_commission,fighter_commission,
+              shipping_name,shipping_email,shipping_phone,shipping_address,shipping_city,shipping_postal,shipping_country,notes,status)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'awaiting_payment') RETURNING *`,
+      args: [req.user.id, total, subtotal, shippingCost, code ? code.code : null, discountAmount,
+             school ? school.id : null, schoolCommission, fighterCommission,
+             shipping_name.trim(), shipping_email.trim().toLowerCase(), shipping_phone||null,
+             shipping_address.trim(), shipping_city.trim(), shipping_postal.trim(), shipping_country||'NL', notes||null]
     })
-    await db.execute({
-      sql: 'UPDATE product_variants SET stock = stock - ? WHERE id = ?',
-      args: [item.quantity, item.variant_id]
-    })
+    order = orderR.rows[0]
+
+    for (const item of items) {
+      await tx.execute({
+        sql: 'INSERT INTO order_items (order_id,variant_id,product_id,name,size,color,price,quantity) VALUES (?,?,?,?,?,?,?,?)',
+        args: [order.id, item.variant_id, item.product_id, item.name, item.size, item.color||null, item.sale_price||item.price, item.quantity]
+      })
+    }
+
+    await tx.execute({ sql: 'DELETE FROM cart_items WHERE user_id = ?', args: [req.user.id] })
+    await tx.commit()
+  } catch (e) {
+    try { await tx.rollback() } catch (_) {}
+    throw e
   }
 
-  // Winkelwagen legen
-  await db.execute({ sql: 'DELETE FROM cart_items WHERE user_id = ?', args: [req.user.id] })
-
-  // ── Betaling aanmaken (Mollie of mock) ──────────────────────────────────
-  const payment = await mollie.createPayment({
-    amount:      total,
-    description: `Bestelling #${order.id} — FightMarketing`,
-    redirectUrl: `${APP_URL}/bestelling/${order.id}/status`,
-    orderId:     order.id,
-  })
+  // ── Betaling aanmaken (Mollie of mock) — buiten de transactie ───────────
+  let payment
+  try {
+    payment = await mollie.createPayment({
+      amount:      total,
+      description: `Bestelling #${order.id} — FightMarketing`,
+      redirectUrl: `${APP_URL}/bestelling/${order.id}/status`,
+      orderId:     order.id,
+    })
+  } catch (e) {
+    // Betaling kon niet worden aangemaakt: annuleer de order en geef de voorraad vrij
+    await db.execute({ sql: `UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`, args: [order.id] })
+    for (const item of items) {
+      await db.execute({ sql: 'UPDATE product_variants SET stock = stock + ? WHERE id = ?', args: [item.quantity, item.variant_id] })
+    }
+    const err = new Error('Betaling kon niet worden gestart. Probeer het opnieuw.')
+    err.status = 502
+    throw err
+  }
 
   await db.execute({
     sql: `UPDATE orders SET payment_id = ?, payment_method = ? WHERE id = ?`,

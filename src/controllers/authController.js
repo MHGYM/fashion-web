@@ -1,49 +1,69 @@
 const bcrypt = require('bcryptjs')
 const jwt    = require('jsonwebtoken')
 const db     = require('../db')
+const { isEmail, isStr, optStr, bad } = require('../middleware/validate')
+
+const wrap = fn => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next)
 
 const sign = (user) => jwt.sign(
   { id: user.id, email: user.email, role: user.role, school_id: user.school_id || null },
   process.env.JWT_SECRET, { expiresIn: '30d' }
 )
 
-const register = async (req, res) => {
+const publicUser = (u) => ({
+  id: u.id, email: u.email, first_name: u.first_name, last_name: u.last_name,
+  role: u.role, school_id: u.school_id || null,
+})
+
+const register = wrap(async (req, res) => {
   const { email, password, first_name, last_name, phone } = req.body
-  if (!email || !password || !first_name || !last_name)
-    return res.status(400).json({ error: 'Vul alle verplichte velden in.' })
-  const ex = await db.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [email] })
+  if (!isEmail(email))                 return bad(res, 'Vul een geldig e-mailadres in.')
+  if (!isStr(password, 100) || password.length < 8) return bad(res, 'Wachtwoord moet minimaal 8 tekens zijn.')
+  if (!isStr(first_name, 60) || !isStr(last_name, 60)) return bad(res, 'Vul je voor- en achternaam in.')
+  if (!optStr(phone, 40))              return bad(res, 'Ongeldig telefoonnummer.')
+
+  const ex = await db.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [email.toLowerCase()] })
   if (ex.rows[0]) return res.status(409).json({ error: 'E-mail is al in gebruik.' })
+
   const hash = await bcrypt.hash(password, 12)
   const r = await db.execute({
     sql: 'INSERT INTO users (email, password, first_name, last_name, phone) VALUES (?,?,?,?,?) RETURNING *',
-    args: [email.toLowerCase(), hash, first_name, last_name, phone || null]
+    args: [email.toLowerCase(), hash, first_name.trim(), last_name.trim(), phone || null]
   })
   const user = r.rows[0]
-  res.status(201).json({ token: sign(user), user: { id: user.id, email: user.email, first_name: user.first_name, last_name: user.last_name, role: user.role, school_id: user.school_id || null } })
-}
+  res.status(201).json({ token: sign(user), user: publicUser(user) })
+})
 
-const login = async (req, res) => {
+const login = wrap(async (req, res) => {
   const { email, password } = req.body
-  const r = await db.execute({ sql: 'SELECT * FROM users WHERE email = ?', args: [email?.toLowerCase()] })
+  if (!isStr(email, 254) || !isStr(password, 100))
+    return res.status(401).json({ error: 'Ongeldig e-mail of wachtwoord.' })
+
+  const r = await db.execute({ sql: 'SELECT * FROM users WHERE email = ?', args: [email.toLowerCase()] })
   const user = r.rows[0]
   if (!user || !(await bcrypt.compare(password, user.password)))
     return res.status(401).json({ error: 'Ongeldig e-mail of wachtwoord.' })
-  res.json({ token: sign(user), user: { id: user.id, email: user.email, first_name: user.first_name, last_name: user.last_name, role: user.role, school_id: user.school_id || null } })
-}
+  res.json({ token: sign(user), user: publicUser(user) })
+})
 
-const me = async (req, res) => {
+const me = wrap(async (req, res) => {
   const r = await db.execute({ sql: 'SELECT id,email,first_name,last_name,phone,address,city,postal_code,country,role,school_id FROM users WHERE id = ?', args: [req.user.id] })
   if (!r.rows[0]) return res.status(404).json({ error: 'Niet gevonden.' })
   res.json(r.rows[0])
-}
+})
 
-const updateProfile = async (req, res) => {
+const updateProfile = wrap(async (req, res) => {
   const { first_name, last_name, phone, address, city, postal_code, country } = req.body
+  if (!isStr(first_name, 60) || !isStr(last_name, 60)) return bad(res, 'Vul je voor- en achternaam in.')
+  if (!optStr(phone, 40) || !optStr(address, 200) || !optStr(city, 120) || !optStr(postal_code, 12) || !optStr(country, 2))
+    return bad(res, 'Ongeldige invoer.')
+
   await db.execute({
     sql: 'UPDATE users SET first_name=?,last_name=?,phone=?,address=?,city=?,postal_code=?,country=? WHERE id=?',
-    args: [first_name, last_name, phone||null, address||null, city||null, postal_code||null, country||'NL', req.user.id]
+    args: [first_name.trim(), last_name.trim(), phone||null, address||null, city||null, postal_code||null, country||'NL', req.user.id]
   })
   res.json({ message: 'Profiel bijgewerkt.' })
-}
+})
 
 module.exports = { register, login, me, updateProfile }

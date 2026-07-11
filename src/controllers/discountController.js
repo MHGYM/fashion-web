@@ -1,4 +1,5 @@
 const db = require('../db')
+const { isStr, optStr, isNum, isInt, bad } = require('../middleware/validate')
 
 const wrap = fn => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next)
@@ -38,7 +39,11 @@ const list = wrap(async (req, res) => {
 const create = wrap(async (req, res) => {
   let { code, school_id, fighter_name, discount_pct, commission_pct, max_uses } = req.body
   code = (code || '').trim().toUpperCase().replace(/\s+/g, '')
-  if (!code) return res.status(400).json({ error: 'Code is verplicht.' })
+  if (!isStr(code, 40))                    return bad(res, 'Code is verplicht (max 40 tekens).')
+  if (!optStr(fighter_name, 80))           return bad(res, 'Vechternaam is te lang.')
+  if (discount_pct   != null && !isNum(discount_pct, 0, 100)) return bad(res, 'Korting moet tussen 0 en 100% liggen.')
+  if (commission_pct != null && !isNum(commission_pct, 0, 50)) return bad(res, 'Commissie moet tussen 0 en 50% liggen.')
+  if (max_uses != null && max_uses !== '' && !isInt(max_uses, 1, 1000000)) return bad(res, 'Ongeldig maximum aantal keer.')
 
   // School-login mag alleen codes voor de eigen school maken
   if (req.user.role !== 'admin') school_id = req.user.school_id
@@ -57,6 +62,10 @@ const create = wrap(async (req, res) => {
 
 const update = wrap(async (req, res) => {
   const { fighter_name, discount_pct, commission_pct, max_uses, active } = req.body
+  if (!optStr(fighter_name, 80))           return bad(res, 'Vechternaam is te lang.')
+  if (discount_pct   != null && !isNum(discount_pct, 0, 100)) return bad(res, 'Korting moet tussen 0 en 100% liggen.')
+  if (commission_pct != null && !isNum(commission_pct, 0, 50)) return bad(res, 'Commissie moet tussen 0 en 50% liggen.')
+
   const r = await db.execute({ sql: 'SELECT * FROM discount_codes WHERE id = ?', args: [req.params.id] })
   const dc = r.rows[0]
   if (!dc) return res.status(404).json({ error: 'Code niet gevonden.' })

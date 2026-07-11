@@ -1,7 +1,11 @@
 const db = require('../db')
+const { isStr, optStr, bad } = require('../middleware/validate')
 
 const wrap = fn => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next)
+
+/** Optionele ISO-datum/datetime (leeg mag) */
+const optDate = (v) => v == null || v === '' || !Number.isNaN(Date.parse(v))
 
 /** Actieve drop (publiek, voor countdown op storefronts) */
 const activeDrop = wrap(async (req, res) => {
@@ -28,7 +32,9 @@ const list = wrap(async (req, res) => {
 
 const create = wrap(async (req, res) => {
   const { name, season, opens_at, closes_at } = req.body
-  if (!name?.trim()) return res.status(400).json({ error: 'Naam is verplicht.' })
+  if (!isStr(name, 120))    return bad(res, 'Naam is verplicht (max 120 tekens).')
+  if (!optStr(season, 60))  return bad(res, 'Seizoen is te lang.')
+  if (!optDate(opens_at) || !optDate(closes_at)) return bad(res, 'Ongeldige datum.')
   const r = await db.execute({
     sql: 'INSERT INTO drops (name,season,opens_at,closes_at) VALUES (?,?,?,?) RETURNING *',
     args: [name.trim(), season||null, opens_at||null, closes_at||null]
@@ -38,7 +44,8 @@ const create = wrap(async (req, res) => {
 
 const update = wrap(async (req, res) => {
   const { name, season, opens_at, closes_at, active } = req.body
-  if (!name?.trim()) return res.status(400).json({ error: 'Naam is verplicht.' })
+  if (!isStr(name, 120))    return bad(res, 'Naam is verplicht (max 120 tekens).')
+  if (!optDate(opens_at) || !optDate(closes_at)) return bad(res, 'Ongeldige datum.')
   await db.execute({
     sql: 'UPDATE drops SET name=?,season=?,opens_at=?,closes_at=?,active=? WHERE id=?',
     args: [name.trim(), season||null, opens_at||null, closes_at||null, active === false || active === 0 ? 0 : 1, req.params.id]

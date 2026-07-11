@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield } from 'lucide-react'
 import api from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 export default function SchoolsPage() {
+  usePageTitle('Aangesloten scholen')
   const navigate = useNavigate()
   const [schools, setSchools] = useState(null)
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Shield, Clock } from 'lucide-react'
 import api from '../api'
 import ProductCard from '../components/ProductCard'
+import usePageTitle from '../hooks/usePageTitle'
 
 function Countdown({ closesAt }) {
   const [left, setLeft] = useState('')
@@ -27,6 +28,7 @@ export default function SchoolShopPage() {
   const navigate = useNavigate()
   const [data, setData]   = useState(null)
   const [error, setError] = useState('')
+  usePageTitle(data ? `Clubshop ${data.school.name}` : 'Clubshop')
 
   useEffect(() => {
     setData(null); setError('')

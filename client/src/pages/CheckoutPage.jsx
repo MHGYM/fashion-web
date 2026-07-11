@@ -4,8 +4,11 @@ import { Tag, X } from 'lucide-react'
 import api from '../api'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import usePageTitle from '../hooks/usePageTitle'
+import { FREE_SHIPPING_THRESHOLD, SHIPPING_COST } from '../config'
 
 export default function CheckoutPage() {
+  usePageTitle('Bestellen')
   const { items, total, fetchCart } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -35,7 +38,7 @@ export default function CheckoutPage() {
   const set = (k, v) => setForm(f => ({...f, [k]: v}))
 
   const discount   = code ? Math.round(total * (code.discount_pct / 100) * 100) / 100 : 0
-  const shipping   = total - discount >= 50 ? 0 : 4.95
+  const shipping   = total - discount >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST
   const orderTotal = total - discount + shipping
 
   const applyCode = async () => {
@@ -146,7 +149,7 @@ export default function CheckoutPage() {
               <div className="summary-row" style={{ color:'#16a34a' }}>
                 <span style={{ display:'flex', alignItems:'center', gap:6 }}>
                   <Tag size={14}/> {code.code} (−{code.discount_pct}%)
-                  <button onClick={() => setCode(null)} title="Verwijder code" style={{ background:'none', border:'none', cursor:'pointer', color:'#999', display:'flex' }}><X size={13}/></button>
+                  <button onClick={() => setCode(null)} title="Verwijder code" aria-label="Kortingscode verwijderen" style={{ background:'none', border:'none', cursor:'pointer', color:'#999', display:'flex' }}><X size={13}/></button>
                 </span>
                 <span style={{ fontWeight:600 }}>−€{discount.toFixed(2)}</span>
               </div>

@@ -54,6 +54,25 @@ const PATCHES = [
   `ALTER TABLE orders   ADD COLUMN school_commission REAL DEFAULT 0`,
   `ALTER TABLE orders   ADD COLUMN fighter_commission REAL DEFAULT 0`,
   `ALTER TABLE orders   ADD COLUMN paid_at DATETIME`,
+
+  // ── Indexes op veelgebruikte kolommen (slug/code hebben al UNIQUE-indexes) ──
+  `CREATE INDEX IF NOT EXISTS idx_products_school     ON products(school_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_products_drop       ON products(drop_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_products_category   ON products(category_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_products_active     ON products(active)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_school       ON orders(school_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_user         ON orders(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_status       ON orders(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_payment      ON orders(payment_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_paid_at      ON orders(paid_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_discount     ON orders(discount_code)`,
+  `CREATE INDEX IF NOT EXISTS idx_order_items_order   ON order_items(order_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_variants_product    ON product_variants(product_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_images_product      ON product_images(product_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_cart_user           ON cart_items(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_users_school        ON users(school_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_codes_school        ON discount_codes(school_id)`,
 ]
 
 const HOMEPAGE_DEFAULTS = [
@@ -63,12 +82,13 @@ const HOMEPAGE_DEFAULTS = [
   ['hero_cta',     'Ontdek de shop'],
 ]
 
-// Oude SeasonFits-defaults → alleen overschrijven als de admin ze nooit aanpaste
+// Oude SeasonFits/SummerFits-teksten → alleen overschrijven als de waarde nog
+// exact zo'n oude merktekst is (eigen teksten van de admin blijven staan)
 const LEGACY_HOMEPAGE_VALUES = [
-  ['hero_image',   'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1920&q=80'],
-  ['hero_overline','Nieuwe collectie — 2025'],
-  ['hero_heading', 'DEFINE YOUR STYLE'],
-  ['hero_cta',     'Koop Nu'],
+  ['hero_image',   ['https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1920&q=80']],
+  ['hero_overline',['Nieuwe collectie — 2025']],
+  ['hero_heading', ['DEFINE YOUR STYLE', 'YOUR FIT FOR EVERY SEASON', 'YOUR FIT|FOR EVERY SEASON']],
+  ['hero_cta',     ['Koop Nu']],
 ]
 
 async function ensureSchema() {
@@ -83,17 +103,19 @@ async function ensureSchema() {
       })
     } catch (_) {}
   }
-  // Rebrand: vervang oude SeasonFits-defaults door FightMarketing-defaults,
-  // maar respecteer teksten die de admin zelf heeft aangepast
+  // Rebrand: vervang oude SeasonFits/SummerFits-teksten door FightMarketing-
+  // defaults, maar respecteer teksten die de admin zelf heeft aangepast
   for (let i = 0; i < HOMEPAGE_DEFAULTS.length; i++) {
     const [key, newValue] = HOMEPAGE_DEFAULTS[i]
-    const [, legacyValue] = LEGACY_HOMEPAGE_VALUES[i]
-    try {
-      await db.execute({
-        sql:  'UPDATE homepage_settings SET value = ? WHERE key = ? AND value = ?',
-        args: [newValue, key, legacyValue],
-      })
-    } catch (_) {}
+    const [, legacyValues] = LEGACY_HOMEPAGE_VALUES[i]
+    for (const legacyValue of legacyValues) {
+      try {
+        await db.execute({
+          sql:  'UPDATE homepage_settings SET value = ? WHERE key = ? AND value = ?',
+          args: [newValue, key, legacyValue],
+        })
+      } catch (_) {}
+    }
   }
 }
 

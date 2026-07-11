@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api'
+import usePageTitle from '../hooks/usePageTitle'
 
 export default function AccountPage() {
+  usePageTitle('Mijn account')
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab]       = useState('orders')
