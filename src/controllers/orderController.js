@@ -167,11 +167,14 @@ const getOrder = wrap(async (req, res) => {
 // ── Admin ────────────────────────────────────────────────────────────────────
 
 const adminListOrders = wrap(async (req, res) => {
-  const { status } = req.query
+  const { status, school_id } = req.query
   let sql = `SELECT o.*, u.first_name || ' ' || u.last_name as customer_name, s.name as school_name
              FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN schools s ON s.id = o.school_id`
+  const where = []
   const args = []
-  if (status) { sql += ` WHERE o.status = ?`; args.push(status) }
+  if (status)    { where.push('o.status = ?');    args.push(status) }
+  if (school_id) { where.push(school_id === 'none' ? 'o.school_id IS NULL' : 'o.school_id = ?'); if (school_id !== 'none') args.push(Number(school_id)) }
+  if (where.length) sql += ` WHERE ${where.join(' AND ')}`
   sql += ` ORDER BY o.created_at DESC`
   const r = await db.execute({ sql, args })
   res.json(r.rows)

@@ -9,11 +9,13 @@ router.get('/', ctrl.listSchools)
 router.get('/dashboard/me', authenticate, requireSchool, ctrl.dashboard)
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
-router.get   ('/admin',           authenticate, requireAdmin, ctrl.adminListSchools)
-router.post  ('/',                authenticate, requireAdmin, ctrl.createSchool)
-router.put   ('/:id',             authenticate, requireAdmin, ctrl.updateSchool)
-router.delete('/:id',             authenticate, requireAdmin, ctrl.deleteSchool)
-router.post  ('/:id/login',       authenticate, requireAdmin, ctrl.createSchoolLogin)
+router.get   ('/admin',                 authenticate, requireAdmin, ctrl.adminListSchools)
+router.get   ('/admin/payouts',         authenticate, requireAdmin, ctrl.payouts)
+router.get   ('/admin/payouts/export',  authenticate, requireAdmin, ctrl.payoutsExport)
+router.post  ('/',                      authenticate, requireAdmin, ctrl.createSchool)
+router.put   ('/:id',                   authenticate, requireAdmin, ctrl.updateSchool)
+router.delete('/:id',                   authenticate, requireAdmin, ctrl.deleteSchool)
+router.post  ('/:id/login',             authenticate, requireAdmin, ctrl.createSchoolLogin)
 
 // ── Public storefront by slug (laatste) ──────────────────────────────────────
 router.get('/:slug', ctrl.getStorefront)

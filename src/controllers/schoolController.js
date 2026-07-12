@@ -50,7 +50,9 @@ const adminListSchools = wrap(async (req, res) => {
     SELECT s.*,
       (SELECT COUNT(*)                     FROM orders o WHERE o.school_id = s.id AND o.paid_at IS NOT NULL) as paid_orders,
       (SELECT COALESCE(SUM(o.total),0)     FROM orders o WHERE o.school_id = s.id AND o.paid_at IS NOT NULL) as revenue,
-      (SELECT COALESCE(SUM(o.school_commission),0) FROM orders o WHERE o.school_id = s.id AND o.paid_at IS NOT NULL) as commission
+      (SELECT COALESCE(SUM(o.school_commission),0) FROM orders o WHERE o.school_id = s.id AND o.paid_at IS NOT NULL) as commission,
+      (SELECT MAX(o.created_at)            FROM orders o WHERE o.school_id = s.id) as last_order_at,
+      (SELECT COUNT(*)                     FROM users  u WHERE u.school_id = s.id AND u.role = 'school') as login_count
     FROM schools s ORDER BY s.name`)
   res.json(r.rows)
 })
@@ -66,9 +68,18 @@ const createSchool = wrap(async (req, res) => {
   if (admin_email && !isEmail(admin_email)) return bad(res, 'Ongeldig e-mailadres voor de school-login.')
   if (admin_password && admin_password.length < 8) return bad(res, 'Wachtwoord voor de school-login moet minimaal 8 tekens zijn.')
 
-  let slug = slugify(name)
-  const ex = await db.execute({ sql: 'SELECT id FROM schools WHERE slug = ?', args: [slug] })
-  if (ex.rows[0]) slug = `${slug}-${Date.now()}`
+  // Slug: eigen invoer (gevalideerd) of automatisch uit de naam
+  let slug
+  if (req.body.slug) {
+    slug = String(req.body.slug).trim().toLowerCase()
+    if (!/^[a-z0-9-]{2,80}$/.test(slug)) return bad(res, 'Slug mag alleen kleine letters, cijfers en streepjes bevatten (2–80 tekens).')
+    const ex = await db.execute({ sql: 'SELECT id FROM schools WHERE slug = ?', args: [slug] })
+    if (ex.rows[0]) return res.status(409).json({ error: 'Deze slug is al in gebruik.' })
+  } else {
+    slug = slugify(name)
+    const ex = await db.execute({ sql: 'SELECT id FROM schools WHERE slug = ?', args: [slug] })
+    if (ex.rows[0]) slug = `${slug}-${Date.now()}`
+  }
 
   const r = await db.execute({
     sql: `INSERT INTO schools (name,slug,tagline,logo_url,hero_image,primary_color,contact_email,commission_pct,iban)
@@ -92,19 +103,50 @@ const createSchool = wrap(async (req, res) => {
 })
 
 const updateSchool = wrap(async (req, res) => {
-  const { name, tagline, logo_url, hero_image, primary_color, contact_email, commission_pct, iban, active } = req.body
+  const { name, tagline, logo_url, hero_image, primary_color, contact_email, commission_pct, iban, active, slug } = req.body
   if (!isStr(name, 120))          return bad(res, 'Naam is verplicht (max 120 tekens).')
   if (contact_email && !isEmail(contact_email)) return bad(res, 'Ongeldig contact-e-mailadres.')
   if (commission_pct != null && !isNum(commission_pct, 0, 50)) return bad(res, 'Commissie moet tussen 0 en 50% liggen.')
+
+  // Slug alleen wijzigen als expliciet meegegeven (oude shoplinks breken dan)
+  let newSlug = null
+  if (slug) {
+    newSlug = String(slug).trim().toLowerCase()
+    if (!/^[a-z0-9-]{2,80}$/.test(newSlug)) return bad(res, 'Slug mag alleen kleine letters, cijfers en streepjes bevatten (2–80 tekens).')
+    const ex = await db.execute({ sql: 'SELECT id FROM schools WHERE slug = ? AND id != ?', args: [newSlug, req.params.id] })
+    if (ex.rows[0]) return res.status(409).json({ error: 'Deze slug is al in gebruik.' })
+  }
+
   await db.execute({
-    sql: `UPDATE schools SET name=?,tagline=?,logo_url=?,hero_image=?,primary_color=?,contact_email=?,commission_pct=?,iban=?,active=? WHERE id=?`,
+    sql: `UPDATE schools SET name=?,tagline=?,logo_url=?,hero_image=?,primary_color=?,contact_email=?,commission_pct=?,iban=?,active=?,slug=COALESCE(?,slug) WHERE id=?`,
     args: [name.trim(), tagline||null, logo_url||null, hero_image||null, primary_color||'#111111',
-           contact_email||null, commission_pct ?? 15, iban||null, active === false || active === 0 ? 0 : 1, req.params.id]
+           contact_email||null, commission_pct ?? 15, iban||null, active === false || active === 0 ? 0 : 1, newSlug, req.params.id]
   })
   res.json({ message: 'School bijgewerkt.' })
 })
 
+/**
+ * DELETE /schools/:id       → deactiveren (soft delete, shop offline)
+ * DELETE /schools/:id?hard=1 → definitief verwijderen — alleen mogelijk zonder
+ * bestellingen; producten worden losgekoppeld, school-logins worden klant,
+ * kortingscodes verdwijnen.
+ */
 const deleteSchool = wrap(async (req, res) => {
+  if (req.query.hard === '1') {
+    const cnt = await db.execute({ sql: 'SELECT COUNT(*) as n FROM orders WHERE school_id = ?', args: [req.params.id] })
+    if (Number(cnt.rows[0].n) > 0)
+      return res.status(409).json({ error: 'Deze school heeft bestellingen en kan niet definitief worden verwijderd. Deactiveer de school in plaats daarvan.' })
+
+    const tx = await db.transaction('write')
+    try {
+      await tx.execute({ sql: 'UPDATE products SET school_id = NULL WHERE school_id = ?', args: [req.params.id] })
+      await tx.execute({ sql: `UPDATE users SET role = 'customer', school_id = NULL WHERE school_id = ?`, args: [req.params.id] })
+      await tx.execute({ sql: 'DELETE FROM discount_codes WHERE school_id = ?', args: [req.params.id] })
+      await tx.execute({ sql: 'DELETE FROM schools WHERE id = ?', args: [req.params.id] })
+      await tx.commit()
+    } catch (e) { try { await tx.rollback() } catch (_) {}; throw e }
+    return res.json({ message: 'School definitief verwijderd.' })
+  }
   await db.execute({ sql: 'UPDATE schools SET active = 0 WHERE id = ?', args: [req.params.id] })
   res.json({ message: 'School gedeactiveerd.' })
 })
@@ -122,6 +164,61 @@ const createSchoolLogin = wrap(async (req, res) => {
     args: [email.toLowerCase(), hash, first_name||'School', last_name||'Beheer', req.params.id]
   })
   res.status(201).json({ message: 'School-login aangemaakt.' })
+})
+
+// ── Uitbetalingen (platform-admin) ────────────────────────────────────────────
+
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/
+
+/** Per school de betaalde omzet en commissies in een maand (YYYY-MM). */
+async function payoutRows(month, schoolId = null) {
+  let sql = `
+    SELECT s.id as school_id, s.name as school_name, s.iban, s.commission_pct, s.active,
+      COUNT(o.id)                              as orders,
+      COALESCE(SUM(o.total),0)                 as revenue,
+      COALESCE(SUM(o.discount_amount),0)       as discount,
+      COALESCE(SUM(o.school_commission),0)     as school_commission,
+      COALESCE(SUM(o.fighter_commission),0)    as fighter_commission
+    FROM schools s
+    LEFT JOIN orders o ON o.school_id = s.id
+      AND o.paid_at IS NOT NULL AND o.status != 'cancelled'
+      AND strftime('%Y-%m', o.paid_at) = ?`
+  const args = [month]
+  if (schoolId) { sql += ` WHERE s.id = ?`; args.push(schoolId) }
+  sql += ` GROUP BY s.id ORDER BY s.name`
+  const r = await db.execute({ sql, args })
+  return r.rows
+}
+
+/** GET /schools/admin/payouts?month=YYYY-MM */
+const payouts = wrap(async (req, res) => {
+  const month = req.query.month || new Date().toISOString().slice(0, 7)
+  if (!MONTH_RE.test(month)) return bad(res, 'Ongeldige maand — gebruik JJJJ-MM.')
+  res.json({ month, rows: await payoutRows(month) })
+})
+
+/** GET /schools/admin/payouts/export?month=YYYY-MM&school_id= → CSV-download */
+const payoutsExport = wrap(async (req, res) => {
+  const month = req.query.month || new Date().toISOString().slice(0, 7)
+  if (!MONTH_RE.test(month)) return bad(res, 'Ongeldige maand — gebruik JJJJ-MM.')
+  const schoolId = req.query.school_id ? Number(req.query.school_id) : null
+
+  const rows = await payoutRows(month, schoolId)
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const header = ['School', 'Maand', 'IBAN', 'Commissie %', 'Betaalde orders', 'Omzet', 'Korting', 'Schoolcommissie', 'Vechterscommissie', 'Uit te betalen']
+  const lines = [header.join(';')]
+  for (const r of rows) {
+    lines.push([
+      esc(r.school_name), month, esc(r.iban || ''), r.commission_pct,
+      r.orders, Number(r.revenue).toFixed(2), Number(r.discount).toFixed(2),
+      Number(r.school_commission).toFixed(2), Number(r.fighter_commission).toFixed(2),
+      (Number(r.school_commission) + Number(r.fighter_commission)).toFixed(2),
+    ].join(';'))
+  }
+  const suffix = schoolId ? `-school-${schoolId}` : ''
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="uitbetalingen-${month}${suffix}.csv"`)
+  res.send('﻿' + lines.join('\r\n')) // BOM zodat Excel de tekens goed leest
 })
 
 // ── School-dashboard (rol 'school') ───────────────────────────────────────────
@@ -186,5 +283,6 @@ const dashboard = wrap(async (req, res) => {
 module.exports = {
   listSchools, getStorefront,
   adminListSchools, createSchool, updateSchool, deleteSchool, createSchoolLogin,
+  payouts, payoutsExport,
   dashboard,
 }

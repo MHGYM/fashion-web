@@ -3,13 +3,16 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingBag, Tag, Home, Image as ImageIcon,
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp,
-  ArrowLeft, Eye, EyeOff, Search, RefreshCw, Star, Shield, CalendarClock, Percent
+  ArrowLeft, Eye, EyeOff, Search, RefreshCw, Star, Shield, CalendarClock, Percent,
+  Euro, Users
 } from 'lucide-react'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
 import AdminSchools from './admin/AdminSchools'
 import AdminDrops   from './admin/AdminDrops'
 import AdminCodes   from './admin/AdminCodes'
+import AdminPayouts from './admin/AdminPayouts'
+import AdminUsers   from './admin/AdminUsers'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CLOTHING_SIZES = ['XS','S','M','L','XL','XXL']
@@ -79,6 +82,8 @@ export default function AdminPage() {
             { key:'categories',icon:<Tag size={16}/>,             label:'Categorieën' },
             { key:'orders',    icon:<ShoppingBag size={16}/>,     label:'Bestellingen' },
             { key:'schools',   icon:<Shield size={16}/>,          label:'Scholen' },
+            { key:'payouts',   icon:<Euro size={16}/>,            label:'Uitbetalingen' },
+            { key:'users',     icon:<Users size={16}/>,           label:'Gebruikers' },
             { key:'drops',     icon:<CalendarClock size={16}/>,   label:'Drops' },
             { key:'codes',     icon:<Percent size={16}/>,         label:'Kortingscodes' },
             { key:'homepage',  icon:<Home size={16}/>,            label:'Homepage' },
@@ -109,6 +114,8 @@ export default function AdminPage() {
             {tab === 'categories' && <CategoriesTab categories={categories} onRefresh={refreshCategories}/>}
             {tab === 'orders'     && <OrdersTab orders={orders} onStatusChange={async (id,s) => { await api.put(`/orders/admin/${id}/status`,{status:s}); loadAll() }}/>}
             {tab === 'schools'    && <AdminSchools/>}
+            {tab === 'payouts'    && <AdminPayouts/>}
+            {tab === 'users'      && <AdminUsers/>}
             {tab === 'drops'      && <AdminDrops/>}
             {tab === 'codes'      && <AdminCodes/>}
             {tab === 'homepage'   && <HomepageSection/>}
@@ -645,10 +652,15 @@ function CategoriesTab({ categories, onRefresh }) {
 // ── Orders tab ────────────────────────────────────────────────────────────────
 function OrdersTab({ orders, onStatusChange }) {
   const [filter,      setFilter]  = useState('all')
+  const [schoolFilter, setSchoolFilter] = useState('all')
   const [detailOrder, setDetail]  = useState(null)
   const [loadingDetail, setLD]    = useState(false)
 
-  const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
+  const schoolNames = [...new Set(orders.map(o => o.school_name).filter(Boolean))].sort()
+  const filtered = orders
+    .filter(o => filter === 'all' || o.status === filter)
+    .filter(o => schoolFilter === 'all'
+      || (schoolFilter === 'none' ? !o.school_name : o.school_name === schoolFilter))
 
   const openDetail = async (id) => {
     setLD(true)
@@ -662,7 +674,7 @@ function OrdersTab({ orders, onStatusChange }) {
       <PageHeader title="Bestellingen" />
 
       {/* Filter tabs */}
-      <div style={{ display:'flex', gap:4, marginBottom:'1.25rem' }}>
+      <div style={{ display:'flex', gap:4, marginBottom:'0.75rem', flexWrap:'wrap' }}>
         {[['all','Alle'], ...STATUS_OPTS.map(s => [s, STATUS_NL[s]])].map(([key, label]) => (
           <button key={key} onClick={() => setFilter(key)}
             style={{ padding:'6px 14px', border:'1px solid', borderRadius:100, fontSize:'0.75rem', fontWeight:600, cursor:'pointer', borderColor: filter===key ? '#000' : '#ddd', background: filter===key ? '#000' : '#fff', color: filter===key ? '#fff' : '#666' }}>
@@ -670,6 +682,20 @@ function OrdersTab({ orders, onStatusChange }) {
             {key !== 'all' && <span style={{ marginLeft:5, opacity:0.7 }}>({orders.filter(o=>o.status===key).length})</span>}
           </button>
         ))}
+      </div>
+
+      {/* School filter */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'1.25rem' }}>
+        <label htmlFor="order-school-filter" style={{ fontSize:'0.75rem', fontWeight:700, color:'#888', textTransform:'uppercase', letterSpacing:'0.06em' }}>School:</label>
+        <select id="order-school-filter" value={schoolFilter} onChange={e => setSchoolFilter(e.target.value)}
+          style={{ padding:'6px 10px', borderRadius:6, border:'1px solid #ddd', fontSize:'0.8rem', fontWeight:600, cursor:'pointer' }}>
+          <option value="all">Alle scholen</option>
+          <option value="none">Algemene shop (geen school)</option>
+          {schoolNames.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {schoolFilter !== 'all' && (
+          <span style={{ fontSize:'0.75rem', color:'#888' }}>{filtered.length} bestelling(en)</span>
+        )}
       </div>
 
       <OrderTable orders={filtered} onStatus={onStatusChange} onDetail={openDetail}/>

@@ -20,6 +20,14 @@ export default function AdminSchools() {
     load()
   }
 
+  const hardDelete = async (s) => {
+    if (!confirm(`School "${s.name}" DEFINITIEF verwijderen?\n\nDit kan alleen als de school geen bestellingen heeft. Producten worden losgekoppeld, school-logins worden gewone klantaccounts en kortingscodes verdwijnen.\n\nDit kan niet ongedaan worden gemaakt.`)) return
+    try {
+      await api.delete(`/schools/${s.id}?hard=1`)
+      load()
+    } catch (e) { alert(e.response?.data?.error || 'Verwijderen mislukt.') }
+  }
+
   return (
     <div style={{ padding: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -33,7 +41,7 @@ export default function AdminSchools() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              {['School', 'Shop', 'Commissie %', 'Orders', 'Omzet', 'Commissie €', 'Status', 'Acties'].map(h => (
+              {['School', 'Shop', 'Commissie %', 'Orders', 'Omzet', 'Commissie €', 'Laatste order', 'Status', 'Acties'].map(h => (
                 <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{h}</th>
               ))}
             </tr>
@@ -61,6 +69,9 @@ export default function AdminSchools() {
                 <td style={{ padding: '10px 14px' }}>{s.paid_orders}</td>
                 <td style={{ padding: '10px 14px', fontWeight: 600 }}>{eur(s.revenue)}</td>
                 <td style={{ padding: '10px 14px', fontWeight: 700, color: '#16a34a' }}>{eur(s.commission)}</td>
+                <td style={{ padding: '10px 14px', color: '#888', fontSize: '0.8rem' }}>
+                  {s.last_order_at ? new Date(s.last_order_at).toLocaleDateString('nl-NL') : 'nog geen'}
+                </td>
                 <td style={{ padding: '10px 14px' }}>
                   {s.active
                     ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', background: '#dcfce7', padding: '3px 8px', borderRadius: 100 }}>Actief</span>
@@ -70,13 +81,15 @@ export default function AdminSchools() {
                   <div style={{ display: 'flex', gap: 6 }}>
                     <IconBtn title="Bewerken" onClick={() => setModal(s)}><Pencil size={13}/></IconBtn>
                     <IconBtn title="School-login aanmaken" onClick={() => setLoginFor(s)}><KeyRound size={13}/></IconBtn>
-                    <IconBtn title="Deactiveren" danger onClick={() => deactivate(s)}><Trash2 size={13}/></IconBtn>
+                    {s.active
+                      ? <IconBtn title="Deactiveren" danger onClick={() => deactivate(s)}><Trash2 size={13}/></IconBtn>
+                      : <IconBtn title="Definitief verwijderen (alleen zonder bestellingen)" danger onClick={() => hardDelete(s)}><X size={13}/></IconBtn>}
                   </div>
                 </td>
               </tr>
             ))}
             {schools && schools.length === 0 && (
-              <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#aaa' }}>Nog geen scholen — voeg de eerste toe</td></tr>
+              <tr><td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: '#aaa' }}>Nog geen scholen — voeg de eerste toe</td></tr>
             )}
           </tbody>
         </table>
@@ -92,6 +105,7 @@ function SchoolModal({ school, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     name: school?.name || '', tagline: school?.tagline || '',
+    slug: school?.slug || '',
     logo_url: school?.logo_url || '', hero_image: school?.hero_image || '',
     primary_color: school?.primary_color || '#111111',
     contact_email: school?.contact_email || '',
@@ -104,10 +118,14 @@ function SchoolModal({ school, onClose, onSaved }) {
 
   const save = async () => {
     if (!form.name.trim()) return alert('Naam is verplicht.')
+    if (form.slug && !/^[a-z0-9-]{2,80}$/.test(form.slug)) return alert('Slug mag alleen kleine letters, cijfers en streepjes bevatten.')
     setSaving(true)
     try {
-      if (school) await api.put(`/schools/${school.id}`, form)
-      else        await api.post('/schools', form)
+      // Slug alleen meesturen als ingevuld (en bij bewerken: als gewijzigd)
+      const payload = { ...form }
+      if (!payload.slug || (school && payload.slug === school.slug)) delete payload.slug
+      if (school) await api.put(`/schools/${school.id}`, payload)
+      else        await api.post('/schools', payload)
       onSaved()
     } catch (e) { alert(e.response?.data?.error || 'Opslaan mislukt.') }
     finally { setSaving(false) }
@@ -119,6 +137,9 @@ function SchoolModal({ school, onClose, onSaved }) {
         <Field label="Naam *"><input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="MH Gym"/></Field>
         <Field label="Contact e-mail"><input className="input" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="info@school.nl"/></Field>
       </div>
+      <Field label={school ? 'Shop-slug (/s/…) — wijzigen breekt oude links' : 'Shop-slug (/s/…) — leeg = automatisch uit de naam'}>
+        <input className="input" value={form.slug} onChange={e => set('slug', e.target.value.toLowerCase())} placeholder="mh-gym"/>
+      </Field>
       <Field label="Tagline"><input className="input" value={form.tagline} onChange={e => set('tagline', e.target.value)} placeholder="Kickboksen & MMA in Amsterdam"/></Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <Field label="Logo URL"><input className="input" value={form.logo_url} onChange={e => set('logo_url', e.target.value)} placeholder="/uploads/logo.png"/></Field>
