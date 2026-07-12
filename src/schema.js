@@ -140,6 +140,31 @@ async function ensureSchema() {
     }
   } catch (e) { console.error('[DB] admin-bootstrap:', e.message) }
 
+  // ── Eenmalige admin-wachtwoordreset (herstel bij lockout) ──────────────────
+  // Zet ADMIN_RESET=1 + ADMIN_EMAIL + ADMIN_PASSWORD in de omgeving en deploy
+  // opnieuw: het wachtwoord van dat admin-account wordt (her)ingesteld op de
+  // waarde van ADMIN_PASSWORD. Bestaat het account niet, dan wordt het als
+  // admin aangemaakt. Zet ADMIN_RESET daarna weer uit.
+  try {
+    if (process.env.ADMIN_RESET === '1' && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+      const bcrypt = require('bcryptjs')
+      const adminEmail = process.env.ADMIN_EMAIL.toLowerCase()
+      const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12)
+      const existing = await db.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [adminEmail] })
+      if (existing.rows[0]) {
+        await db.execute({ sql: `UPDATE users SET password = ?, role = 'admin' WHERE email = ?`, args: [hash, adminEmail] })
+        console.log(`[DB] ADMIN_RESET: wachtwoord van ${adminEmail} opnieuw ingesteld.`)
+      } else {
+        await db.execute({
+          sql: `INSERT INTO users (email,password,first_name,last_name,role) VALUES (?,?,?,?,'admin')`,
+          args: [adminEmail, hash, 'Platform', 'Admin']
+        })
+        console.log(`[DB] ADMIN_RESET: admin-account ${adminEmail} aangemaakt.`)
+      }
+      console.warn('[DB] ADMIN_RESET is actief — zet deze variabele weer uit na inloggen.')
+    }
+  } catch (e) { console.error('[DB] ADMIN_RESET mislukt:', e.message) }
+
   // ── Centrale catalogus: eenmalige backfill ─────────────────────────────────
   // Vóór deze migratie stonden alle 'algemeen assortiment'-producten in élke
   // clubshop. Die situatie behouden we door ze eenmalig voor alle bestaande
