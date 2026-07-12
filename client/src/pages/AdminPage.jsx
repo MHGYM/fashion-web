@@ -15,8 +15,32 @@ import AdminPayouts from './admin/AdminPayouts'
 import AdminUsers   from './admin/AdminUsers'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const CLOTHING_SIZES = ['XS','S','M','L','XL','XXL']
-const SHOE_SIZES     = ['36','37','38','39','40','41','42','43','44','45','46']
+// Maattypes per soort fightgear. `defaults` = maten die bij een nieuw product
+// alvast aan staan.
+const SIZE_TYPES = {
+  kleding:           { label: '👕 Kleding (XS–XXL)',        sizes: ['XS','S','M','L','XL','XXL'], defaults: ['S','M','L','XL'] },
+  handschoenen:      { label: '🥊 Handschoenen (2–20 OZ)',  sizes: ['2 OZ','4 OZ','6 OZ','8 OZ','10 OZ','12 OZ','14 OZ','16 OZ','18 OZ','20 OZ'], defaults: ['8 OZ','10 OZ','12 OZ','14 OZ','16 OZ'] },
+  scheenbeschermers: { label: '🦵 Scheenbeschermers (S–XL)', sizes: ['S','M','L','XL'], defaults: ['S','M','L','XL'] },
+  bitjes:            { label: '🦷 Bitjes',                  sizes: ['Junior','Senior'], defaults: ['Junior','Senior'] },
+  headgear:          { label: '🪖 Headgear (S/M/L)',        sizes: ['S','M','L'], defaults: ['S','M','L'] },
+  bandage:           { label: '🧵 Bandage (2.5–4.5m)',      sizes: ['2.5m','3m','4.5m'], defaults: ['2.5m','3m','4.5m'] },
+  schoenen:          { label: '👟 Schoenen (36–46)',        sizes: ['36','37','38','39','40','41','42','43','44','45','46'], defaults: [] },
+}
+
+/**
+ * Herkent het maattype van een bestaand product aan zijn varianten.
+ * Lettermaten vallen terug op 'kleding' (het oude gedrag) — de beheerder kan
+ * het type daarna zelf omzetten naar bijv. scheenbeschermers of headgear.
+ */
+function detectSizeType(variants = []) {
+  const sizes = variants.map(v => String(v.size))
+  if (!sizes.length) return 'kleding'
+  if (sizes.some(s => /oz/i.test(s)))                 return 'handschoenen'
+  if (sizes.some(s => /^\d+([.,]\d+)?m$/i.test(s)))   return 'bandage'
+  if (sizes.some(s => /^(junior|senior)$/i.test(s)))  return 'bitjes'
+  if (sizes.every(s => /^\d+$/.test(s)))              return 'schoenen'
+  return 'kleding'
+}
 
 const STATUS_OPTS  = ['awaiting_payment','pending','processing','shipped','delivered','cancelled']
 const STATUS_NL    = { awaiting_payment:'Wacht op betaling', pending:'In behandeling', processing:'Verwerkt', shipped:'Verzonden', delivered:'Afgeleverd', cancelled:'Geannuleerd' }
@@ -320,7 +344,7 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
     school_id:'', drop_id:''
   })
   const [images,   setImages]   = useState([])
-  const [sizeType, setSizeType] = useState('clothing')
+  const [sizeType, setSizeType] = useState('kleding')
   const [variants, setVariants] = useState([])
   const [schools,  setSchools]  = useState([])
   const [drops,    setDrops]    = useState([])
@@ -332,8 +356,8 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
 
   // Initialiseer varianten op basis van sizeType
   const initVariants = (type) => {
-    const sizes = type === 'shoes' ? SHOE_SIZES : CLOTHING_SIZES
-    return sizes.map(s => ({ size:s, stock:10, active: type==='clothing' ? ['S','M','L','XL'].includes(s) : false }))
+    const cfg = SIZE_TYPES[type]
+    return cfg.sizes.map(s => ({ size:s, stock:10, active: cfg.defaults.includes(s) }))
   }
 
   useEffect(() => {
@@ -342,20 +366,21 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
         const p = r.data
         setForm({ name:p.name, description:p.description||'', price:p.price, sale_price:p.sale_price||'', category_id:p.category_id||'', gender:p.gender||'unisex', featured:!!p.featured, active:p.active!==0, school_id:p.school_id||'', drop_id:p.drop_id||'' })
         setImages(p.images || [])
-        // Detecteer size type van bestaande varianten
-        const isShoe = p.variants?.some(v => !isNaN(v.size))
-        const type   = isShoe ? 'shoes' : 'clothing'
+        // Detecteer maattype van bestaande varianten
+        const type = detectSizeType(p.variants)
         setSizeType(type)
-        // Map bestaande varianten op grid
-        const sizes = type === 'shoes' ? SHOE_SIZES : CLOTHING_SIZES
-        setVariants(sizes.map(s => {
+        // Grid = maten van het type + eventuele afwijkende bestaande maten
+        // (zoals 'One size') achteraan — zo gaat er nooit voorraad verloren
+        const base  = SIZE_TYPES[type].sizes
+        const extra = (p.variants || []).map(v => v.size).filter(s => !base.includes(s))
+        setVariants([...base, ...extra].map(s => {
           const found = p.variants?.find(v => v.size === s)
           return { size:s, stock: found ? found.stock : 0, active: !!found }
         }))
         setLoading(false)
       }).catch(() => onClose())
     } else {
-      setVariants(initVariants('clothing'))
+      setVariants(initVariants('kleding'))
     }
   }, [productId])
 
@@ -520,14 +545,14 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
             <Section title="Maten & Voorraad">
               {/* Type toggle */}
               <div style={{ display:'flex', gap:8, marginBottom:'1.25rem', flexWrap:'wrap', alignItems:'center' }}>
-                {[['clothing','👕 Kleding (S–XXL)'],['shoes','👟 Schoenen (36–46)']].map(([type, label]) => (
+                {Object.entries(SIZE_TYPES).map(([type, cfg]) => (
                   <button key={type} onClick={() => changeSizeType(type)}
-                    style={{ padding:'7px 16px', border:'1.5px solid', borderColor: sizeType===type ? '#000' : '#ddd', borderRadius:6, background: sizeType===type ? '#000' : '#fff', color: sizeType===type ? '#fff' : '#666', fontSize:'0.8rem', fontWeight:600, cursor:'pointer' }}>
-                    {label}
+                    style={{ padding:'7px 14px', border:'1.5px solid', borderColor: sizeType===type ? '#000' : '#ddd', borderRadius:6, background: sizeType===type ? '#000' : '#fff', color: sizeType===type ? '#fff' : '#666', fontSize:'0.78rem', fontWeight:600, cursor:'pointer' }}>
+                    {cfg.label}
                   </button>
                 ))}
-                {productId && <span style={{ fontSize:'0.7rem', color:'#f59e0b', marginLeft:4 }}>⚠ Wijzigen wist bestaande maten</span>}
               </div>
+              {productId && <p style={{ fontSize:'0.7rem', color:'#f59e0b', margin:'-0.75rem 0 1rem' }}>⚠ Type wijzigen wist bestaande maten en voorraad van dit product</p>}
 
               {/* Snel alles instellen */}
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:'1rem', padding:'10px 14px', background:'#f9f9f9', borderRadius:6 }}>
