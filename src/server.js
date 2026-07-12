@@ -3,11 +3,12 @@ const express  = require('express')
 const cors     = require('cors')
 const helmet   = require('helmet')
 const path     = require('path')
+const fs       = require('fs')
 const upload   = require('./middleware/upload')
 const { authenticate, requireAdmin } = require('./middleware/auth')
 const { authLimiter } = require('./middleware/rateLimits')
 const { ensureSchema } = require('./schema')
-const { APP_URL } = require('./config')
+const { APP_URL, UPLOADS_DIR } = require('./config')
 
 // Fail-fast: zonder geheime sleutel zijn login-tokens vervalsbaar
 if (!process.env.JWT_SECRET) {
@@ -20,6 +21,13 @@ app.set('trust proxy', 1) // juiste client-IP's achter een reverse proxy (nodig 
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // uploads embedbaar vanaf de site
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      // Productfoto's mogen van externe hosts komen (Unsplash, CDN's)
+      'img-src': ["'self'", 'data:', 'https:'],
+    },
+  },
 }))
 
 // CORS: in productie alleen de eigen origins, lokaal alles (Vite-proxy)
@@ -31,7 +39,7 @@ app.use(cors({
 
 app.use(express.json({ limit: '1mb' })) // afbeeldingen gaan via multipart, geen grote JSON nodig
 app.use(express.urlencoded({ extended: false })) // Mollie webhook POST form-encoded
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
+app.use('/uploads', express.static(UPLOADS_DIR))
 
 // Bruteforce-bescherming op login/registratie
 app.use('/api/auth/login', authLimiter)
@@ -57,6 +65,18 @@ app.get('/api/health', (_, res) => res.json({ ok: true }))
 
 // 404 voor onbekende API-routes (JSON i.p.v. HTML)
 app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint niet gevonden.' }))
+
+// ── Productie: serveer de client-build als één service ───────────────────────
+// Lokaal draait Vite op :5174 (met proxy); op de server staat de build in
+// client/dist en handelt Express alles af, incl. SPA-fallback voor React Router.
+const clientDist = path.join(__dirname, '../client/dist')
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist))
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next()
+    res.sendFile(path.join(clientDist, 'index.html'))
+  })
+}
 
 // Global error handler — must be last. Lekt in productie geen interne details.
 app.use((err, req, res, next) => {

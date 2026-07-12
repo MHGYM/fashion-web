@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install", "cd client && npm install"]
+
+[phases.build]
+cmds = ["cd client && npm run build"]
+
+[variables]
+NODE_ENV = "production"
+
+[start]
+# migrate is idempotent (CREATE TABLE IF NOT EXISTS) en maakt op een verse
+# volume-database eerst de basistabellen aan; daarna start de server
+cmd = "node src/migrate.js && node src/server.js"

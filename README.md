@@ -62,18 +62,30 @@ het starten van de server automatisch toegevoegd (`ensureSchema`).
   Webhook-verificatie: de webhook ontvangt alleen een betaal-ID; de status wordt
   altijd rechtstreeks bij Mollie opgehaald (aanbevolen Mollie-praktijk).
 
-## Deploy naar fightmarketing.nl
+## Deploy naar fightmarketing.nl (Railway, één service)
 
-1. Zet de API achter een publieke URL (bijv. `https://api.fightmarketing.nl`)
-   en de client-build (`cd client && npm run build` → `client/dist`) achter
-   `https://fightmarketing.nl`. Laat de host `/api` en `/uploads` naar de API
-   proxyen (zelfde paden als de Vite dev-proxy).
-2. Zet in `.env` op de server:
-   `APP_URL=https://fightmarketing.nl`, `BASE_URL=https://api.fightmarketing.nl`,
-   een sterke `JWT_SECRET` en je `MOLLIE_API_KEY`.
-3. `robots.txt` en `sitemap.xml` staan in `client/public/` en wijzen al naar
+De server serveert in productie ook de client-build (`client/dist`) met
+SPA-fallback — één service is genoeg. `nixpacks.toml` regelt de build en
+draait bij elke start eerst `migrate` (idempotent).
+
+1. **Volume**: mount een Railway-volume op `/data` (database + uploads).
+2. **Variabelen** op de service:
+   | Variabele        | Waarde |
+   |------------------|--------|
+   | `JWT_SECRET`     | lange willekeurige string |
+   | `DATABASE_URL`   | `file:/data/fightmarketing.db` |
+   | `UPLOADS_DIR`    | `/data/uploads` |
+   | `APP_URL`        | `https://fightmarketing.nl` |
+   | `BASE_URL`       | `https://fightmarketing.nl` (zelfde service = zelfde URL) |
+   | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | eerste admin-login op de verse database |
+   | `MOLLIE_API_KEY` | `test_...` of `live_...` (leeg = mock-betalingen!) |
+   | `SMTP_*`         | mailserver-gegevens (leeg = mails alleen in de log) |
+3. **Domein**: voeg in Railway → Settings → Networking het custom domain
+   `fightmarketing.nl` toe en zet bij je registrar een CNAME naar de getoonde
+   Railway-host. Werkt de site direct via het gegenereerde `*.up.railway.app`
+   domein? Zet `APP_URL`/`BASE_URL` dan tijdelijk op dat adres.
+4. `robots.txt` en `sitemap.xml` staan in `client/public/` en wijzen al naar
    fightmarketing.nl.
-4. Persisteer het SQLite-bestand (volume/disk) en de map `uploads/`.
 
 ## Het platform
 

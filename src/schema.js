@@ -120,6 +120,26 @@ async function ensureSchema() {
     try { await db.execute(sql) } catch (_) {}
   }
 
+  // ── Eerste admin-account op een verse (productie)database ──────────────────
+  // Alleen als er nog géén admin bestaat en ADMIN_EMAIL + ADMIN_PASSWORD als
+  // omgevingsvariabelen zijn gezet — geen hardcoded wachtwoorden in productie.
+  try {
+    const admins = await db.execute(`SELECT COUNT(*) as n FROM users WHERE role = 'admin'`)
+    if (Number(admins.rows[0].n) === 0) {
+      if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+        const bcrypt = require('bcryptjs')
+        const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12)
+        await db.execute({
+          sql: `INSERT INTO users (email,password,first_name,last_name,role) VALUES (?,?,?,?,'admin')`,
+          args: [process.env.ADMIN_EMAIL.toLowerCase(), hash, 'Platform', 'Admin']
+        })
+        console.log(`[DB] Eerste admin-account aangemaakt: ${process.env.ADMIN_EMAIL}`)
+      } else {
+        console.warn('[DB] Geen admin-account gevonden. Zet ADMIN_EMAIL en ADMIN_PASSWORD als env-variabelen of draai npm run seed.')
+      }
+    }
+  } catch (e) { console.error('[DB] admin-bootstrap:', e.message) }
+
   // ── Centrale catalogus: eenmalige backfill ─────────────────────────────────
   // Vóór deze migratie stonden alle 'algemeen assortiment'-producten in élke
   // clubshop. Die situatie behouden we door ze eenmalig voor alle bestaande
