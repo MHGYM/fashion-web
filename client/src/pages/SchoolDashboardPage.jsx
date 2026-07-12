@@ -151,7 +151,7 @@ function AssortmentPanel() {
               </div>
               <button onClick={() => toggle(p)} disabled={busy === p.id}
                 aria-pressed={!!p.enabled}
-                style={{ padding: '7px 14px', borderRadius: 100, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', minWidth: 96,
+                style={{ padding: '7px 14px', minHeight: 40, borderRadius: 100, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', minWidth: 96,
                   border: '1.5px solid', borderColor: p.enabled ? '#16a34a' : '#ddd',
                   background: p.enabled ? '#dcfce7' : '#fff', color: p.enabled ? '#16a34a' : '#888' }}>
                 {busy === p.id ? '…' : p.enabled ? '✓ In shop' : 'Niet in shop'}
