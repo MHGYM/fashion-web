@@ -1,6 +1,46 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, RefreshCw, KeyRound, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Plus, Pencil, Trash2, X, RefreshCw, KeyRound, ExternalLink, Upload } from 'lucide-react'
 import api from '../../api'
+
+/**
+ * URL-veld met upload-knop: kies een bestand → upload naar /api/upload →
+ * URL wordt automatisch ingevuld, met voorvertoning.
+ */
+export function UploadUrlField({ label, value, onChange, placeholder }) {
+  const fileRef = useRef()
+  const [busy, setBusy] = useState(false)
+
+  const upload = async (file) => {
+    setBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const r = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      onChange(r.data.url)
+    } catch (e) { alert('Upload mislukt: ' + (e.response?.data?.error || e.message)) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div>
+      <label className="label" style={{ fontSize: '0.75rem' }}>{label}</label>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {value && (
+          <img src={value} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, border: '1px solid #eee', flexShrink: 0 }}
+            onError={e => { e.currentTarget.style.display = 'none' }}/>
+        )}
+        <input className="input" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}/>
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="btn btn-outline"
+          style={{ padding: '9px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          {busy ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }}/> : <Upload size={13}/>}
+          {busy ? 'Bezig…' : 'Upload'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }}/>
+      </div>
+    </div>
+  )
+}
 
 const eur = n => `€${Number(n || 0).toFixed(2)}`
 
@@ -141,10 +181,8 @@ function SchoolModal({ school, onClose, onSaved }) {
         <input className="input" value={form.slug} onChange={e => set('slug', e.target.value.toLowerCase())} placeholder="mh-gym"/>
       </Field>
       <Field label="Tagline"><input className="input" value={form.tagline} onChange={e => set('tagline', e.target.value)} placeholder="Kickboksen & MMA in Amsterdam"/></Field>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <Field label="Logo URL"><input className="input" value={form.logo_url} onChange={e => set('logo_url', e.target.value)} placeholder="/uploads/logo.png"/></Field>
-        <Field label="Hero-afbeelding URL"><input className="input" value={form.hero_image} onChange={e => set('hero_image', e.target.value)} placeholder="/uploads/hero.jpg"/></Field>
-      </div>
+      <UploadUrlField label="Logo (upload of URL)" value={form.logo_url} onChange={v => set('logo_url', v)} placeholder="/uploads/logo.png"/>
+      <UploadUrlField label="Hero-afbeelding (upload of URL)" value={form.hero_image} onChange={v => set('hero_image', v)} placeholder="/uploads/hero.jpg"/>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
         <Field label="Clubkleur">
           <input type="color" className="input" value={form.primary_color} onChange={e => set('primary_color', e.target.value)} style={{ height: 40, padding: 4 }}/>
