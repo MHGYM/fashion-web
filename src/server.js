@@ -71,5 +71,11 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000
 ensureSchema()
-  .then(() => app.listen(PORT, () => console.log(`FightMarketing API draait op poort ${PORT}`)))
+  .then(() => {
+    app.listen(PORT, () => console.log(`FightMarketing API draait op poort ${PORT}`))
+    // "Drop is open"-mails: check bij start en daarna elke 10 minuten
+    const { notifyOpenDrops } = require('./controllers/dropController')
+    notifyOpenDrops().catch(() => {})
+    setInterval(() => notifyOpenDrops().catch(() => {}), 10 * 60 * 1000)
+  })
   .catch(e => { console.error('Schema fout:', e); process.exit(1) })

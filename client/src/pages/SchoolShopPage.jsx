@@ -1,9 +1,46 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Shield, Clock } from 'lucide-react'
+import { Shield, Clock, Bell } from 'lucide-react'
 import api from '../api'
 import ProductCard from '../components/ProductCard'
 import usePageTitle from '../hooks/usePageTitle'
+
+/** Inschrijfformulier: mail mij zodra een nieuwe drop opent */
+function DropSubscribe({ schoolSlug }) {
+  const [mail, setMail] = useState('')
+  const [state, setState] = useState('idle') // idle | busy | done | error
+  const [msg, setMsg] = useState('')
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setState('busy')
+    try {
+      const r = await api.post('/drops/subscribe', { email: mail, school_slug: schoolSlug })
+      setMsg(r.data.message); setState('done')
+    } catch (err) {
+      setMsg(err.response?.data?.error || 'Inschrijven mislukt.'); setState('error')
+    }
+  }
+
+  if (state === 'done') return (
+    <p style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', padding: '0.5rem 0' }}>
+      <Bell size={14}/> {msg}
+    </p>
+  )
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', padding: '0.25rem 0' }}>
+      <label htmlFor="drop-mail" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600 }}>
+        <Bell size={14}/> Mis geen drop:
+      </label>
+      <input id="drop-mail" className="input" type="email" required placeholder="jouw@email.nl"
+        value={mail} onChange={e => setMail(e.target.value)} style={{ maxWidth: 220, padding: '8px 12px' }}/>
+      <button className="btn btn-black" type="submit" disabled={state === 'busy'} style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
+        {state === 'busy' ? 'Bezig…' : 'Houd me op de hoogte'}
+      </button>
+      {state === 'error' && <span style={{ fontSize: '0.78rem', color: 'var(--error)', width: '100%', textAlign: 'center' }}>{msg}</span>}
+    </form>
+  )
+}
 
 function Countdown({ closesAt }) {
   const [left, setLeft] = useState('')
@@ -86,6 +123,11 @@ export default function SchoolShopPage() {
       )}
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+        {/* Drop-alert inschrijving */}
+        <div style={{ marginBottom: '2.5rem', background: '#fafafa', border: '1px solid #eee', borderRadius: 10, padding: '1rem' }}>
+          <DropSubscribe schoolSlug={school.slug}/>
+        </div>
+
         {/* Clubcollectie */}
         <div style={{ marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: 4 }}>Clubcollectie</h2>

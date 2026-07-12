@@ -1,8 +1,31 @@
 const db = require('../db')
 const mollie = require('../services/mollie')
+const email = require('../services/email')
 
 const wrap = fn => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next)
+
+/** Stuurt orderbevestiging + schoolnotificatie na een geslaagde betaling (fire-and-forget). */
+async function sendPaidEmails(orderId) {
+  try {
+    const oR = await db.execute({ sql: 'SELECT * FROM orders WHERE id = ?', args: [orderId] })
+    const order = oR.rows[0]
+    if (!order) return
+    const items = (await db.execute({ sql: 'SELECT * FROM order_items WHERE order_id = ?', args: [orderId] })).rows
+    await email.orderConfirmation(order, items)
+
+    if (order.school_id) {
+      const sR = await db.execute({ sql: 'SELECT * FROM schools WHERE id = ?', args: [order.school_id] })
+      const school = sR.rows[0]
+      if (school) {
+        const admins = (await db.execute({
+          sql: `SELECT email FROM users WHERE role = 'school' AND school_id = ?`, args: [school.id]
+        })).rows.map(u => u.email)
+        await email.schoolOrderNotification([school.contact_email, ...admins], school, order)
+      }
+    }
+  } catch (e) { console.error('[MAIL] order-mails mislukt:', e.message) }
+}
 
 /** Voorraad terugboeken bij mislukte/verlopen betaling */
 async function restock(orderId) {
@@ -27,6 +50,8 @@ async function settleOrder(order, molliePaidStatus) {
         args: [order.discount_code.toUpperCase()]
       })
     }
+    // Bevestiging naar klant + notificatie naar de school (async, blokkeert de betaling niet)
+    sendPaidEmails(order.id).catch(() => {})
   } else if (['canceled', 'expired', 'failed'].includes(molliePaidStatus)) {
     await db.execute({
       sql: `UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`,

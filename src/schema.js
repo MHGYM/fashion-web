@@ -43,6 +43,21 @@ const PATCHES = [
     active         INTEGER DEFAULT 1,
     created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  `ALTER TABLE drops    ADD COLUMN notified_at DATETIME`,
+  `CREATE TABLE IF NOT EXISTS drop_subscribers (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    email      TEXT NOT NULL UNIQUE,
+    school_id  INTEGER REFERENCES schools(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token      TEXT NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    used       INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
   `ALTER TABLE users    ADD COLUMN school_id INTEGER REFERENCES schools(id)`,
   `ALTER TABLE products ADD COLUMN school_id INTEGER REFERENCES schools(id)`,
   `ALTER TABLE products ADD COLUMN drop_id   INTEGER REFERENCES drops(id)`,
