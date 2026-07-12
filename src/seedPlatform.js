@@ -36,10 +36,13 @@ async function seed() {
     args: ['beheer@mhgym.nl', hash, 'MH Gym', 'Beheer', schoolIds['mh-gym']]
   })
 
-  // ── Categorie Fight Gear ─────────────────────────────────────────────────
+  // ── Categorieën Fight Gear + Handschoenen ────────────────────────────────
   await db.execute(`INSERT OR IGNORE INTO categories (name, slug, sort_order) VALUES ('Fight Gear', 'fight-gear', 6)`)
   const catR = await db.execute(`SELECT id FROM categories WHERE slug = 'fight-gear'`)
   const catId = catR.rows[0].id
+  await db.execute(`INSERT OR IGNORE INTO categories (name, slug, sort_order) VALUES ('Handschoenen', 'handschoenen', 7)`)
+  const glovesCatR = await db.execute(`SELECT id FROM categories WHERE slug = 'handschoenen'`)
+  const glovesCatId = glovesCatR.rows[0].id
 
   // ── Actieve drop (bestelvenster: nu + 21 dagen) ──────────────────────────
   const dropEx = await db.execute(`SELECT id FROM drops WHERE name = 'Herfstdrop 2026'`)
@@ -64,6 +67,10 @@ async function seed() {
     { school: 'mh-gym', name: 'MH Gym Handbandages 4,5m', price: 12.95, sizes: ['One size'],
       desc: 'Professionele bandages in clubkleuren, per paar.',
       img: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=600&q=80' },
+    { school: 'mh-gym', name: 'MH Gym Bokshandschoenen', price: 69.95, cat: 'gloves',
+      sizes: ['8 OZ', '10 OZ', '12 OZ', '14 OZ', '16 OZ'],
+      desc: 'Officiële MH Gym bokshandschoenen — premium kunstleer, extra polssteun. Twijfel je over je maat? Bekijk het maatadvies.',
+      img: 'https://images.unsplash.com/photo-1583473848882-f9a5bc7fd2ee?w=600&q=80' },
     { school: 'team-vechtlust', name: 'Vechtlust Rashguard', price: 44.95, sizes: ['S','M','L','XL'],
       desc: 'Full-print rashguard van Team Vechtlust — sneldrogend.',
       img: 'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?w=600&q=80' },
@@ -79,7 +86,7 @@ async function seed() {
     const r = await db.execute({
       sql: `INSERT INTO products (name,slug,description,price,category_id,gender,featured,active,school_id,drop_id)
             VALUES (?,?,?,?,?,'unisex',0,1,?,?) RETURNING id`,
-      args: [p.name, slug, p.desc, p.price, catId, schoolIds[p.school], dropId]
+      args: [p.name, slug, p.desc, p.price, p.cat === 'gloves' ? glovesCatId : catId, schoolIds[p.school], dropId]
     })
     const pid = r.rows[0].id
     await db.execute({ sql: 'INSERT INTO product_images (product_id,url,sort_order) VALUES (?,?,0)', args: [pid, p.img] })

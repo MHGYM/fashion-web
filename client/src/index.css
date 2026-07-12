@@ -431,6 +431,9 @@ tr:hover td { background: var(--bg2); }
 
 /* ── Mobile ─────────────────────────────── */
 @media (max-width: 768px) {
+  /* Geen horizontale pagina-scroll (clip breekt position:sticky niet) */
+  html, body { overflow-x: clip; }
+
   .navbar-links { display: none; }
   .mobile-menu-btn { display: flex; }
   .product-layout { grid-template-columns: 1fr; gap: 2rem; }
@@ -440,6 +443,23 @@ tr:hover td { background: var(--bg2); }
   .footer-inner { grid-template-columns: 1fr; gap: 2rem; }
   .hero { padding: 3rem 1.5rem; }
   .form-row { grid-template-columns: 1fr; }
+
+  /* Tabellen: scrollen binnen hun eigen kaart i.p.v. de pagina afsnijden */
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+
+  /* Touch-vriendelijke targets */
+  .btn { min-height: 44px; }
+  .qty-btn { width: 40px; height: 40px; }
+  td button { min-height: 38px; min-width: 38px; justify-content: center; }
+  .cart-btn, .mobile-menu-btn { min-height: 44px; min-width: 44px; justify-content: center; }
+
+  /* 16px voorkomt automatische zoom op iOS bij focus */
+  input.input, select.input, textarea.input { font-size: 16px !important; }
+
+  /* Toasts over de volle breedte onderin */
+  .toast-wrap { left: 16px; right: 16px; bottom: 16px; }
+
+  .product-thumbs { flex-wrap: wrap; }
 
   /* Homepage mobile */
   .hero-full { height: 92svh; align-items: flex-end; }
@@ -455,4 +475,38 @@ tr:hover td { background: var(--bg2); }
   .promo-banner-img { min-height: 280px; order: -1; }
   .usp-bar { flex-wrap: wrap; }
   .usp-item { min-width: 50%; border-bottom: 1px solid #1a1a1a; }
+
+  /* ── Admin op mobiel: sidebar wordt horizontale tab-balk ── */
+  .admin-shell { flex-direction: column !important; }
+  .admin-sidebar { width: 100% !important; border-right: none !important; border-bottom: 1px solid #1a1a1a; }
+  .admin-sidebar > div:first-child { padding: 0.9rem 1.25rem 0.5rem !important; border-bottom: none !important; }
+  .admin-nav {
+    display: flex !important; flex-direction: row !important;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    padding: 0 0.75rem 0.75rem !important; gap: 4px;
+    scrollbar-width: none;
+  }
+  .admin-nav::-webkit-scrollbar { display: none; }
+  .admin-nav button {
+    width: auto !important; white-space: nowrap;
+    border-radius: 8px; padding: 9px 13px !important; flex-shrink: 0;
+  }
+  .admin-sidebar > div:last-child { display: none; } /* 'Naar shop' — mobiel via navbar-logo */
+}
+
+/* ── Kleine schermen: navbar compacter zodat niets overloopt ── */
+@media (max-width: 480px) {
+  .navbar-inner { padding: 0 1rem; }
+  .navbar-logo { font-size: 1.02rem; }
+  .navbar-actions { gap: 0.4rem; }
+  .navbar-actions .btn-sm { padding: 7px 10px; font-size: 0.75rem; }
+  /* Account-knop met naam verbergen — 'Mijn account' staat in het hamburger-menu */
+  .navbar-actions a[href="/account"] { display: none; }
+}
+
+/* ── Inline 2/3-koloms grids in admin-modals stapelen op smalle schermen.
+     Bewuste attribuut-selector-override: de admin-formulieren gebruiken
+     inline grid-styles; dit voorkomt refactoren van elk formulier. ── */
+@media (max-width: 640px) {
+  .stack-mobile [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
 }

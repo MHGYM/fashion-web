@@ -4,6 +4,7 @@ import { ShoppingBag, ChevronLeft, Check } from 'lucide-react'
 import api from '../api'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import SizeGuideGloves from '../components/SizeGuideGloves'
 
 export default function ProductPage() {
   const { slug } = useParams()
@@ -29,6 +30,8 @@ export default function ProductPage() {
   const discount  = hasSale ? Math.round((1 - product.sale_price / product.price) * 100) : 0
   const images    = product.images || []
   const variants  = product.variants || []
+  // Maatadvies alleen bij handschoenen-categorie
+  const isGloves  = `${product.category_slug || ''} ${product.category_name || ''}`.toLowerCase().includes('handschoen')
 
   const handleAddToCart = async () => {
     if (!user) { navigate('/login'); return }
@@ -88,6 +91,9 @@ export default function ProductPage() {
           </div>
 
           {product.description && <p className="product-desc">{product.description}</p>}
+
+          {/* Maatadvies bokshandschoenen */}
+          {isGloves && <SizeGuideGloves/>}
 
           {/* Maten */}
           {variants.length > 0 && (

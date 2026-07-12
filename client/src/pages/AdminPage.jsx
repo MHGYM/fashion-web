@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, ShoppingBag, Tag, Home, Image as ImageIcon,
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp,
   ArrowLeft, Eye, EyeOff, Search, RefreshCw, Star, Shield, CalendarClock, Percent,
-  Euro, Users
+  Euro, Users, MoreVertical
 } from 'lucide-react'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
@@ -68,14 +68,14 @@ export default function AdminPage() {
   if (!user || user.role !== 'admin') return null
 
   return (
-    <div style={{ display:'flex', minHeight:'calc(100vh - 64px)' }}>
+    <div className="admin-shell" style={{ display:'flex', minHeight:'calc(100vh - 64px)' }}>
       {/* Sidebar */}
-      <aside style={{ width:220, background:'#0a0a0a', borderRight:'1px solid #1a1a1a', display:'flex', flexDirection:'column', flexShrink:0 }}>
+      <aside className="admin-sidebar" style={{ width:220, background:'#0a0a0a', borderRight:'1px solid #1a1a1a', display:'flex', flexDirection:'column', flexShrink:0 }}>
         <div style={{ padding:'1.5rem 1.25rem 1rem', borderBottom:'1px solid #1a1a1a' }}>
           <div style={{ fontSize:'0.65rem', letterSpacing:'0.2em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase', marginBottom:4 }}>Beheer</div>
           <div style={{ fontSize:'1rem', fontWeight:900, color:'#fff', letterSpacing:'0.06em', textTransform:'uppercase' }}>FightMarketing</div>
         </div>
-        <nav style={{ padding:'0.75rem 0', flex:1 }}>
+        <nav className="admin-nav" style={{ padding:'0.75rem 0', flex:1 }}>
           {[
             { key:'dashboard', icon:<LayoutDashboard size={16}/>, label:'Dashboard' },
             { key:'products',  icon:<Package size={16}/>,         label:'Producten' },
@@ -179,16 +179,30 @@ function ProductsTab({ products, categories, onRefresh }) {
   const [search, setSearch]     = useState('')
   const [modalOpen, setModal]   = useState(false)
   const [editId, setEditId]     = useState(null)
+  const [menuFor, setMenuFor]   = useState(null) // product-id van geopend ⋮-menu
 
   const openNew  = () => { setEditId(null); setModal(true) }
   const openEdit = (id) => { setEditId(id);  setModal(true) }
   const close    = () => { setModal(false); setEditId(null) }
   const saved    = () => { close(); onRefresh() }
 
-  const deleteProduct = async (p) => {
-    if (!confirm(`"${p.name}" deactiveren?`)) return
+  const deactivateProduct = async (p) => {
+    setMenuFor(null)
+    if (!confirm(`"${p.name}" deactiveren? Het product is dan niet meer zichtbaar in de shop, maar blijft bewaard.`)) return
     try {
       await api.delete(`/products/${p.id}`)
+      onRefresh()
+    } catch(e) {
+      alert('Deactiveren mislukt: ' + (e.response?.data?.error || e.message))
+    }
+  }
+
+  const hardDeleteProduct = async (p) => {
+    setMenuFor(null)
+    if (!confirm(`"${p.name}" permanent verwijderen?\n\nDit kan niet ongedaan worden gemaakt — weet je het zeker?`)) return
+    try {
+      const r = await api.delete(`/products/${p.id}?hard=1`)
+      if (r.data.deactivated) alert(r.data.message) // zat in bestellingen → soft-delete
       onRefresh()
     } catch(e) {
       alert('Verwijderen mislukt: ' + (e.response?.data?.error || e.message))
@@ -249,15 +263,31 @@ function ProductsTab({ products, categories, onRefresh }) {
                   }
                 </td>
                 <td style={{ padding:'10px 14px' }}>
-                  <div style={{ display:'flex', gap:6 }}>
+                  <div style={{ display:'flex', gap:6, position:'relative' }}>
                     <button onClick={() => openEdit(p.id)} title="Bewerken"
                       style={{ padding:'6px 10px', border:'1px solid #e0e0e0', borderRadius:6, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', color:'#444' }}>
                       <Pencil size={13}/>
                     </button>
-                    <button onClick={() => deleteProduct(p)} title="Verwijderen"
-                      style={{ padding:'6px 10px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', color:'#ef4444' }}>
-                      <Trash2 size={13}/>
+                    <button onClick={() => setMenuFor(menuFor === p.id ? null : p.id)} title="Meer opties" aria-label="Meer opties" aria-expanded={menuFor === p.id}
+                      style={{ padding:'6px 10px', border:'1px solid #e0e0e0', borderRadius:6, background: menuFor === p.id ? '#f3f4f6' : '#fff', cursor:'pointer', display:'flex', alignItems:'center', color:'#444' }}>
+                      <MoreVertical size={13}/>
                     </button>
+                    {menuFor === p.id && (
+                      <>
+                        {/* Klik buiten het menu sluit het */}
+                        <div onClick={() => setMenuFor(null)} style={{ position:'fixed', inset:0, zIndex:40 }}/>
+                        <div style={{ position:'absolute', right:0, top:'calc(100% + 4px)', zIndex:50, background:'#fff', border:'1px solid #e5e5e5', borderRadius:8, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', minWidth:200, overflow:'hidden' }}>
+                          <button onClick={() => deactivateProduct(p)}
+                            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, color:'#444', textAlign:'left' }}>
+                            <EyeOff size={13}/> Deactiveren
+                          </button>
+                          <button onClick={() => hardDeleteProduct(p)}
+                            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'none', border:'none', borderTop:'1px solid #f3f4f6', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, color:'#ef4444', textAlign:'left' }}>
+                            <Trash2 size={13}/> Permanent verwijderen
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -377,7 +407,7 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:1000, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'2rem 1rem', overflowY:'auto' }}
       onClick={onClose}>
-      <div style={{ background:'#fff', borderRadius:10, width:'100%', maxWidth:780, boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+      <div className="stack-mobile" style={{ background:'#fff', borderRadius:10, width:'100%', maxWidth:780, boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1.25rem 1.5rem', borderBottom:'1px solid #eee' }}>
@@ -803,7 +833,7 @@ function HomepageSection() {
   )
 
   return (
-    <div style={{ padding:'2rem' }}>
+    <div className="stack-mobile" style={{ padding:'2rem' }}>
       <PageHeader title="Homepage beheer" />
 
       {/* ── Hero afbeelding ── */}

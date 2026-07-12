@@ -114,9 +114,37 @@ const updateProduct = wrap(async (req, res) => {
   res.json({ message: 'Product bijgewerkt.' })
 })
 
+/**
+ * DELETE /products/:id        → deactiveren (soft delete, blijft in orderhistorie)
+ * DELETE /products/:id?hard=1 → permanent verwijderen. Komt het product voor in
+ * bestaande bestellingen, dan wordt het alsnog gedeactiveerd (soft-delete) zodat
+ * de orderhistorie niet breekt — de response meldt dat expliciet.
+ */
 const deleteProduct = wrap(async (req, res) => {
-  await db.execute({ sql: 'UPDATE products SET active = 0 WHERE id = ?', args: [req.params.id] })
-  res.json({ message: 'Product gedeactiveerd.' })
+  const { id } = req.params
+
+  if (req.query.hard === '1') {
+    const used = await db.execute({ sql: 'SELECT COUNT(*) as n FROM order_items WHERE product_id = ?', args: [id] })
+    if (Number(used.rows[0].n) > 0) {
+      await db.execute({ sql: 'UPDATE products SET active = 0 WHERE id = ?', args: [id] })
+      return res.json({
+        deleted: false, deactivated: true,
+        message: 'Dit product komt voor in bestaande bestellingen en is daarom gedeactiveerd in plaats van verwijderd — zo blijft de orderhistorie kloppen.',
+      })
+    }
+    const tx = await db.transaction('write')
+    try {
+      await tx.execute({ sql: 'DELETE FROM cart_items WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = ?)', args: [id] })
+      await tx.execute({ sql: 'DELETE FROM product_variants WHERE product_id = ?', args: [id] })
+      await tx.execute({ sql: 'DELETE FROM product_images WHERE product_id = ?', args: [id] })
+      await tx.execute({ sql: 'DELETE FROM products WHERE id = ?', args: [id] })
+      await tx.commit()
+    } catch (e) { try { await tx.rollback() } catch (_) {}; throw e }
+    return res.json({ deleted: true, message: 'Product permanent verwijderd.' })
+  }
+
+  await db.execute({ sql: 'UPDATE products SET active = 0 WHERE id = ?', args: [id] })
+  res.json({ deleted: false, deactivated: true, message: 'Product gedeactiveerd.' })
 })
 
 const replaceVariants = wrap(async (req, res) => {
