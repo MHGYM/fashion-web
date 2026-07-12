@@ -99,7 +99,68 @@ export default function SchoolDashboardPage() {
 
       {/* Kortingscodes / vechters */}
       <CodesPanel codes={codes} onChanged={load}/>
+
+      {/* Centrale catalogus: kies wat er in jouw shop staat */}
+      <AssortmentPanel/>
     </div>
+  )
+}
+
+const eurOrSale = (p) => p.sale_price
+  ? <><span style={{ color:'#dc2626', fontWeight:700 }}>{eur(p.sale_price)}</span> <s style={{ color:'#aaa', fontSize:'0.78rem' }}>{eur(p.price)}</s></>
+  : <span style={{ fontWeight:700 }}>{eur(p.price)}</span>
+
+function AssortmentPanel() {
+  const [items, setItems] = useState(null)
+  const [busy, setBusy]   = useState(null)
+
+  const load = useCallback(() => {
+    api.get('/schools/assortment/me').then(r => setItems(r.data)).catch(() => setItems([]))
+  }, [])
+  useEffect(load, [])
+
+  const toggle = async (p) => {
+    setBusy(p.id)
+    try {
+      await api.put(`/schools/assortment/me/${p.id}`, { active: !p.enabled })
+      await load()
+    } catch (e) { alert(e.response?.data?.error || 'Aanpassen mislukt.') }
+    finally { setBusy(null) }
+  }
+
+  return (
+    <Panel title="Extra assortiment in jouw shop" style={{ marginTop: '2.5rem' }}>
+      <p style={{ fontSize: '0.78rem', color: '#888', padding: '0.9rem 1.25rem 0', lineHeight: 1.6 }}>
+        Producten uit de centrale FightMarketing-catalogus. Zet aan wat jij in jouw
+        clubshop wilt verkopen — jouw eigen clubcollectie staat er altijd in.
+      </p>
+      {items === null ? (
+        <div style={{ padding: '1.5rem', textAlign: 'center', color: '#aaa', fontSize: '0.85rem' }} role="status">Laden…</div>
+      ) : items.length === 0 ? (
+        <div style={{ padding: '1.5rem', textAlign: 'center', color: '#aaa', fontSize: '0.85rem' }}>De centrale catalogus is nog leeg.</div>
+      ) : (
+        <div style={{ padding: '0.5rem 0' }}>
+          {items.map(p => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 1.25rem', borderBottom: '1px solid #f5f5f5' }}>
+              <div style={{ width: 40, height: 50, borderRadius: 6, overflow: 'hidden', background: '#f5f5f5', flexShrink: 0 }}>
+                {p.image && <img src={p.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#999' }}>{p.category_name || '—'} · {eurOrSale(p)}</div>
+              </div>
+              <button onClick={() => toggle(p)} disabled={busy === p.id}
+                aria-pressed={!!p.enabled}
+                style={{ padding: '7px 14px', borderRadius: 100, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', minWidth: 96,
+                  border: '1.5px solid', borderColor: p.enabled ? '#16a34a' : '#ddd',
+                  background: p.enabled ? '#dcfce7' : '#fff', color: p.enabled ? '#16a34a' : '#888' }}>
+                {busy === p.id ? '…' : p.enabled ? '✓ In shop' : 'Niet in shop'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
   )
 }
 

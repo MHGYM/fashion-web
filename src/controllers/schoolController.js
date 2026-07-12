@@ -30,14 +30,20 @@ const getStorefront = wrap(async (req, res) => {
       AND (closes_at IS NULL OR datetime(closes_at) >= datetime('now'))
     ORDER BY closes_at ASC LIMIT 1`)
 
+  // Clubcollectie + catalogusproducten die deze school zelf heeft geactiveerd
   const pR = await db.execute({
     sql: `SELECT p.*, c.name as category_name,
             (SELECT url FROM product_images WHERE product_id = p.id ORDER BY sort_order LIMIT 1) as image,
             (SELECT SUM(pv.stock) FROM product_variants pv WHERE pv.product_id = p.id) as total_stock
           FROM products p LEFT JOIN categories c ON c.id = p.category_id
-          WHERE p.active = 1 AND (p.school_id = ? OR p.school_id IS NULL)
+          WHERE p.active = 1 AND (
+            p.school_id = ?
+            OR (p.school_id IS NULL AND EXISTS (
+              SELECT 1 FROM school_products sp
+              WHERE sp.product_id = p.id AND sp.school_id = ? AND sp.active = 1))
+          )
           ORDER BY (p.school_id IS NULL), p.featured DESC, p.created_at DESC`,
-    args: [school.id]
+    args: [school.id, school.id]
   })
 
   res.json({ school, drop: dropR.rows[0] || null, products: pR.rows })
@@ -166,6 +172,47 @@ const createSchoolLogin = wrap(async (req, res) => {
   res.status(201).json({ message: 'School-login aangemaakt.' })
 })
 
+// ── Assortiment: school kiest catalogusproducten voor de eigen shop ──────────
+
+/** Bepaalt voor welke school de assortiment-actie geldt (school zelf of admin met ?school_id) */
+const assortmentSchoolId = (req) =>
+  req.user.role === 'admin' ? Number(req.query.school_id) : req.user.school_id
+
+/** GET /schools/assortment/me — centrale catalogus + aan/uit-status voor de eigen shop */
+const myAssortment = wrap(async (req, res) => {
+  const schoolId = assortmentSchoolId(req)
+  if (!schoolId) return res.status(400).json({ error: 'Geen school gekoppeld aan dit account.' })
+  const r = await db.execute({
+    sql: `SELECT p.id, p.name, p.price, p.sale_price, c.name as category_name,
+            (SELECT url FROM product_images WHERE product_id = p.id ORDER BY sort_order LIMIT 1) as image,
+            COALESCE(sp.active, 0) as enabled
+          FROM products p
+          LEFT JOIN categories c ON c.id = p.category_id
+          LEFT JOIN school_products sp ON sp.product_id = p.id AND sp.school_id = ?
+          WHERE p.school_id IS NULL AND p.active = 1
+          ORDER BY p.name`,
+    args: [schoolId]
+  })
+  res.json(r.rows)
+})
+
+/** PUT /schools/assortment/me/:productId — { active } catalogusproduct aan/uit in eigen shop */
+const toggleAssortment = wrap(async (req, res) => {
+  const schoolId = assortmentSchoolId(req)
+  if (!schoolId) return res.status(400).json({ error: 'Geen school gekoppeld aan dit account.' })
+  const productId = Number(req.params.productId)
+  const p = await db.execute({ sql: 'SELECT id FROM products WHERE id = ? AND school_id IS NULL AND active = 1', args: [productId] })
+  if (!p.rows[0]) return res.status(404).json({ error: 'Catalogusproduct niet gevonden.' })
+
+  const active = req.body.active === false || req.body.active === 0 ? 0 : 1
+  await db.execute({
+    sql: `INSERT INTO school_products (school_id, product_id, active) VALUES (?,?,?)
+          ON CONFLICT(school_id, product_id) DO UPDATE SET active = ?`,
+    args: [schoolId, productId, active, active]
+  })
+  res.json({ message: active ? 'Product staat nu in jouw shop.' : 'Product is uit jouw shop gehaald.' })
+})
+
 // ── Uitbetalingen (platform-admin) ────────────────────────────────────────────
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/
@@ -284,5 +331,5 @@ module.exports = {
   listSchools, getStorefront,
   adminListSchools, createSchool, updateSchool, deleteSchool, createSchoolLogin,
   payouts, payoutsExport,
-  dashboard,
+  dashboard, myAssortment, toggleAssortment,
 }

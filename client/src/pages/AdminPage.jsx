@@ -464,7 +464,7 @@ function ProductModal({ productId, categories, onClose, onSaved }) {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
                 <FormGroup label="School (clubcollectie)">
                   <select className="input" value={form.school_id} onChange={e => setForm(f=>({...f,school_id:e.target.value}))}>
-                    <option value="">Algemeen assortiment (alle shops)</option>
+                    <option value="">Centrale catalogus — scholen kiezen zelf of dit in hun shop staat</option>
                     {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </FormGroup>

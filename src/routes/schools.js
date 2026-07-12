@@ -7,6 +7,8 @@ router.get('/', ctrl.listSchools)
 
 // ── School-dashboard (rol 'school' of admin) ─────────────────────────────────
 router.get('/dashboard/me', authenticate, requireSchool, ctrl.dashboard)
+router.get('/assortment/me',            authenticate, requireSchool, ctrl.myAssortment)
+router.put('/assortment/me/:productId', authenticate, requireSchool, ctrl.toggleAssortment)
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 router.get   ('/admin',                 authenticate, requireAdmin, ctrl.adminListSchools)

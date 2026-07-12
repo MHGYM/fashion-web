@@ -44,6 +44,15 @@ const PATCHES = [
     created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
   `ALTER TABLE drops    ADD COLUMN notified_at DATETIME`,
+  `CREATE TABLE IF NOT EXISTS school_products (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    school_id  INTEGER NOT NULL REFERENCES schools(id)  ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    active     INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(school_id, product_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_school_products_school ON school_products(school_id)`,
   `CREATE TABLE IF NOT EXISTS drop_subscribers (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     email      TEXT NOT NULL UNIQUE,
@@ -110,6 +119,21 @@ async function ensureSchema() {
   for (const sql of PATCHES) {
     try { await db.execute(sql) } catch (_) {}
   }
+
+  // ── Centrale catalogus: eenmalige backfill ─────────────────────────────────
+  // Vóór deze migratie stonden alle 'algemeen assortiment'-producten in élke
+  // clubshop. Die situatie behouden we door ze eenmalig voor alle bestaande
+  // scholen te activeren; daarna kiest elke school zelf wat erbij komt.
+  try {
+    const migrated = await db.execute(`SELECT value FROM homepage_settings WHERE key = 'catalog_migrated'`)
+    if (!migrated.rows[0]) {
+      await db.execute(`
+        INSERT OR IGNORE INTO school_products (school_id, product_id, active)
+        SELECT s.id, p.id, 1 FROM schools s CROSS JOIN products p WHERE p.school_id IS NULL`)
+      await db.execute(`INSERT OR IGNORE INTO homepage_settings (key, value) VALUES ('catalog_migrated', '1')`)
+      console.log('[DB] Centrale catalogus: bestaande algemene producten voor alle scholen geactiveerd.')
+    }
+  } catch (e) { console.error('[DB] catalogus-backfill:', e.message) }
   for (const [key, value] of HOMEPAGE_DEFAULTS) {
     try {
       await db.execute({
