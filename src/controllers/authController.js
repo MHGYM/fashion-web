@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs')
 const jwt    = require('jsonwebtoken')
+const crypto = require('crypto')
 const db     = require('../db')
+const email  = require('../services/email')
+const { APP_URL } = require('../config')
 const { isEmail, isStr, optStr, bad } = require('../middleware/validate')
 
 const wrap = fn => (req, res, next) =>
@@ -66,4 +69,46 @@ const updateProfile = wrap(async (req, res) => {
   res.json({ message: 'Profiel bijgewerkt.' })
 })
 
-module.exports = { register, login, me, updateProfile }
+/**
+ * POST /auth/forgot-password — stuurt een resetlink per mail.
+ * Antwoordt altijd hetzelfde, ook bij onbekende adressen (geen account-enumeratie).
+ */
+const forgotPassword = wrap(async (req, res) => {
+  const addr = (req.body.email || '').trim().toLowerCase()
+  const generic = { message: 'Als dit e-mailadres bij ons bekend is, ontvang je binnen enkele minuten een resetlink.' }
+  if (!isEmail(addr)) return res.json(generic)
+
+  const r = await db.execute({ sql: 'SELECT id, email, first_name FROM users WHERE email = ?', args: [addr] })
+  const user = r.rows[0]
+  if (user) {
+    const token = crypto.randomBytes(32).toString('hex')
+    await db.execute({ sql: 'DELETE FROM password_reset_tokens WHERE user_id = ?', args: [user.id] })
+    await db.execute({
+      sql: `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?,?,datetime('now','+1 hour'))`,
+      args: [user.id, token]
+    })
+    email.passwordReset(user.email, user.first_name, `${APP_URL}/reset-password?token=${token}`).catch(() => {})
+  }
+  res.json(generic)
+})
+
+/** POST /auth/reset-password — { token, password } */
+const resetPassword = wrap(async (req, res) => {
+  const { token, password } = req.body
+  if (!isStr(token, 128)) return bad(res, 'Ongeldige resetlink.')
+  if (!isStr(password, 100) || password.length < 8) return bad(res, 'Wachtwoord moet minimaal 8 tekens zijn.')
+
+  const r = await db.execute({
+    sql: `SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND datetime(expires_at) > datetime('now')`,
+    args: [token]
+  })
+  const reset = r.rows[0]
+  if (!reset) return res.status(400).json({ error: 'Deze resetlink is ongeldig of verlopen. Vraag een nieuwe aan.' })
+
+  const hash = await bcrypt.hash(password, 12)
+  await db.execute({ sql: 'UPDATE users SET password = ? WHERE id = ?', args: [hash, reset.user_id] })
+  await db.execute({ sql: 'UPDATE password_reset_tokens SET used = 1 WHERE id = ?', args: [reset.id] })
+  res.json({ message: 'Wachtwoord gewijzigd. Je kunt nu inloggen.' })
+})
+
+module.exports = { register, login, me, updateProfile, forgotPassword, resetPassword }

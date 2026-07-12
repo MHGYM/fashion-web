@@ -1,8 +1,11 @@
 const router = require('express').Router()
 const { authenticate } = require('../middleware/auth')
+const { authLimiter } = require('../middleware/rateLimits')
 const ctrl = require('../controllers/authController')
 router.post('/register', ctrl.register)
 router.post('/login', ctrl.login)
+router.post('/forgot-password', authLimiter, ctrl.forgotPassword)
+router.post('/reset-password',  authLimiter, ctrl.resetPassword)
 router.get('/me', authenticate, ctrl.me)
 router.put('/profile', authenticate, ctrl.updateProfile)
 module.exports = router

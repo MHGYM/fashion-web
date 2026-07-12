@@ -19,6 +19,7 @@ const SchoolShopPage      = lazy(() => import('./pages/SchoolShopPage'))
 const SchoolDashboardPage = lazy(() => import('./pages/SchoolDashboardPage'))
 const MockPayPage         = lazy(() => import('./pages/MockPayPage'))
 const PaymentReturnPage   = lazy(() => import('./pages/PaymentReturnPage'))
+const ResetPasswordPage   = lazy(() => import('./pages/ResetPasswordPage'))
 const NotFoundPage        = lazy(() => import('./pages/NotFoundPage'))
 
 const PageLoader = () => (
@@ -48,6 +49,7 @@ function App() {
                 <Route path="/bestelling/:id/status"   element={<PaymentReturnPage />} />
                 <Route path="/login"       element={<AuthPage mode="login" />} />
                 <Route path="/register"    element={<AuthPage mode="register" />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="*"            element={<NotFoundPage />} />
               </Routes>
             </Suspense>

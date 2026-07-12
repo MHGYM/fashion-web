@@ -1,6 +1,48 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import api from '../api'
+
+/** Wachtwoord-vergeten mini-formulier */
+function ForgotForm({ onBack }) {
+  const [mail, setMail]     = useState('')
+  const [done, setDone]     = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault(); setLoading(true)
+    try { await api.post('/auth/forgot-password', { email: mail }) } catch {}
+    setDone(true); setLoading(false)
+  }
+
+  return (
+    <>
+      <h2>Wachtwoord vergeten</h2>
+      {done ? (
+        <>
+          <p>Als dit e-mailadres bij ons bekend is, ontvang je binnen enkele minuten een resetlink. Check ook je spam-map.</p>
+          <button className="btn btn-black btn-full" onClick={onBack}>Terug naar inloggen</button>
+        </>
+      ) : (
+        <>
+          <p>Vul je e-mailadres in — je ontvangt een link om een nieuw wachtwoord in te stellen.</p>
+          <form onSubmit={submit}>
+            <div className="form-group">
+              <label className="label" htmlFor="forgot-mail">E-mailadres</label>
+              <input id="forgot-mail" className="input" type="email" value={mail} onChange={e => setMail(e.target.value)} required autoFocus/>
+            </div>
+            <button className="btn btn-black btn-full btn-lg" type="submit" disabled={loading}>
+              {loading ? 'Bezig…' : 'Stuur resetlink'}
+            </button>
+          </form>
+          <div className="auth-footer">
+            <button onClick={onBack} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:600, fontSize:'0.85rem' }}>← Terug naar inloggen</button>
+          </div>
+        </>
+      )}
+    </>
+  )
+}
 
 export default function AuthPage({ mode }) {
   const { login, register } = useAuth()
@@ -10,6 +52,7 @@ export default function AuthPage({ mode }) {
   const [form, setForm] = useState({ email:'', password:'', first_name:'', last_name:'', phone:'' })
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
+  const [forgot,  setForgot]  = useState(false)
   const set = (k,v) => setForm(f => ({...f,[k]:v}))
 
   const submit = async (e) => {
@@ -23,6 +66,14 @@ export default function AuthPage({ mode }) {
     }
     setLoading(false)
   }
+
+  if (isLogin && forgot) return (
+    <div className="auth-page">
+      <div className="auth-box">
+        <ForgotForm onBack={() => setForgot(false)}/>
+      </div>
+    </div>
+  )
 
   return (
     <div className="auth-page">
@@ -47,8 +98,16 @@ export default function AuthPage({ mode }) {
             <input className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} required/>
           </div>
           <div className="form-group">
-            <label className="label">Wachtwoord</label>
-            <input className="input" type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6}/>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+              <label className="label">Wachtwoord</label>
+              {isLogin && (
+                <button type="button" onClick={() => setForgot(true)}
+                  style={{ background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontSize:'0.8rem', fontWeight:600, padding:0 }}>
+                  Wachtwoord vergeten?
+                </button>
+              )}
+            </div>
+            <input className="input" type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={isLogin ? 6 : 8}/>
           </div>
           {error && <p style={{ color:'var(--error)', fontSize:'0.85rem', marginBottom:'1rem' }}>{error}</p>}
           <button className="btn btn-black btn-full btn-lg" type="submit" disabled={loading}>
