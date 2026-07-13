@@ -136,7 +136,7 @@ export default function AdminPage() {
             {tab === 'dashboard'  && <DashboardTab stats={stats} orders={orders} products={products} onStatusChange={async (id,s) => { await api.put(`/orders/admin/${id}/status`,{status:s}); loadAll() }}/>}
             {tab === 'products'   && <ProductsTab  products={products} categories={categories} onRefresh={loadAll}/>}
             {tab === 'categories' && <CategoriesTab categories={categories} onRefresh={refreshCategories}/>}
-            {tab === 'orders'     && <OrdersTab orders={orders} onStatusChange={async (id,s) => { await api.put(`/orders/admin/${id}/status`,{status:s}); loadAll() }}/>}
+            {tab === 'orders'     && <OrdersTab orders={orders} onStatusChange={async (id,s) => { await api.put(`/orders/admin/${id}/status`,{status:s}); loadAll() }} onRefresh={loadAll}/>}
             {tab === 'schools'    && <AdminSchools/>}
             {tab === 'payouts'    && <AdminPayouts/>}
             {tab === 'users'      && <AdminUsers/>}
@@ -694,11 +694,20 @@ function CategoriesTab({ categories, onRefresh }) {
 }
 
 // ── Orders tab ────────────────────────────────────────────────────────────────
-function OrdersTab({ orders, onStatusChange }) {
+function OrdersTab({ orders, onStatusChange, onRefresh }) {
   const [filter,      setFilter]  = useState('all')
   const [schoolFilter, setSchoolFilter] = useState('all')
   const [detailOrder, setDetail]  = useState(null)
   const [loadingDetail, setLD]    = useState(false)
+
+  const deleteOrder = async (o) => {
+    if (!confirm(`Bestelling #${o.id} definitief verwijderen?${o.paid_at ? '' : '\nDe gereserveerde voorraad wordt teruggegeven.'}`)) return
+    try {
+      await api.delete(`/orders/admin/${o.id}`)
+      setDetail(null)
+      onRefresh && onRefresh()
+    } catch (e) { alert(e.response?.data?.error || 'Verwijderen mislukt.') }
+  }
 
   const schoolNames = [...new Set(orders.map(o => o.school_name).filter(Boolean))].sort()
   const filtered = orders
@@ -794,6 +803,15 @@ function OrdersTab({ orders, onStatusChange }) {
                 {detailOrder.notes && (
                   <div style={{ marginTop:'1rem', padding:'10px 12px', background:'#fffbeb', borderRadius:6, border:'1px solid #fde68a', fontSize:'0.82rem', color:'#92400e' }}>
                     <strong>Opmerking:</strong> {detailOrder.notes}
+                  </div>
+                )}
+
+                {!detailOrder.paid_at && (
+                  <div style={{ marginTop:'1.25rem', paddingTop:'1rem', borderTop:'1px solid #f0f0f0', textAlign:'right' }}>
+                    <button onClick={() => deleteOrder(detailOrder)}
+                      style={{ padding:'8px 14px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff', color:'#ef4444', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, display:'inline-flex', alignItems:'center', gap:6 }}>
+                      <Trash2 size={14}/> Bestelling verwijderen
+                    </button>
                   </div>
                 )}
               </div>

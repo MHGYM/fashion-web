@@ -194,4 +194,31 @@ const adminUpdateOrderStatus = wrap(async (req, res) => {
   res.json({ message: 'Status bijgewerkt.' })
 })
 
-module.exports = { createOrder, myOrders, getOrder, adminListOrders, adminGetOrder, adminUpdateOrderStatus }
+/**
+ * DELETE /orders/admin/:id — verwijdert een onbetaalde bestelling (bijv. een
+ * test- of spookorder). Betaalde bestellingen blijven bewaard voor de
+ * administratie. Bij een order die nog op betaling wachtte wordt de
+ * gereserveerde voorraad teruggegeven.
+ */
+const adminDeleteOrder = wrap(async (req, res) => {
+  const r = await db.execute({ sql: 'SELECT * FROM orders WHERE id = ?', args: [req.params.id] })
+  const order = r.rows[0]
+  if (!order) return res.status(404).json({ error: 'Bestelling niet gevonden.' })
+  if (order.paid_at) return res.status(400).json({ error: 'Betaalde bestellingen kunnen niet verwijderd worden (orderhistorie/administratie).' })
+
+  const tx = await db.transaction('write')
+  try {
+    if (order.status === 'awaiting_payment') {
+      const items = (await tx.execute({ sql: 'SELECT variant_id, quantity FROM order_items WHERE order_id = ?', args: [order.id] })).rows
+      for (const it of items) {
+        await tx.execute({ sql: 'UPDATE product_variants SET stock = stock + ? WHERE id = ?', args: [it.quantity, it.variant_id] })
+      }
+    }
+    await tx.execute({ sql: 'DELETE FROM order_items WHERE order_id = ?', args: [order.id] })
+    await tx.execute({ sql: 'DELETE FROM orders WHERE id = ?', args: [order.id] })
+    await tx.commit()
+  } catch (e) { try { await tx.rollback() } catch (_) {}; throw e }
+  res.json({ message: 'Bestelling verwijderd.' })
+})
+
+module.exports = { createOrder, myOrders, getOrder, adminListOrders, adminGetOrder, adminUpdateOrderStatus, adminDeleteOrder }

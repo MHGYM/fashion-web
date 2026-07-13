@@ -8,4 +8,5 @@ router.get('/mine/:id', authenticate, ctrl.getOrder)
 router.get('/admin', authenticate, requireAdmin, ctrl.adminListOrders)
 router.get('/admin/:id', authenticate, requireAdmin, ctrl.adminGetOrder)
 router.put('/admin/:id/status', authenticate, requireAdmin, ctrl.adminUpdateOrderStatus)
+router.delete('/admin/:id', authenticate, requireAdmin, ctrl.adminDeleteOrder)
 module.exports = router
