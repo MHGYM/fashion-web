@@ -71,9 +71,20 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint niet gevon
 // client/dist en handelt Express alles af, incl. SPA-fallback voor React Router.
 const clientDist = path.join(__dirname, '../client/dist')
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist))
+  // Gehashte assets (assets/index-XXXX.js) mogen eeuwig gecachet worden; de
+  // rest (vooral index.html) op no-cache zodat de browser na een nieuwe deploy
+  // altijd de actuele versie ophaalt — voorkomt "oude versie blijft hangen".
+  app.use(express.static(clientDist, {
+    setHeaders: (res, filePath) => {
+      res.setHeader('Cache-Control',
+        filePath.includes(`${path.sep}assets${path.sep}`)
+          ? 'public, max-age=31536000, immutable'
+          : 'no-cache')
+    }
+  }))
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next()
+    res.setHeader('Cache-Control', 'no-cache')
     res.sendFile(path.join(clientDist, 'index.html'))
   })
 }

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, ShoppingBag, Tag, Home, Image as ImageIcon,
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp,
   ArrowLeft, Eye, EyeOff, Search, RefreshCw, Star, Shield, CalendarClock, Percent,
-  Euro, Users, MoreVertical
+  Euro, Users
 } from 'lucide-react'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
@@ -203,7 +203,6 @@ function ProductsTab({ products, categories, onRefresh }) {
   const [search, setSearch]     = useState('')
   const [modalOpen, setModal]   = useState(false)
   const [editId, setEditId]     = useState(null)
-  const [menuFor, setMenuFor]   = useState(null) // product-id van geopend ⋮-menu
 
   const openNew  = () => { setEditId(null); setModal(true) }
   const openEdit = (id) => { setEditId(id);  setModal(true) }
@@ -287,31 +286,21 @@ function ProductsTab({ products, categories, onRefresh }) {
                   }
                 </td>
                 <td style={{ padding:'10px 14px' }}>
-                  <div style={{ display:'flex', gap:6, position:'relative' }}>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                     <button onClick={() => openEdit(p.id)} title="Bewerken"
-                      style={{ padding:'6px 10px', border:'1px solid #e0e0e0', borderRadius:6, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', color:'#444' }}>
-                      <Pencil size={13}/>
+                      style={{ padding:'6px 10px', border:'1px solid #e0e0e0', borderRadius:6, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:5, color:'#444', fontSize:'0.75rem', fontWeight:600 }}>
+                      <Pencil size={13}/> Bewerken
                     </button>
-                    <button onClick={() => setMenuFor(menuFor === p.id ? null : p.id)} title="Meer opties" aria-label="Meer opties" aria-expanded={menuFor === p.id}
-                      style={{ padding:'6px 10px', border:'1px solid #e0e0e0', borderRadius:6, background: menuFor === p.id ? '#f3f4f6' : '#fff', cursor:'pointer', display:'flex', alignItems:'center', color:'#444' }}>
-                      <MoreVertical size={13}/>
-                    </button>
-                    {menuFor === p.id && (
-                      <>
-                        {/* Klik buiten het menu sluit het */}
-                        <div onClick={() => setMenuFor(null)} style={{ position:'fixed', inset:0, zIndex:40 }}/>
-                        <div style={{ position:'absolute', right:0, top:'calc(100% + 4px)', zIndex:50, background:'#fff', border:'1px solid #e5e5e5', borderRadius:8, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', minWidth:200, overflow:'hidden' }}>
-                          <button onClick={() => deactivateProduct(p)}
-                            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, color:'#444', textAlign:'left' }}>
-                            <EyeOff size={13}/> Deactiveren
-                          </button>
-                          <button onClick={() => hardDeleteProduct(p)}
-                            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'none', border:'none', borderTop:'1px solid #f3f4f6', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, color:'#ef4444', textAlign:'left' }}>
-                            <Trash2 size={13}/> Permanent verwijderen
-                          </button>
-                        </div>
-                      </>
+                    {p.active && (
+                      <button onClick={() => deactivateProduct(p)} title="Deactiveren — product blijft bewaard, maar niet zichtbaar in de shop"
+                        style={{ padding:'6px 10px', border:'1px solid #e0e0e0', borderRadius:6, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:5, color:'#b45309', fontSize:'0.75rem', fontWeight:600 }}>
+                        <EyeOff size={13}/> Deactiveren
+                      </button>
                     )}
+                    <button onClick={() => hardDeleteProduct(p)} title="Permanent verwijderen — kan niet ongedaan worden gemaakt"
+                      style={{ padding:'6px 10px', border:'1px solid #fee2e2', borderRadius:6, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:5, color:'#ef4444', fontSize:'0.75rem', fontWeight:600 }}>
+                      <Trash2 size={13}/> Verwijderen
+                    </button>
                   </div>
                 </td>
               </tr>

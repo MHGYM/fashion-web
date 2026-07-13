@@ -152,12 +152,30 @@ const replaceVariants = wrap(async (req, res) => {
   const { variants } = req.body
   if (!Array.isArray(variants)) return res.status(400).json({ error: 'Varianten array verwacht.' })
 
-  await db.execute({ sql: 'DELETE FROM product_variants WHERE product_id = ?', args: [id] })
+  // Upsert i.p.v. delete+insert. Varianten die in een bestaande bestelling
+  // zitten mogen niet verwijderd worden (foreign key vanuit order_items zonder
+  // cascade → anders faalt de hele opslag). We werken bestaande maten bij,
+  // voegen nieuwe toe, en verwijderen verdwenen maten alleen als ze nergens
+  // besteld zijn; anders zetten we de voorraad op 0 (uit de verkoop).
+  const existing = (await db.execute({ sql: 'SELECT id, size FROM product_variants WHERE product_id = ?', args: [id] })).rows
+  const incoming = new Set(variants.map(v => String(v.size)))
+
   for (const v of variants) {
-    await db.execute({
-      sql: 'INSERT INTO product_variants (product_id,size,color,stock) VALUES (?,?,?,?)',
-      args: [id, v.size, v.color || null, v.stock || 0]
-    })
+    const match = existing.find(e => String(e.size) === String(v.size))
+    if (match) {
+      await db.execute({ sql: 'UPDATE product_variants SET stock = ?, color = ? WHERE id = ?', args: [v.stock || 0, v.color || null, match.id] })
+    } else {
+      await db.execute({ sql: 'INSERT INTO product_variants (product_id,size,color,stock) VALUES (?,?,?,?)', args: [id, v.size, v.color || null, v.stock || 0] })
+    }
+  }
+  for (const e of existing) {
+    if (incoming.has(String(e.size))) continue
+    const used = await db.execute({ sql: 'SELECT COUNT(*) AS n FROM order_items WHERE variant_id = ?', args: [e.id] })
+    if (Number(used.rows[0].n) === 0) {
+      await db.execute({ sql: 'DELETE FROM product_variants WHERE id = ?', args: [e.id] })
+    } else {
+      await db.execute({ sql: 'UPDATE product_variants SET stock = 0 WHERE id = ?', args: [e.id] })
+    }
   }
   res.json({ message: 'Varianten bijgewerkt.' })
 })
