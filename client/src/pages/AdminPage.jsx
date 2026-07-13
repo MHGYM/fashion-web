@@ -825,11 +825,12 @@ function OrdersTab({ orders, onStatusChange, onRefresh }) {
 
 // ── Homepage section ──────────────────────────────────────────────────────────
 function HomepageSection() {
-  const heroFileRef = useRef()
-  const [settings,  setSettings]  = useState(null)
-  const [saving,    setSaving]    = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [saved,     setSaved]     = useState(false)
+  const heroFileRef  = useRef()
+  const promoFileRef = useRef()
+  const [settings,     setSettings]     = useState(null)
+  const [saving,       setSaving]       = useState(false)
+  const [uploadingKey, setUploadingKey] = useState(null)
+  const [saved,        setSaved]        = useState(false)
 
   useEffect(() => {
     api.get('/products/homepage-settings')
@@ -839,15 +840,15 @@ function HomepageSection() {
 
   const set = (key, val) => setSettings(s => ({ ...s, [key]: val }))
 
-  const uploadHeroImage = async (file) => {
-    setUploading(true)
+  const uploadImage = async (key, file) => {
+    setUploadingKey(key)
     try {
       const fd = new FormData()
       fd.append('image', file)
       const r = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      set('hero_image', r.data.url)
+      set(key, r.data.url)
     } catch(e) { alert('Upload mislukt: ' + (e.response?.data?.error || e.message)) }
-    finally { setUploading(false) }
+    finally { setUploadingKey(null) }
   }
 
   const save = async () => {
@@ -878,15 +879,15 @@ function HomepageSection() {
             <img src={settings.hero_image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', opacity:0.7 }}/>
           )}
           <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8 }}>
-            <button onClick={() => heroFileRef.current?.click()} disabled={uploading}
+            <button onClick={() => heroFileRef.current?.click()} disabled={uploadingKey === 'hero_image'}
               style={{ padding:'9px 18px', background:'rgba(255,255,255,0.92)', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem', display:'flex', alignItems:'center', gap:6 }}>
-              {uploading ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }}/> Uploaden…</> : <><Upload size={14}/> Foto uploaden</>}
+              {uploadingKey === 'hero_image' ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }}/> Uploaden…</> : <><Upload size={14}/> Foto uploaden</>}
             </button>
             <span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.72rem' }}>of plak een URL hieronder</span>
           </div>
         </div>
         <input ref={heroFileRef} type="file" accept="image/*" style={{ display:'none' }}
-          onChange={e => { const f = e.target.files?.[0]; if (f) uploadHeroImage(f); e.target.value = '' }}/>
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage('hero_image', f); e.target.value = '' }}/>
         <input className="input" value={settings.hero_image || ''} onChange={e => set('hero_image', e.target.value)}
           placeholder="https://... of /uploads/bestand.jpg" style={{ fontSize:'0.82rem' }}/>
       </div>
@@ -903,10 +904,73 @@ function HomepageSection() {
             <label className="label" style={{ fontSize:'0.75rem' }}>Knoptekst (CTA)</label>
             <input className="input" value={settings.hero_cta || ''} onChange={e => set('hero_cta', e.target.value)} placeholder="Koop Nu"/>
           </div>
+          <div>
+            <label className="label" style={{ fontSize:'0.75rem' }}>Knop-link (waar de knop heen gaat)</label>
+            <input className="input" value={settings.hero_cta_link || ''} onChange={e => set('hero_cta_link', e.target.value)} placeholder="/shop  ·  /scholen  ·  https://…"/>
+          </div>
           <div style={{ gridColumn:'1 / -1' }}>
             <label className="label" style={{ fontSize:'0.75rem' }}>Hoofdtekst (heading)</label>
             <input className="input" value={settings.hero_heading || ''} onChange={e => set('hero_heading', e.target.value)} placeholder="DEFINE YOUR STYLE"/>
             <p style={{ fontSize:'0.7rem', color:'#aaa', marginTop:4 }}>Gebruik | als regelafbreking, bijv. <em>DEFINE|YOUR|STYLE</em></p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Promo-banner ── */}
+      <div style={{ marginBottom:'2rem' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.875rem', paddingBottom:'0.5rem', borderBottom:'1px solid #f0f0f0' }}>
+          <span style={{ fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase', color:'#aaa' }}>Promo-banner</span>
+          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:'0.78rem', fontWeight:600, cursor:'pointer' }}>
+            <input type="checkbox" checked={settings.promo_visible !== '0'} onChange={e => set('promo_visible', e.target.checked ? '1' : '0')} style={{ width:15, height:15 }}/>
+            Tonen op homepage
+          </label>
+        </div>
+
+        <div style={{ position:'relative', height:160, borderRadius:8, overflow:'hidden', background:'#111', marginBottom:'0.75rem' }}>
+          {settings.promo_image && <img src={settings.promo_image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', opacity:0.7 }}/>}
+          <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <button onClick={() => promoFileRef.current?.click()} disabled={uploadingKey === 'promo_image'}
+              style={{ padding:'9px 18px', background:'rgba(255,255,255,0.92)', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem', display:'flex', alignItems:'center', gap:6 }}>
+              {uploadingKey === 'promo_image' ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }}/> Uploaden…</> : <><Upload size={14}/> Foto uploaden</>}
+            </button>
+          </div>
+        </div>
+        <input ref={promoFileRef} type="file" accept="image/*" style={{ display:'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage('promo_image', f); e.target.value = '' }}/>
+        <input className="input" value={settings.promo_image || ''} onChange={e => set('promo_image', e.target.value)} placeholder="https://... of /uploads/bestand.jpg" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}/>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+          <div>
+            <label className="label" style={{ fontSize:'0.75rem' }}>Bovenregel</label>
+            <input className="input" value={settings.promo_overline || ''} onChange={e => set('promo_overline', e.target.value)} placeholder="Limited Drop"/>
+          </div>
+          <div>
+            <label className="label" style={{ fontSize:'0.75rem' }}>Knoptekst</label>
+            <input className="input" value={settings.promo_cta || ''} onChange={e => set('promo_cta', e.target.value)} placeholder="Ontdek nu"/>
+          </div>
+          <div>
+            <label className="label" style={{ fontSize:'0.75rem' }}>Knop-link</label>
+            <input className="input" value={settings.promo_cta_link || ''} onChange={e => set('promo_cta_link', e.target.value)} placeholder="/shop  ·  /scholen  ·  https://…"/>
+          </div>
+          <div style={{ gridColumn:'1 / -1' }}>
+            <label className="label" style={{ fontSize:'0.75rem' }}>Hoofdtekst</label>
+            <input className="input" value={settings.promo_heading || ''} onChange={e => set('promo_heading', e.target.value)} placeholder="DE SEIZOENSCOLLECTIE|IS ER."/>
+            <p style={{ fontSize:'0.7rem', color:'#aaa', marginTop:4 }}>Gebruik | als regelafbreking.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sectietitels ── */}
+      <div style={{ marginBottom:'2rem' }}>
+        <div style={{ fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase', color:'#aaa', marginBottom:'0.875rem', paddingBottom:'0.5rem', borderBottom:'1px solid #f0f0f0' }}>Sectietitels</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+          <div>
+            <label className="label" style={{ fontSize:'0.75rem' }}>Titel "uitgelicht"-sectie</label>
+            <input className="input" value={settings.featured_title || ''} onChange={e => set('featured_title', e.target.value)} placeholder="Nieuw binnen"/>
+          </div>
+          <div>
+            <label className="label" style={{ fontSize:'0.75rem' }}>Titel sale-sectie</label>
+            <input className="input" value={settings.sale_title || ''} onChange={e => set('sale_title', e.target.value)} placeholder="Sale"/>
           </div>
         </div>
       </div>

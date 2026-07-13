@@ -17,11 +17,35 @@ const CAT_FALLBACK = {
 const DEFAULT_CAT_IMG = 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&q=80'
 
 const HERO_DEFAULTS = {
-  hero_image:   'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80',
-  hero_overline:'Hét fight gear platform van Nederland',
-  hero_heading: 'JOUW CLUB.|JOUW GEAR.',
-  hero_cta:     'Ontdek de shop',
+  hero_image:    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80',
+  hero_overline: 'Hét fight gear platform van Nederland',
+  hero_heading:  'JOUW CLUB.|JOUW GEAR.',
+  hero_cta:      'Ontdek de shop',
+  hero_cta_link: '/shop',
+  promo_visible:  '1',
+  promo_image:    'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&q=80',
+  promo_overline: 'Limited Drop',
+  promo_heading:  'DE SEIZOENSCOLLECTIE|IS ER.',
+  promo_cta:      'Ontdek nu',
+  promo_cta_link: '/shop',
+  featured_title: 'Nieuw binnen',
+  sale_title:     'Sale',
 }
+
+// Interne paden via <Link>, volledige URLs via <a> — zo kan de admin de knoppen
+// naar een pagina op de site óf naar een externe link laten wijzen.
+function SmartLink({ to, className, children }) {
+  const target = to || '/shop'
+  if (/^https?:\/\//.test(target)) {
+    return <a href={target} className={className}>{children}</a>
+  }
+  return <Link to={target} className={className}>{children}</Link>
+}
+
+// Splitst een tekst op | in regels met <br/>
+const lines = (txt) => (txt || '').split('|').map((line, i, arr) => (
+  <span key={i}>{line}{i < arr.length - 1 && <br/>}</span>
+))
 
 export default function HomePage() {
   const [featured,    setFeatured]    = useState([])
@@ -56,7 +80,7 @@ export default function HomePage() {
               <span key={i}>{line}{i < headingLines.length - 1 && <br/>}</span>
             ))}
           </h1>
-          <Link to="/shop" className="hero-cta">{hero.hero_cta}</Link>
+          <SmartLink to={hero.hero_cta_link} className="hero-cta">{hero.hero_cta}</SmartLink>
         </div>
         <div className="hero-scroll-hint">
           <span>SCROLL</span>
@@ -91,7 +115,7 @@ export default function HomePage() {
         <section className="home-section">
           <div className="home-section-inner">
             <div className="home-section-header">
-              <h2 className="home-section-title">Nieuw binnen</h2>
+              <h2 className="home-section-title">{hero.featured_title}</h2>
               <Link to="/shop" className="home-section-link">Alles bekijken →</Link>
             </div>
             <div className="product-grid">
@@ -102,24 +126,26 @@ export default function HomePage() {
       )}
 
       {/* ── Promo banner ─────────────────────────── */}
-      <section className="promo-banner">
-        <div className="promo-banner-text">
-          <p className="promo-overline">Limited Drop</p>
-          <h2 className="promo-heading">DE SEIZOENS­COLLECTIE<br />IS ER.</h2>
-          <Link to="/shop" className="promo-cta">Ontdek nu</Link>
-        </div>
-        <div
-          className="promo-banner-img"
-          style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&q=80)' }}
-        />
-      </section>
+      {hero.promo_visible !== '0' && (
+        <section className="promo-banner">
+          <div className="promo-banner-text">
+            <p className="promo-overline">{hero.promo_overline}</p>
+            <h2 className="promo-heading">{lines(hero.promo_heading)}</h2>
+            <SmartLink to={hero.promo_cta_link} className="promo-cta">{hero.promo_cta}</SmartLink>
+          </div>
+          <div
+            className="promo-banner-img"
+            style={{ backgroundImage: `url(${hero.promo_image})` }}
+          />
+        </section>
+      )}
 
       {/* ── Sale ─────────────────────────────────── */}
       {sale.length > 0 && (
         <section className="home-section">
           <div className="home-section-inner">
             <div className="home-section-header">
-              <h2 className="home-section-title">Sale</h2>
+              <h2 className="home-section-title">{hero.sale_title}</h2>
               <Link to="/shop?sale=1" className="home-section-link">Alle sale →</Link>
             </div>
             <div className="product-grid">

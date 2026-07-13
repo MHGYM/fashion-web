@@ -100,10 +100,21 @@ const PATCHES = [
 ]
 
 const HOMEPAGE_DEFAULTS = [
-  ['hero_image',   'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80'],
-  ['hero_overline','Hét fight gear platform van Nederland'],
-  ['hero_heading', 'JOUW CLUB.|JOUW GEAR.'],
-  ['hero_cta',     'Ontdek de shop'],
+  ['hero_image',    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80'],
+  ['hero_overline', 'Hét fight gear platform van Nederland'],
+  ['hero_heading',  'JOUW CLUB.|JOUW GEAR.'],
+  ['hero_cta',      'Ontdek de shop'],
+  ['hero_cta_link', '/shop'],
+  // Promo-banner (bewerkbaar via de Homepage-editor)
+  ['promo_visible',  '1'],
+  ['promo_image',    'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&q=80'],
+  ['promo_overline', 'Limited Drop'],
+  ['promo_heading',  'DE SEIZOENSCOLLECTIE|IS ER.'],
+  ['promo_cta',      'Ontdek nu'],
+  ['promo_cta_link', '/shop'],
+  // Sectietitels
+  ['featured_title', 'Nieuw binnen'],
+  ['sale_title',     'Sale'],
 ]
 
 // Oude SeasonFits/SummerFits-teksten → alleen overschrijven als de waarde nog
@@ -189,14 +200,14 @@ async function ensureSchema() {
   }
   // Rebrand: vervang oude SeasonFits/SummerFits-teksten door FightMarketing-
   // defaults, maar respecteer teksten die de admin zelf heeft aangepast
-  for (let i = 0; i < HOMEPAGE_DEFAULTS.length; i++) {
-    const [key, newValue] = HOMEPAGE_DEFAULTS[i]
-    const [, legacyValues] = LEGACY_HOMEPAGE_VALUES[i]
+  for (const [key, legacyValues] of LEGACY_HOMEPAGE_VALUES) {
+    const def = HOMEPAGE_DEFAULTS.find(d => d[0] === key)
+    if (!def) continue
     for (const legacyValue of legacyValues) {
       try {
         await db.execute({
           sql:  'UPDATE homepage_settings SET value = ? WHERE key = ? AND value = ?',
-          args: [newValue, key, legacyValue],
+          args: [def[1], key, legacyValue],
         })
       } catch (_) {}
     }

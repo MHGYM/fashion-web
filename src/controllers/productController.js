@@ -245,7 +245,11 @@ const getHomepageSettings = wrap(async (req, res) => {
 })
 
 const updateHomepageSettings = wrap(async (req, res) => {
-  const allowed = ['hero_image', 'hero_overline', 'hero_heading', 'hero_cta']
+  const allowed = [
+    'hero_image', 'hero_overline', 'hero_heading', 'hero_cta', 'hero_cta_link',
+    'promo_visible', 'promo_image', 'promo_overline', 'promo_heading', 'promo_cta', 'promo_cta_link',
+    'featured_title', 'sale_title',
+  ]
   for (const key of allowed) {
     if (req.body[key] !== undefined) {
       await db.execute({
