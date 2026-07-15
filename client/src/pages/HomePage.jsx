@@ -48,6 +48,10 @@ const lines = (txt) => (txt || '').split('|').map((line, i, arr) => (
   <span key={i}>{line}{i < arr.length - 1 && <br/>}</span>
 ))
 
+// Herkent een videobestand aan de extensie — zo speelt een video ook af als
+// die per ongeluk in het foto-veld is geüpload.
+const isVideoUrl = (u) => /\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(u || '')
+
 export default function HomePage() {
   const [featured,    setFeatured]    = useState([])
   const [sale,        setSale]        = useState([])
@@ -64,17 +68,22 @@ export default function HomePage() {
   // Heading: gebruik | als regelafbreking
   const headingLines = (hero.hero_heading || '').split('|')
 
+  // Video-achtergrond: expliciet hero_video, óf een video die in het foto-veld staat
+  const heroVideo  = hero.hero_video || (isVideoUrl(hero.hero_image) ? hero.hero_image : '')
+  const heroPoster = isVideoUrl(hero.hero_image) ? '' : hero.hero_image
+
   return (
     <div className="homepage">
 
       {/* ── Hero ─────────────────────────────────── */}
       <section className="hero-full">
-        {hero.hero_video ? (
+        {heroVideo ? (
           <video
             className="hero-full-bg"
-            src={hero.hero_video}
-            poster={hero.hero_image}
-            autoPlay muted loop playsInline
+            src={heroVideo}
+            poster={heroPoster || undefined}
+            autoPlay loop playsInline muted
+            ref={el => { if (el) el.muted = true }}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
