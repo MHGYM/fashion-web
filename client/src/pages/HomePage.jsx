@@ -18,6 +18,7 @@ const DEFAULT_CAT_IMG = 'https://images.unsplash.com/photo-1441984904996-e0b6ba6
 
 const HERO_DEFAULTS = {
   hero_image:    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80',
+  hero_video:    '',
   hero_overline: 'Hét fight gear platform van Nederland',
   hero_heading:  'JOUW CLUB.|JOUW GEAR.',
   hero_cta:      'Ontdek de shop',
@@ -68,10 +69,20 @@ export default function HomePage() {
 
       {/* ── Hero ─────────────────────────────────── */}
       <section className="hero-full">
-        <div
-          className="hero-full-bg"
-          style={{ backgroundImage: `url(${hero.hero_image})` }}
-        />
+        {hero.hero_video ? (
+          <video
+            className="hero-full-bg"
+            src={hero.hero_video}
+            poster={hero.hero_image}
+            autoPlay muted loop playsInline
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div
+            className="hero-full-bg"
+            style={{ backgroundImage: `url(${hero.hero_image})` }}
+          />
+        )}
         <div className="hero-full-overlay" />
         <div className="hero-full-content">
           <p className="hero-overline">{hero.hero_overline}</p>

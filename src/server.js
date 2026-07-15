@@ -24,8 +24,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      // Productfoto's mogen van externe hosts komen (Unsplash, CDN's)
-      'img-src': ["'self'", 'data:', 'https:'],
+      // Productfoto's en video's mogen van externe hosts komen (Unsplash, CDN's)
+      'img-src':   ["'self'", 'data:', 'https:'],
+      'media-src': ["'self'", 'data:', 'https:', 'blob:'],
     },
   },
 }))
@@ -45,10 +46,13 @@ app.use('/uploads', express.static(UPLOADS_DIR))
 app.use('/api/auth/login', authLimiter)
 app.use('/api/auth/register', authLimiter)
 
-// Image upload endpoint
-app.post('/api/upload', authenticate, requireAdmin, upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Geen bestand ontvangen.' })
-  res.json({ url: `/uploads/${req.file.filename}` })
+// Upload endpoint (foto's én video's) — multer-fouten netjes teruggeven
+app.post('/api/upload', authenticate, requireAdmin, (req, res) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Bestand te groot (max 50MB).' : (err.message || 'Upload mislukt.') })
+    if (!req.file) return res.status(400).json({ error: 'Geen bestand ontvangen.' })
+    res.json({ url: `/uploads/${req.file.filename}` })
+  })
 })
 
 app.use('/api/auth',      require('./routes/auth'))

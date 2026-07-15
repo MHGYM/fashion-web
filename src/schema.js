@@ -101,6 +101,7 @@ const PATCHES = [
 
 const HOMEPAGE_DEFAULTS = [
   ['hero_image',    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80'],
+  ['hero_video',    ''],
   ['hero_overline', 'Hét fight gear platform van Nederland'],
   ['hero_heading',  'JOUW CLUB.|JOUW GEAR.'],
   ['hero_cta',      'Ontdek de shop'],

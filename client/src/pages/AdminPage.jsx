@@ -826,6 +826,7 @@ function OrdersTab({ orders, onStatusChange, onRefresh }) {
 // ── Homepage section ──────────────────────────────────────────────────────────
 function HomepageSection() {
   const heroFileRef  = useRef()
+  const heroVideoRef = useRef()
   const promoFileRef = useRef()
   const [settings,     setSettings]     = useState(null)
   const [saving,       setSaving]       = useState(false)
@@ -890,6 +891,29 @@ function HomepageSection() {
           onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage('hero_image', f); e.target.value = '' }}/>
         <input className="input" value={settings.hero_image || ''} onChange={e => set('hero_image', e.target.value)}
           placeholder="https://... of /uploads/bestand.jpg" style={{ fontSize:'0.82rem' }}/>
+
+        {/* Hero-video (optioneel) */}
+        <div style={{ marginTop:'1rem' }}>
+          <label className="label" style={{ fontSize:'0.75rem' }}>Hero-video (optioneel — vervangt de foto door een bewegende achtergrond)</label>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <button onClick={() => heroVideoRef.current?.click()} disabled={uploadingKey === 'hero_video'} className="btn btn-outline"
+              style={{ fontSize:'0.8rem', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
+              {uploadingKey === 'hero_video' ? <><RefreshCw size={13} style={{ animation:'spin 1s linear infinite' }}/> Uploaden…</> : <><Upload size={13}/> Video uploaden</>}
+            </button>
+            <input className="input" value={settings.hero_video || ''} onChange={e => set('hero_video', e.target.value)}
+              placeholder="leeg = foto gebruiken" style={{ fontSize:'0.82rem', flex:1, minWidth:160 }}/>
+            {settings.hero_video && (
+              <button onClick={() => set('hero_video', '')} className="btn btn-outline" style={{ fontSize:'0.8rem', color:'#ef4444', whiteSpace:'nowrap' }}>Video weghalen</button>
+            )}
+          </div>
+          <input ref={heroVideoRef} type="file" accept="video/*" style={{ display:'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage('hero_video', f); e.target.value = '' }}/>
+          {settings.hero_video && (
+            <video src={settings.hero_video} muted loop autoPlay playsInline
+              style={{ marginTop:'0.6rem', width:'100%', maxHeight:180, objectFit:'cover', borderRadius:8, background:'#000' }}/>
+          )}
+          <p style={{ fontSize:'0.7rem', color:'#aaa', marginTop:4 }}>Tip: kort MP4-fragment, geluidloos (speelt automatisch + herhaalt). Max 50MB — de foto blijft de fallback/poster.</p>
+        </div>
       </div>
 
       {/* ── Hero teksten ── */}

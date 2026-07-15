@@ -15,9 +15,9 @@ const storage = multer.diskStorage({
 
 module.exports = multer({
   storage,
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB — ruim genoeg voor een korte hero-video
   fileFilter: (_, file, cb) => {
-    if (/^image\//.test(file.mimetype)) cb(null, true)
-    else cb(new Error('Alleen afbeeldingen zijn toegestaan'))
+    if (/^(image|video)\//.test(file.mimetype)) cb(null, true)
+    else cb(new Error('Alleen afbeeldingen of video\'s zijn toegestaan'))
   }
 })
