@@ -999,6 +999,24 @@ function HomepageSection() {
         </div>
       </div>
 
+      {/* ── USP-balk (onderaan de homepage) ── */}
+      <div style={{ marginBottom:'2rem' }}>
+        <div style={{ fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase', color:'#aaa', marginBottom:'0.875rem', paddingBottom:'0.5rem', borderBottom:'1px solid #f0f0f0' }}>USP-balk (onderaan de homepage)</div>
+        {[1,2,3,4].map(n => (
+          <div key={n} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginBottom:'0.75rem' }}>
+            <div>
+              <label className="label" style={{ fontSize:'0.75rem' }}>Blok {n} — titel</label>
+              <input className="input" value={settings['usp'+n+'_title'] || ''} onChange={e => set('usp'+n+'_title', e.target.value)} placeholder="Snelle levering"/>
+            </div>
+            <div>
+              <label className="label" style={{ fontSize:'0.75rem' }}>Blok {n} — subtekst</label>
+              <input className="input" value={settings['usp'+n+'_sub'] || ''} onChange={e => set('usp'+n+'_sub', e.target.value)} placeholder="1–3 werkdagen"/>
+            </div>
+          </div>
+        ))}
+        <p style={{ fontSize:'0.7rem', color:'#aaa', marginTop:2 }}>Laat een blok leeg (titel én subtekst) om het te verbergen.</p>
+      </div>
+
       {/* Opslaan */}
       <button onClick={save} disabled={saving} className="btn btn-black"
         style={{ display:'flex', alignItems:'center', gap:6, fontSize:'0.85rem' }}>

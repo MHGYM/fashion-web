@@ -31,6 +31,10 @@ const HERO_DEFAULTS = {
   promo_cta_link: '/shop',
   featured_title: 'Nieuw binnen',
   sale_title:     'Sale',
+  usp1_title: 'Snelle levering', usp1_sub: '1–3 werkdagen',
+  usp2_title: 'Gratis retour',   usp2_sub: '30 dagen',
+  usp3_title: 'Veilig betalen',  usp3_sub: 'iDEAL & meer',
+  usp4_title: 'Klantenservice',  usp4_sub: 'Altijd bereikbaar',
 }
 
 // Interne paden via <Link>, volledige URLs via <a> — zo kan de admin de knoppen
@@ -191,15 +195,15 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ── USP balk ─────────────────────────────── */}
+      {/* ── USP balk (bewerkbaar via Homepage-editor) ─── */}
       <div className="usp-bar">
         {[
-          ['Snelle levering', '1–3 werkdagen'],
-          ['Gratis retour', '30 dagen'],
-          ['Veilig betalen', 'iDEAL & meer'],
-          ['Klantenservice', 'Altijd bereikbaar'],
-        ].map(([title, sub]) => (
-          <div key={title} className="usp-item">
+          [hero.usp1_title, hero.usp1_sub],
+          [hero.usp2_title, hero.usp2_sub],
+          [hero.usp3_title, hero.usp3_sub],
+          [hero.usp4_title, hero.usp4_sub],
+        ].filter(([t, s]) => t || s).map(([title, sub], i) => (
+          <div key={i} className="usp-item">
             <div className="usp-title">{title}</div>
             <div className="usp-sub">{sub}</div>
           </div>

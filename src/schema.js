@@ -116,6 +116,11 @@ const HOMEPAGE_DEFAULTS = [
   // Sectietitels
   ['featured_title', 'Nieuw binnen'],
   ['sale_title',     'Sale'],
+  // USP-balk onderaan de homepage (titel + subtekst per blok)
+  ['usp1_title', 'Snelle levering'], ['usp1_sub', '1–3 werkdagen'],
+  ['usp2_title', 'Gratis retour'],   ['usp2_sub', '30 dagen'],
+  ['usp3_title', 'Veilig betalen'],  ['usp3_sub', 'iDEAL & meer'],
+  ['usp4_title', 'Klantenservice'],  ['usp4_sub', 'Altijd bereikbaar'],
 ]
 
 // Oude SeasonFits/SummerFits-teksten → alleen overschrijven als de waarde nog

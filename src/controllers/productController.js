@@ -249,6 +249,8 @@ const updateHomepageSettings = wrap(async (req, res) => {
     'hero_image', 'hero_video', 'hero_overline', 'hero_heading', 'hero_cta', 'hero_cta_link',
     'promo_visible', 'promo_image', 'promo_overline', 'promo_heading', 'promo_cta', 'promo_cta_link',
     'featured_title', 'sale_title',
+    'usp1_title', 'usp1_sub', 'usp2_title', 'usp2_sub',
+    'usp3_title', 'usp3_sub', 'usp4_title', 'usp4_sub',
   ]
   for (const key of allowed) {
     if (req.body[key] !== undefined) {
