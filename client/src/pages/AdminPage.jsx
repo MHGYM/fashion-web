@@ -210,7 +210,6 @@ function ProductsTab({ products, categories, onRefresh }) {
   const saved    = () => { close(); onRefresh() }
 
   const deactivateProduct = async (p) => {
-    setMenuFor(null)
     if (!confirm(`"${p.name}" deactiveren? Het product is dan niet meer zichtbaar in de shop, maar blijft bewaard.`)) return
     try {
       await api.delete(`/products/${p.id}`)
@@ -221,7 +220,6 @@ function ProductsTab({ products, categories, onRefresh }) {
   }
 
   const hardDeleteProduct = async (p) => {
-    setMenuFor(null)
     if (!confirm(`"${p.name}" permanent verwijderen?\n\nDit kan niet ongedaan worden gemaakt — weet je het zeker?`)) return
     try {
       const r = await api.delete(`/products/${p.id}?hard=1`)
