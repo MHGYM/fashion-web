@@ -320,8 +320,8 @@ img { display: block; max-width: 100%; }
 .product-page { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
 .product-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: start; }
 .product-images {}
-.product-main-img { border-radius: var(--radius); overflow: hidden; aspect-ratio: 3/4; background: var(--bg2); }
-.product-main-img img { width: 100%; height: 100%; object-fit: contain; }
+.product-main-img { border-radius: var(--radius); overflow: hidden; background: var(--bg2); }
+.product-main-img img { display: block; width: 100%; height: auto; }
 .product-thumbs { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .product-thumb {
   width: 72px; height: 96px; border-radius: 8px; overflow: hidden; cursor: pointer;
