@@ -1,4 +1,6 @@
 require('dotenv').config()
+const { guardEnv } = require('./guardEnv')
+guardEnv() // in productie: weiger te draaien tegen ephemeral opslag
 const { createClient } = require('@libsql/client')
 
 const db = createClient({ url: process.env.DATABASE_URL || 'file:./seasonfits.db' })

@@ -8,6 +8,7 @@ const upload   = require('./middleware/upload')
 const { authenticate, requireAdmin } = require('./middleware/auth')
 const { authLimiter } = require('./middleware/rateLimits')
 const { ensureSchema } = require('./schema')
+const { guardEnv } = require('./guardEnv')
 const { APP_URL, UPLOADS_DIR } = require('./config')
 
 // Fail-fast: zonder geheime sleutel zijn login-tokens vervalsbaar
@@ -15,6 +16,9 @@ if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET ontbreekt in .env — server start niet.')
   process.exit(1)
 }
+// Fail-fast: in productie moeten database + uploads op het persistente volume
+// staan, anders is alle data na een deploy weg.
+guardEnv()
 
 const app = express()
 app.set('trust proxy', 1) // juiste client-IP's achter een reverse proxy (nodig voor rate limits)
@@ -65,6 +69,7 @@ app.use('/api/discounts', require('./routes/discounts'))
 app.use('/api/drops',     require('./routes/drops'))
 app.use('/api/payments',  require('./routes/payments'))
 app.use('/api/customizer', require('./routes/customizer'))
+app.use('/api/admin/backup', require('./routes/backup'))
 
 app.get('/api/health', (_, res) => res.json({ ok: true }))
 
@@ -118,5 +123,7 @@ ensureSchema()
     const { notifyOpenDrops } = require('./controllers/dropController')
     notifyOpenDrops().catch(() => {})
     setInterval(() => notifyOpenDrops().catch(() => {}), 10 * 60 * 1000)
+    // Dagelijkse database-back-up (consistente snapshot naar het volume)
+    require('./backup').scheduleBackups()
   })
   .catch(e => { console.error('Schema fout:', e); process.exit(1) })
