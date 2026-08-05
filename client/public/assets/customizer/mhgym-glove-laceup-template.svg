@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bokshandschoen lace-up — voor- en achterkant">
+  <style>
+    .glove-top   { fill: var(--glove-top,   #8B2E2E); }
+    .palm        { fill: var(--palm,        #5C6BC0); }
+    .outer-thumb { fill: var(--outer-thumb, #8B2E2E); }
+    .inner-thumb { fill: var(--inner-thumb, #5C6BC0); }
+    .laces       { fill: var(--laces,       #2E2E2E); }
+    .trim        { fill: var(--trim,        #111111); }
+    .logo        { fill: var(--logo,        #EFC64B); }
+    .part        { stroke: #00000030; stroke-width: 2; stroke-linejoin: round; }
+    .lace-cross  { fill: none; stroke: #efeae1; stroke-width: 5; stroke-linecap: round; }
+    .eyelet      { fill: #1c1c1c; }
+    .lbl         { fill: #9a9aa5; font: 600 15px Inter, system-ui, sans-serif; letter-spacing: .12em; }
+  </style>
+
+  <!-- ============ VOORKANT (rug van de hand) ============ -->
+  <g>
+    <rect class="laces part" x="64" y="256" width="184" height="96" rx="16"/>
+    <path class="glove-top part" d="M58,258 L58,150 C58,110 92,82 148,82 C204,82 246,110 246,150 L246,258 Z"/>
+    <path class="outer-thumb part" d="M58,150 C34,150 24,178 32,202 C39,222 58,228 72,220 L72,150 Z"/>
+    <rect class="trim part" x="56" y="250" width="192" height="13" rx="5"/>
+    <!-- veters -->
+    <g>
+      <circle class="eyelet" cx="128" cy="272" r="4"/><circle class="eyelet" cx="184" cy="272" r="4"/>
+      <circle class="eyelet" cx="128" cy="300" r="4"/><circle class="eyelet" cx="184" cy="300" r="4"/>
+      <circle class="eyelet" cx="128" cy="328" r="4"/><circle class="eyelet" cx="184" cy="328" r="4"/>
+      <path class="lace-cross" d="M128,272 L184,300 M184,272 L128,300 M128,300 L184,328 M184,300 L128,328"/>
+    </g>
+    <circle class="logo part" cx="156" cy="166" r="30"/>
+    <text class="lbl" x="152" y="388" text-anchor="middle">VOORKANT</text>
+  </g>
+
+  <!-- ============ PALM (binnenkant) ============ -->
+  <g transform="translate(320,0)">
+    <rect class="laces part" x="64" y="256" width="184" height="96" rx="16"/>
+    <path class="palm part" d="M58,258 L58,150 C58,110 92,82 148,82 C204,82 246,110 246,150 L246,258 Z"/>
+    <path class="inner-thumb part" d="M246,150 C270,150 280,178 272,202 C265,222 246,228 232,220 L232,150 Z"/>
+    <rect class="trim part" x="56" y="250" width="192" height="13" rx="5"/>
+    <g>
+      <circle class="eyelet" cx="128" cy="272" r="4"/><circle class="eyelet" cx="184" cy="272" r="4"/>
+      <circle class="eyelet" cx="128" cy="300" r="4"/><circle class="eyelet" cx="184" cy="300" r="4"/>
+      <circle class="eyelet" cx="128" cy="328" r="4"/><circle class="eyelet" cx="184" cy="328" r="4"/>
+      <path class="lace-cross" d="M128,272 L184,300 M184,272 L128,300 M128,300 L184,328 M184,300 L128,328"/>
+    </g>
+    <circle class="logo part" cx="152" cy="166" r="30"/>
+    <text class="lbl" x="152" y="388" text-anchor="middle">PALM</text>
+  </g>
+</svg>

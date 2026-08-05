@@ -16,7 +16,24 @@ const getCart = wrap(async (req, res) => {
           WHERE ci.user_id = ?`,
     args: [req.user.id]
   })
-  res.json(r.rows)
+  const normal = r.rows.map(x => ({ ...x, custom: false }))
+
+  // Custom-configurator items (aparte tabel) — meegeven in dezelfde lijst
+  const cr = await db.execute({
+    sql: `SELECT cci.id, cci.quantity, cci.price, cci.config, pv.size, p.name, p.slug
+          FROM custom_cart_items cci
+          JOIN products p ON p.id = cci.product_id
+          JOIN product_variants pv ON pv.id = cci.variant_id
+          WHERE cci.user_id = ?`,
+    args: [req.user.id]
+  })
+  const custom = cr.rows.map(x => {
+    let config = {}
+    try { config = JSON.parse(x.config) } catch (_) {}
+    return { id: x.id, quantity: x.quantity, price: x.price, size: x.size, name: x.name, slug: x.slug, custom: true, config }
+  })
+
+  res.json([...normal, ...custom])
 })
 
 const addToCart = wrap(async (req, res) => {

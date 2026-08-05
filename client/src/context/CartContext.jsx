@@ -30,8 +30,8 @@ export function CartProvider({ children }) {
     fetchCart()
   }
 
-  const removeItem = async (id) => {
-    await api.delete(`/cart/${id}`)
+  const removeItem = async (id, custom = false) => {
+    await api.delete(custom ? `/customizer/cart/${id}` : `/cart/${id}`)
     fetchCart()
   }
 

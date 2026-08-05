@@ -64,6 +64,7 @@ app.use('/api/users',     require('./routes/users'))
 app.use('/api/discounts', require('./routes/discounts'))
 app.use('/api/drops',     require('./routes/drops'))
 app.use('/api/payments',  require('./routes/payments'))
+app.use('/api/customizer', require('./routes/customizer'))
 
 app.get('/api/health', (_, res) => res.json({ ok: true }))
 
@@ -80,8 +81,13 @@ if (fs.existsSync(clientDist)) {
   // altijd de actuele versie ophaalt — voorkomt "oude versie blijft hangen".
   app.use(express.static(clientDist, {
     setHeaders: (res, filePath) => {
+      // Gehashte build-assets (assets/index-XXXX.js) mogen eeuwig immutable
+      // gecachet worden. De customizer-tekeningen (assets/customizer/*) juist
+      // NIET: die moeten vervangbaar zijn zonder codewijziging, dus no-cache.
+      const inAssets     = filePath.includes(`${path.sep}assets${path.sep}`)
+      const inCustomizer = filePath.includes(`${path.sep}customizer${path.sep}`)
       res.setHeader('Cache-Control',
-        filePath.includes(`${path.sep}assets${path.sep}`)
+        inAssets && !inCustomizer
           ? 'public, max-age=31536000, immutable'
           : 'no-cache')
     }

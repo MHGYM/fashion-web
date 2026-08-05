@@ -30,9 +30,23 @@ const createOrder = wrap(async (req, res) => {
     args: [req.user.id]
   })
   const items = cartR.rows
-  if (!items.length) return res.status(400).json({ error: 'Winkelwagen is leeg.' })
 
-  const subtotal = items.reduce((sum, i) => sum + (i.sale_price || i.price) * i.quantity, 0)
+  // Custom-configurator items (aparte tabel)
+  const customR = await db.execute({
+    sql: `SELECT cci.id, cci.quantity, cci.price, cci.config, cci.product_id, cci.variant_id, pv.size, p.name
+          FROM custom_cart_items cci
+          JOIN products p ON p.id = cci.product_id
+          JOIN product_variants pv ON pv.id = cci.variant_id
+          WHERE cci.user_id = ?`,
+    args: [req.user.id]
+  })
+  const customItems = customR.rows
+  if (!items.length && !customItems.length) return res.status(400).json({ error: 'Winkelwagen is leeg.' })
+
+  const subtotal = Math.round((
+    items.reduce((sum, i) => sum + (i.sale_price || i.price) * i.quantity, 0) +
+    customItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+  ) * 100) / 100
 
   // ── School (storefront-attributie) ──────────────────────────────────────
   let school = null
@@ -105,7 +119,16 @@ const createOrder = wrap(async (req, res) => {
       })
     }
 
+    // Custom-items → order_items mét custom_config (geen voorraad-afboeking: made-to-order)
+    for (const item of customItems) {
+      await tx.execute({
+        sql: 'INSERT INTO order_items (order_id,variant_id,product_id,name,size,color,price,quantity,custom_config) VALUES (?,?,?,?,?,?,?,?,?)',
+        args: [order.id, item.variant_id, item.product_id, item.name, item.size, null, item.price, item.quantity, item.config]
+      })
+    }
+
     await tx.execute({ sql: 'DELETE FROM cart_items WHERE user_id = ?', args: [req.user.id] })
+    await tx.execute({ sql: 'DELETE FROM custom_cart_items WHERE user_id = ?', args: [req.user.id] })
     await tx.commit()
   } catch (e) {
     try { await tx.rollback() } catch (_) {}

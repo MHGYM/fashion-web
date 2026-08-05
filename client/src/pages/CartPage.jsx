@@ -1,8 +1,42 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Trash2, ShoppingBag } from 'lucide-react'
+import { Trash2, ShoppingBag, Sparkles } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import usePageTitle from '../hooks/usePageTitle'
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_COST } from '../config'
+import { PALETTE } from '../customizer/palette'
+
+const hexOf = name => PALETTE.find(p => p.name === name)?.hex || '#ccc'
+
+// Leesbare samenvatting van een custom ontwerp in de winkelwagen.
+function CustomSummary({ config }) {
+  if (!config) return null
+  const { style, colors, name, logo, notes } = config
+  return (
+    <div className="cart-custom-summary">
+      {style && <div className="ccs-row"><span className="ccs-key">Stijl</span><span>{style}</span></div>}
+      {colors && Object.entries(colors).map(([part, colorName]) => (
+        <div className="ccs-row" key={part}>
+          <span className="ccs-key">{part}</span>
+          <span className="ccs-color">
+            <span className="ccs-swatch" style={{ background: hexOf(colorName) }} />
+            {colorName}
+          </span>
+        </div>
+      ))}
+      {name && <div className="ccs-row"><span className="ccs-key">Naam</span><span>“{name.text}” · {name.color} · {name.style}</span></div>}
+      {logo && (
+        <div className="ccs-row">
+          <span className="ccs-key">Logo</span>
+          <span className="ccs-color">
+            {logo.url && <img src={logo.url} alt="" className="ccs-logo" />}
+            {logo.style}
+          </span>
+        </div>
+      )}
+      {notes && <div className="ccs-row"><span className="ccs-key">Opmerking</span><span>{notes}</span></div>}
+    </div>
+  )
+}
 
 export default function CartPage() {
   usePageTitle('Winkelwagen')
@@ -26,7 +60,24 @@ export default function CartPage() {
       <h1 style={{ fontSize:'1.6rem', fontWeight:800, marginBottom:'2rem' }}>Winkelwagen ({items.length})</h1>
       <div className="cart-layout">
         <div>
-          {items.map(item => (
+          {items.map(item => item.custom ? (
+            /* ── Custom ontwerp ── */
+            <div key={`c${item.id}`} className="cart-item">
+              <div className="cart-item-img cart-item-img-custom">
+                <Sparkles size={26} strokeWidth={1.5} />
+              </div>
+              <div>
+                <div className="cart-item-name">{item.name} <span className="cart-custom-badge">Custom</span></div>
+                <div className="cart-item-meta">Maat: {item.size}</div>
+                <CustomSummary config={item.config} />
+                <div style={{ fontWeight:700, marginTop:8 }}>€{(item.price * item.quantity).toFixed(2)}</div>
+              </div>
+              <button onClick={() => removeItem(item.id, true)} aria-label={`${item.name} verwijderen uit winkelwagen`} style={{ background:'none', border:'none', color:'var(--text-muted)', padding:4, cursor:'pointer' }}>
+                <Trash2 size={18}/>
+              </button>
+            </div>
+          ) : (
+            /* ── Regulier product ── */
             <div key={item.id} className="cart-item">
               <div className="cart-item-img" onClick={() => navigate(`/shop/${item.slug}`)} style={{ cursor:'pointer' }}>
                 {item.image
@@ -56,7 +107,7 @@ export default function CartPage() {
         <div className="cart-summary">
           <h3>Overzicht</h3>
           {items.map(item => (
-            <div key={item.id} className="summary-row">
+            <div key={item.custom ? `c${item.id}` : item.id} className="summary-row">
               <span>{item.name} ×{item.quantity}</span>
               <span>€{((item.sale_price || item.price) * item.quantity).toFixed(2)}</span>
             </div>

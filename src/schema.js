@@ -97,6 +97,20 @@ const PATCHES = [
   `CREATE INDEX IF NOT EXISTS idx_cart_user           ON cart_items(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_users_school        ON users(school_id)`,
   `CREATE INDEX IF NOT EXISTS idx_codes_school        ON discount_codes(school_id)`,
+
+  // ── Custom-configurator ──────────────────────────────────────────────────────
+  `ALTER TABLE order_items ADD COLUMN custom_config TEXT`,
+  `CREATE TABLE IF NOT EXISTS custom_cart_items (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    variant_id INTEGER NOT NULL REFERENCES product_variants(id),
+    config     TEXT    NOT NULL,
+    price      REAL    NOT NULL,
+    quantity   INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_custom_cart_user ON custom_cart_items(user_id)`,
 ]
 
 const HOMEPAGE_DEFAULTS = [
@@ -196,6 +210,34 @@ async function ensureSchema() {
       console.log('[DB] Centrale catalogus: bestaande algemene producten voor alle scholen geactiveerd.')
     }
   } catch (e) { console.error('[DB] catalogus-backfill:', e.message) }
+
+  // ── Custom-configurator: seed de twee custom producten (idempotent) ──────────
+  // active=0 → ze verschijnen niet in de gewone shop; ze zijn alleen via
+  // /customize te bestellen. Ze bestaan wél zodat cart/order een echte
+  // product_id + variant_id hebben. Ruime voorraad (made-to-order).
+  try {
+    const seedCustom = async (slug, name, price, sizes) => {
+      const r = await db.execute({ sql: 'SELECT id FROM products WHERE slug = ?', args: [slug] })
+      let pid = r.rows[0]?.id
+      if (!pid) {
+        const ins = await db.execute({
+          sql: `INSERT INTO products (name, slug, description, price, active, gender, featured)
+                VALUES (?,?,?,?,0,'unisex',0) RETURNING id`,
+          args: [name, slug, 'Volledig zelf samen te stellen via de Customizer.', price],
+        })
+        pid = ins.rows[0].id
+      } else {
+        await db.execute({ sql: 'UPDATE products SET price = ? WHERE id = ?', args: [price, pid] })
+      }
+      for (const size of sizes) {
+        const v = await db.execute({ sql: 'SELECT id FROM product_variants WHERE product_id = ? AND size = ?', args: [pid, size] })
+        if (!v.rows[0]) await db.execute({ sql: 'INSERT INTO product_variants (product_id, size, stock) VALUES (?,?,9999)', args: [pid, size] })
+      }
+    }
+    await seedCustom('custom-gloves',     'Custom Gloves',      69.95, ['8oz', '10oz', '12oz', '14oz', '16oz'])
+    await seedCustom('custom-shinguards', 'Custom Shin Guards', 49.95, ['S', 'M', 'L', 'XL'])
+  } catch (e) { console.error('[DB] custom-producten seed:', e.message) }
+
   for (const [key, value] of HOMEPAGE_DEFAULTS) {
     try {
       await db.execute({

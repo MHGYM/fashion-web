@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 390" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Scheenbeschermer — voor- en achterkant">
+  <style>
+    .shin-pad   { fill: var(--shin-pad,   #5C6BC0); }
+    .foot-guard { fill: var(--foot-guard, #3F51B5); }
+    .strap      { fill: var(--strap,      #2E2E2E); }
+    .trim       { fill: var(--trim,       #111111); }
+    .logo       { fill: var(--logo,       #EFC64B); }
+    .part       { stroke: #00000030; stroke-width: 2; stroke-linejoin: round; }
+    .lbl        { fill: #9a9aa5; font: 600 15px Inter, system-ui, sans-serif; letter-spacing: .12em; }
+  </style>
+
+  <!-- ============ VOORKANT (scheen) ============ -->
+  <g>
+    <path class="strap part" d="M40,116 h140 a6,6 0 0 1 6,6 v18 a6,6 0 0 1 -6,6 H40 Z"/>
+    <path class="strap part" d="M40,196 h140 a6,6 0 0 1 6,6 v18 a6,6 0 0 1 -6,6 H40 Z"/>
+    <path class="shin-pad part" d="M70,58 C70,34 88,24 110,24 C132,24 150,34 150,58 L146,250 C145,268 130,278 110,278 C90,278 75,268 74,250 Z"/>
+    <path class="foot-guard part" d="M76,270 L144,270 L158,312 C158,334 138,342 116,342 L104,342 C82,342 68,330 64,312 Z"/>
+    <rect class="trim part" x="74" y="250" width="72" height="10" rx="4"/>
+    <circle class="logo part" cx="110" cy="80" r="24"/>
+    <text class="lbl" x="110" y="374" text-anchor="middle">VOORKANT</text>
+  </g>
+
+  <!-- ============ ACHTERKANT (banden) ============ -->
+  <g transform="translate(240,0)">
+    <path class="shin-pad part" d="M70,58 C70,34 88,24 110,24 C132,24 150,34 150,58 L146,250 C145,268 130,278 110,278 C90,278 75,268 74,250 Z"/>
+    <path class="foot-guard part" d="M76,270 L144,270 L158,312 C158,334 138,342 116,342 L104,342 C82,342 68,330 64,312 Z"/>
+    <path class="strap part" d="M40,116 h140 a6,6 0 0 1 6,6 v18 a6,6 0 0 1 -6,6 H40 Z"/>
+    <path class="strap part" d="M40,196 h140 a6,6 0 0 1 6,6 v18 a6,6 0 0 1 -6,6 H40 Z"/>
+    <rect class="trim part" x="176" y="118" width="15" height="26" rx="3"/>
+    <rect class="trim part" x="176" y="198" width="15" height="26" rx="3"/>
+    <circle class="logo part" cx="110" cy="80" r="22"/>
+    <text class="lbl" x="110" y="374" text-anchor="middle">ACHTERKANT</text>
+  </g>
+</svg>

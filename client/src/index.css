@@ -510,3 +510,115 @@ tr:hover td { background: var(--bg2); }
 @media (max-width: 640px) {
   .stack-mobile [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Customizer (/customize)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cz-page { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+.cz-header { margin-bottom: 1.5rem; }
+.cz-header h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.4rem; }
+.cz-header p { color: var(--text-muted); max-width: 600px; }
+
+.cz-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.cz-tab {
+  padding: 10px 20px; border: 1.5px solid var(--border); border-radius: 999px;
+  background: var(--bg); font-weight: 600; font-size: 0.9rem; transition: all 0.15s;
+}
+.cz-tab:hover { border-color: var(--text); }
+.cz-tab.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+.cz-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,440px); gap: 2.5rem; align-items: start; }
+
+/* Preview */
+.cz-preview-col { position: sticky; top: 80px; }
+.cz-preview-box {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 300px;
+}
+.cz-preview-svg { width: 100%; }
+.cz-preview-svg svg { width: 100%; height: auto; display: block; }
+.cz-preview-msg { color: var(--text-muted); font-size: 0.9rem; padding: 3rem 0; }
+.cz-price { text-align: center; margin-top: 1rem; }
+.cz-price-amount { font-size: 1.5rem; font-weight: 800; }
+.cz-price-note { display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+/* Bediening */
+.cz-controls { display: flex; flex-direction: column; }
+.cz-field { margin-bottom: 1.25rem; }
+.cz-field-label {
+  font-size: 0.9rem; font-weight: 700; margin-bottom: 0.6rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.cz-field-value { font-weight: 500; font-size: 0.8rem; color: var(--text-muted); }
+.cz-sub-label { font-size: 0.8rem; font-weight: 600; color: var(--text-2); margin: 0.75rem 0 0.4rem; }
+.cz-optional { font-weight: 500; font-size: 0.78rem; color: var(--text-muted); }
+.cz-hint { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem; line-height: 1.4; }
+
+/* Kleurenraster */
+.cz-swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.cz-swatches-sm { grid-template-columns: repeat(8, 1fr); gap: 6px; max-width: 320px; }
+.cz-swatch {
+  aspect-ratio: 1; border-radius: 8px; border: 1px solid rgba(0,0,0,0.15);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s; padding: 0;
+}
+.cz-swatch:hover { transform: scale(1.08); }
+.cz-swatch.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.cz-swatch-check { color: #fff; mix-blend-mode: difference; }
+
+/* Stijl-/keuzeknoppen (Velcro/Lace-Up, Printed/Embroidered, Print/Embroidered) */
+.cz-style-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cz-style-btn {
+  padding: 10px 18px; border: 1.5px solid var(--border); border-radius: 8px;
+  background: var(--bg); font-weight: 600; font-size: 0.85rem; transition: all 0.15s;
+}
+.cz-style-btn:hover { border-color: var(--text); }
+.cz-style-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+.cz-divider { height: 1px; background: var(--border); margin: 0.75rem 0 1.25rem; }
+
+/* Logo-upload */
+.cz-upload {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 12px 18px; border: 1.5px dashed var(--border); border-radius: 8px;
+  font-weight: 600; font-size: 0.85rem; color: var(--text-2); transition: all 0.15s;
+}
+.cz-upload:hover { border-color: var(--text); color: var(--text); }
+.cz-upload.busy { opacity: 0.6; cursor: wait; }
+.cz-logo-preview { display: flex; align-items: center; gap: 10px; background: var(--bg2); border-radius: 8px; padding: 8px 10px; }
+.cz-logo-preview img { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: #fff; }
+.cz-logo-name { flex: 1; font-size: 0.82rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cz-logo-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; }
+.cz-logo-remove:hover { color: #dc2626; }
+
+/* Bevestigen */
+.cz-confirm { display: flex; gap: 10px; align-items: flex-start; font-size: 0.82rem; color: var(--text-2); line-height: 1.45; cursor: pointer; }
+.cz-confirm input { margin-top: 3px; width: 17px; height: 17px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
+
+.cz-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; font-size: 0.85rem; font-weight: 600; padding: 10px 14px; border-radius: 8px; margin-top: 1rem; }
+
+/* Succes-scherm na toevoegen */
+.cz-success { max-width: 460px; margin: 3rem auto; text-align: center; }
+.cz-success-icon { width: 72px; height: 72px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
+.cz-success h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.5rem; }
+.cz-success p { color: var(--text-muted); margin-bottom: 1.5rem; }
+.cz-success-actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+
+/* Custom items in de winkelwagen */
+.cart-item-img-custom { display: flex; align-items: center; justify-content: center; color: var(--accent); background: var(--accent-light); }
+.cart-custom-badge { display: inline-block; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); background: var(--accent-light); padding: 2px 7px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }
+.cart-custom-summary { font-size: 0.8rem; color: var(--text-2); margin: 0.25rem 0; display: flex; flex-direction: column; gap: 3px; }
+.ccs-row { display: flex; gap: 10px; }
+.ccs-key { min-width: 92px; color: var(--text-muted); flex-shrink: 0; }
+.ccs-color { display: inline-flex; align-items: center; gap: 6px; }
+.ccs-swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); display: inline-block; }
+.ccs-logo { width: 18px; height: 18px; object-fit: contain; border-radius: 3px; background: #fff; border: 1px solid var(--border); }
+
+@media (max-width: 900px) {
+  .cz-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+  .cz-preview-col { position: static; }
+}
+@media (max-width: 480px) {
+  .cz-swatches { grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .cz-page { padding: 1.5rem 1rem 3rem; }
+}

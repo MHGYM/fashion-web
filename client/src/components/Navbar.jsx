@@ -17,6 +17,7 @@ export default function Navbar() {
 
         <div className="navbar-links">
           <Link to="/shop">Shop</Link>
+          <Link to="/customize">Customise ✨</Link>
           <Link to="/scholen">Scholen</Link>
           <Link to="/shop?gender=men">Heren</Link>
           <Link to="/shop?gender=women">Dames</Link>
@@ -47,7 +48,7 @@ export default function Navbar() {
 
       {menuOpen && (
         <div className="navbar-mobile-menu">
-          {[['/', 'Home'], ['/shop', 'Shop'], ['/scholen', 'Scholen'], ['/shop?gender=men', 'Heren'], ['/shop?gender=women', 'Dames'], ['/shop?sale=1', 'Sale']].map(([to, label]) => (
+          {[['/', 'Home'], ['/shop', 'Shop'], ['/customize', 'Customise ✨'], ['/scholen', 'Scholen'], ['/shop?gender=men', 'Heren'], ['/shop?gender=women', 'Dames'], ['/shop?sale=1', 'Sale']].map(([to, label]) => (
             <Link key={to} to={to} onClick={() => setMenuOpen(false)}>{label}</Link>
           ))}
           {user ? (
