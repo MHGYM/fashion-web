@@ -31,6 +31,10 @@ app.use(helmet({
       // Productfoto's en video's mogen van externe hosts komen (Unsplash, CDN's)
       'img-src':   ["'self'", 'data:', 'https:'],
       'media-src': ["'self'", 'data:', 'https:', 'blob:'],
+      // 'wasm-unsafe-eval': staat WebAssembly.instantiate() toe (nodig voor de
+      // meshopt-decoder van de 3D-configurator). Dit is NIET hetzelfde als
+      // 'unsafe-eval' — het opent geen JS-eval/inline-scripts, alleen WASM.
+      'script-src': ["'self'", "'wasm-unsafe-eval'"],
     },
   },
 }))
