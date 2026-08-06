@@ -68,6 +68,36 @@ export const ZONES = [
 export const ZONE_IDS = ZONES.map((z) => z.id);
 export const ZONE_BY_ID = Object.fromEntries(ZONES.map((z) => [z.id, z]));
 
+/** Maten waarin de handschoen te bestellen is (moet matchen met de backend). */
+export const SIZES = ['8oz', '10oz', '12oz', '14oz', '16oz'];
+
+/**
+ * Prijsopbouw. De server rekent bij het toevoegen aan de winkelwagen de
+ * definitieve prijs opnieuw uit — dit is voor de weergave in de UI.
+ */
+export const PRICING = {
+  base: 69.95,
+  customImage: 20.00,   // eigen afbeelding op het front panel
+  wristName: 10.00,     // naam op de manchet
+  wristLogo: 15.00,     // eigen logo op de manchet
+};
+
+/** Lettertypes voor de naam op de manchet. */
+export const NAME_FONTS = [
+  { id: 'inter',  label: 'Inter Black',  css: '900 {size}px Inter, system-ui, sans-serif' },
+  { id: 'bebas',  label: 'Bebas Neue',   css: '400 {size}px "Bebas Neue", Impact, sans-serif' },
+  { id: 'oswald', label: 'Oswald',       css: '600 {size}px Oswald, "Arial Narrow", sans-serif' },
+];
+
+/** Relatieve tekstgroottes (vermenigvuldiger op de basisgrootte). */
+export const NAME_SIZES = [
+  { id: 'xs', label: 'A', scale: 0.72 },
+  { id: 's',  label: 'A', scale: 0.86 },
+  { id: 'm',  label: 'A', scale: 1.00 },
+  { id: 'l',  label: 'A', scale: 1.18 },
+  { id: 'xl', label: 'A', scale: 1.36 },
+];
+
 /** Standaardconfiguratie: { 'front-panel': 'Black', ... } */
 export function defaultColors() {
   return Object.fromEntries(ZONES.map((z) => [z.id, z.default]));

@@ -3,80 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FightMarketing — 3D Glove Configurator</title>
-<meta name="description" content="Stel je eigen FightMarketing wedstrijdhandschoen samen in 3D.">
-<!-- Geen import map nodig: alle modules (eigen + gevendorde three.js-addons)
-     gebruiken relatieve import-paden. Een inline <script type="importmap">
-     zou hier stuklopen op de site-brede CSP (script-src 'self', geen
-     'unsafe-inline'). -->
+<title>FightMarketing — Stel je handschoen samen</title>
+<meta name="description" content="Ontwerp je eigen FightMarketing bokshandschoen in 3D.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand">
+  <a class="brand" href="/">
     <svg class="brand-mark" viewBox="0 0 108 62" aria-hidden="true">
       <path d="M0,0 h41 v13 h-27 v11 h22 v13 h-22 v25 h-14 z"/>
       <path d="M53,0 h15 l13,26 l13,-26 h15 v62 h-14 v-35 l-11,22 h-6 l-11,-22 v35 h-14 z"/>
     </svg>
     <span class="brand-text">FIGHT<em>MARKETING</em></span>
-  </div>
-  <div class="topbar-meta">
-    <span class="chip">Pro Series · 3D</span>
-    <span class="topbar-title">Glove Configurator</span>
-  </div>
+  </a>
+  <nav class="topnav">
+    <a href="/">Home</a>
+    <a href="/shop">Shop</a>
+    <a class="is-active" href="/configurator/" aria-current="page">Configurator</a>
+    <a href="/scholen">Scholen</a>
+  </nav>
+  <span class="chip">Made to order</span>
 </header>
 
 <main class="layout">
 
-  <!-- ══ LINKS: camera-presets ══ -->
-  <nav class="views" aria-label="Camerastandpunt kiezen">
-    <button class="view-btn is-active" data-cam="front" aria-pressed="true">
-      <svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20,3 C28,3 34,7 36,14 C38,21 37,32 35,38 C34,41 32,42 29,42 L11,42 C8,42 6,41 5,38 C3,32 2,21 4,14 C6,7 12,3 20,3 Z"/></svg>
-      <span>Front</span>
-    </button>
-    <button class="view-btn" data-cam="back" aria-pressed="false">
-      <svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20,3 C28,3 34,7 36,14 C38,21 37,32 35,38 C34,41 32,42 29,42 L11,42 C8,42 6,41 5,38 C3,32 2,21 4,14 C6,7 12,3 20,3 Z"/><path d="M15,18 L25,26 M25,18 L15,26 M15,26 L25,34 M25,26 L15,34" stroke="#0b0b0e" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
-      <span>Back</span>
-    </button>
-    <button class="view-btn" data-cam="top" aria-pressed="false">
-      <svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20,3 C28,3 34,7 36,14 C38,21 37,32 35,38 C34,41 32,42 29,42 L11,42 C8,42 6,41 5,38 C3,32 2,21 4,14 C6,7 12,3 20,3 Z"/><path d="M8,22 h24" stroke="#0b0b0e" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
-      <span>Top</span>
-    </button>
-    <button class="view-btn view-btn-ghost" id="cam-reset" type="button">
-      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-      <span>Reset</span>
-    </button>
-  </nav>
+  <!-- ══ LINKS: zonekeuze + bediening van de gekozen zone ══ -->
+  <aside class="col col-left">
+    <section class="card">
+      <h2 class="card-title">Stel je handschoen samen</h2>
+      <div id="zone-list" class="zone-list"></div>
+    </section>
+
+    <section class="card" id="zone-editor">
+      <!-- wordt gevuld op basis van de gekozen zone -->
+    </section>
+  </aside>
 
   <!-- ══ MIDDEN: 3D-podium ══ -->
-  <section class="stage" aria-label="3D-voorbeeldweergave">
-    <div class="stage-glow" aria-hidden="true"></div>
+  <section class="stage">
+    <div class="stage-head">
+      <h1 id="stage-title">Front Panel</h1>
+      <p id="stage-hint">Kies een kleur of upload je eigen afbeelding.</p>
+    </div>
+
     <div class="stage-inner">
-      <canvas id="glove-canvas" role="img" aria-label="Draaibare 3D-weergave van de samengestelde handschoen"></canvas>
+      <canvas id="glove-canvas" role="img" aria-label="Draaibare 3D-weergave van je handschoen"></canvas>
       <div id="stage-loading" class="stage-loading">
         <div class="spinner" aria-hidden="true"></div>
         <span>3D-model laden…</span>
       </div>
       <p id="stage-error" class="stage-error" hidden></p>
     </div>
-    <div class="stage-caption">Sleep om te draaien · scroll om te zoomen</div>
+
+    <div class="view-bar" role="group" aria-label="Weergave">
+      <button type="button" data-cam="front" class="is-active" aria-pressed="true">Voor</button>
+      <button type="button" data-cam="back" aria-pressed="false">Achter</button>
+      <button type="button" data-cam="top" aria-pressed="false">Boven</button>
+      <span class="view-sep" aria-hidden="true"></span>
+      <button type="button" id="zoom-out" title="Uitzoomen" aria-label="Uitzoomen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+      <button type="button" id="zoom-in" title="Inzoomen" aria-label="Inzoomen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+      <button type="button" id="cam-reset" title="Beeld herstellen" aria-label="Beeld herstellen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
+      </button>
+    </div>
+    <p class="stage-foot">Sleep om te draaien · scroll om te zoomen</p>
   </section>
 
-  <!-- ══ RECHTS: kleurkiezer ══ -->
-  <aside class="panel" aria-label="Kleuren kiezen">
-    <div class="panel-head">
-      <h2>Colour</h2>
-      <button id="reset" class="ghost-btn" type="button">Reset</button>
-    </div>
+  <!-- ══ RECHTS: naam, maat, prijs, bestellen ══ -->
+  <aside class="col col-right">
+    <section class="card">
+      <h2 class="card-title">Naam op de manchet <span class="opt">optioneel</span></h2>
+      <input id="name-input" class="input" type="text" maxlength="14"
+             placeholder="JOUW NAAM" autocomplete="off" spellcheck="false">
+      <label class="field-label" for="name-font">Lettertype</label>
+      <select id="name-font" class="input select"></select>
+      <span class="field-label">Grootte</span>
+      <div id="name-size" class="size-row" role="group" aria-label="Tekstgrootte"></div>
+      <div class="inline-field">
+        <span class="field-label no-margin">Tekstkleur</span>
+        <div id="name-color" class="mini-swatches"></div>
+      </div>
+    </section>
 
-    <!-- Zones, uploads en tekst worden opgebouwd uit zones.js -->
-    <div id="parts" class="parts"></div>
+    <section class="card">
+      <h2 class="card-title">Maat</h2>
+      <div id="size-row" class="chip-row" role="group" aria-label="Maat"></div>
+      <p class="hint" id="size-hint">Kies een maat om te kunnen bestellen.</p>
+    </section>
 
-    <p class="hint panel-foot">Gebruik alleen beeldmateriaal waarvan je zelf de rechten hebt.</p>
+    <section class="card">
+      <h2 class="card-title">Prijsopbouw</h2>
+      <dl id="price-rows" class="price-rows"></dl>
+      <div class="price-total">
+        <span>Totaal</span>
+        <strong id="price-total">€69,95</strong>
+      </div>
+      <button id="add-to-cart" class="btn btn-gold btn-full" type="button">In winkelwagen</button>
+      <p id="cart-msg" class="cart-msg" hidden></p>
+      <button id="save-design" class="btn btn-ghost btn-full" type="button">Ontwerp downloaden</button>
+      <button id="reset" class="btn btn-quiet btn-full" type="button">Opnieuw beginnen</button>
+
+      <span class="field-label share-label">Deel je ontwerp</span>
+      <div class="share-row">
+        <button id="share-copy" class="share-btn" type="button" title="Link kopiëren" aria-label="Link kopiëren">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg>
+        </button>
+        <a id="share-whatsapp" class="share-btn" target="_blank" rel="noopener" title="Delen via WhatsApp" aria-label="Delen via WhatsApp">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 21l2.3-5.3A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+        </a>
+        <a id="share-mail" class="share-btn" title="Delen via e-mail" aria-label="Delen via e-mail">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+        </a>
+      </div>
+    </section>
   </aside>
 
 </main>
+
+<footer class="trust-bar">
+  <div><strong>Gratis verzending</strong><span>Op alle custom orders</span></div>
+  <div><strong>Made to order</strong><span>3–4 weken levertijd</span></div>
+  <div><strong>Premium kwaliteit</strong><span>Met de hand afgewerkt</span></div>
+  <div><strong>Veilig betalen</strong><span>iDEAL &amp; meer</span></div>
+</footer>
+
+<p class="attribution" id="attribution"></p>
 
 <script type="module" src="js/configurator.js"></script>
 </body>

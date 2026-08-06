@@ -94,8 +94,10 @@ export function createGloveViewer(canvas, opts = {}) {
     object.position.sub(center);
     object.position.y += size.y / 2;
 
+    // 1.85× de langste as vult het kader als een productfoto, met net genoeg
+    // marge dat de manchet en de duim vrij blijven staan.
     const extent = Math.max(size.x, size.y, size.z);
-    camRadius = extent * 2.4;
+    camRadius = extent * 1.85;
     camTargetY = size.y * 0.5;
     controls.target.set(0, camTargetY, 0);
     controls.minDistance = extent * 0.7;
@@ -187,9 +189,13 @@ export function createGloveViewer(canvas, opts = {}) {
       logoW = b.img.width * s; logoH = b.img.height * s;
     }
     let textW = 0;
-    const fontSize = Math.round(H * (b.img ? 0.11 : 0.15));
+    // Lettertype en -grootte komen uit de UI (fontCss met een {size}-plaatshouder,
+    // fontScale als vermenigvuldiger). Zo hoeft de renderer geen fontnamen te kennen.
+    const fontSize = Math.round(H * (b.img ? 0.11 : 0.15) * (b.fontScale ?? 1));
+    const fontCss = (b.fontCss || '800 {size}px Inter, system-ui, sans-serif')
+      .replace('{size}', fontSize);
     if (b.text) {
-      ctx.font = `800 ${fontSize}px "Helvetica Neue", Inter, system-ui, sans-serif`;
+      ctx.font = fontCss;
       textW = Math.min(ctx.measureText(b.text.toUpperCase()).width, W * 0.5);
     }
 
@@ -202,7 +208,7 @@ export function createGloveViewer(canvas, opts = {}) {
     }
     if (b.text) {
       ctx.fillStyle = b.textColor || '#FFFFFF';
-      ctx.font = `800 ${fontSize}px "Helvetica Neue", Inter, system-ui, sans-serif`;
+      ctx.font = fontCss;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText(b.text.toUpperCase(), cursor, BASE_Y, W * 0.5);
@@ -369,6 +375,16 @@ export function createGloveViewer(canvas, opts = {}) {
     repaintBadge(zoneId);
   }
 
+  /** Zoomt in (factor < 1) of uit (factor > 1), binnen de grenzen van OrbitControls. */
+  function zoom(factor) {
+    const dir = camera.position.clone().sub(controls.target);
+    const dist = THREE.MathUtils.clamp(
+      dir.length() * factor, controls.minDistance, controls.maxDistance,
+    );
+    camera.position.copy(controls.target).add(dir.setLength(dist));
+    controls.update();
+  }
+
   function resize() {
     const parent = canvas.parentElement;
     const w = parent.clientWidth, h = parent.clientHeight;
@@ -426,6 +442,7 @@ export function createGloveViewer(canvas, opts = {}) {
     setZoneArtworkTransform,
     setZoneBadge,
     goToPreset,
+    zoom,
     resize,
     renderNow,
     isZoneSupported,
