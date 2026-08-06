@@ -1,16 +1,18 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    FightMarketing — 3D Glove Viewer (Three.js)
    ═══════════════════════════════════════════════════════════════════════════
-   Twee soorten kleurbare zones:
-   - MESH_ZONES: bestaan als losse, benoemde 3D-objecten in de GLB (echte
-     materialen — top-panel, front-panel, palm, palm-back, outer-thumb,
-     inner-thumb, wrist). Kleur = mesh.material.color, vloeiend geanimeerd.
-   - DECAL_ZONES: bestaan NIET als aparte geometrie in de scan (trim, piping,
-     laces, stitching, logo, naam). Elke zone krijgt een THREE.DecalGeometry
-     geprojecteerd op de dichtstbijzijnde échte oppervlaktepositie van een
-     gekozen basis-mesh, met een dynamisch <canvas>-texture als materiaal —
-     live herkleurbaar/herschrijfbaar zonder de geometrie opnieuw te bouwen
-     en zonder dat het onderliggende scan-model UV's nodig heeft.
+   GENERIEKE renderer: kent géén enkele zone- of meshnaam. Alles komt uit het
+   actieve model-profiel (model-profile.js). Een nieuw 3D-model vereist alleen
+   een nieuw profiel — dit bestand blijft ongewijzigd.
+
+   Publieke API (alles per zone-id uit zones.js):
+     viewer.ready                 → Promise, resolvet zodra het model staat
+     viewer.setZoneColor(id, hex) → kleurt de zone, ongeacht mesh/material/decal
+     viewer.setZoneText(id, txt)  → tekst voor tekstzones (bv. 'name')
+     viewer.setZoneImage(id, img) → afbeelding voor artwork-zones (bv. 'logo')
+     viewer.goToPreset(name)      → camerastandpunt uit het profiel
+     viewer.isZoneSupported(id)   → false als dit model de zone niet kan tonen
+     viewer.getZoneSupport(id)    → { supported, type, reason }
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import * as THREE from './vendor/three/three.module.js';
@@ -20,49 +22,26 @@ import { DecalGeometry } from './vendor/three/addons/geometries/DecalGeometry.js
 import { RoomEnvironment } from './vendor/three/addons/environments/RoomEnvironment.js';
 import { MeshoptDecoder } from './vendor/three/addons/libs/meshopt_decoder.module.js';
 
-const MODEL_URL = 'assets/boxing_glove_segmented.glb';
-
-// Duim (Outer/Inner Thumb) is GEEN los mesh meer: deze scan heeft geen
-// scheidbare duim-uitstulping (de duim is volledig vergroeid met de vuist —
-// bevestigd via geïsoleerde render-controle). Een geforceerde nep-scheiding
-// gaf verkeerde/onbetrouwbare zones. Nu net als de andere niet-bestaande
-// onderdelen: een decal op de dichtstbijzijnde échte buurzone.
-export const MESH_ZONES = ['top-panel', 'front-panel', 'palm', 'palm-back', 'wrist'];
-export const DECAL_ZONES = ['piping', 'trim', 'laces', 'stitching', 'logo', 'name', 'outer-thumb', 'inner-thumb'];
-
-// Elke decal-zone: op welk echt mesh hij geprojecteerd wordt + waar op de
-// bounding box van dát mesh (u,v,w = fractie 0..1 langs elke as). Geen
-// aannames over wereld-assen nodig — het dichtstbijzijnde échte
-// oppervlaktepunt op het GENOEMDE mesh wordt via brute-force gezocht.
-// u = links/rechts (X), v = onder/boven (Y, hoogte), w = voor/achter (Z,
-// diepte) — fracties (0..1) binnen de EIGEN bounding box van het aangewezen
-// mesh. Gekalibreerd tegen de v4-geometrie (na contiguïteit-fix + smoothing).
-const DECAL_ANCHORS = {
-  piping:        { mesh: 'top-panel',   u: 0.45, v: 0.10, w: 0.50, size: [190, 30, 90] },
-  trim:          { mesh: 'wrist',       u: 0.55, v: 0.90, w: 0.50, size: [190, 34, 90] },
-  laces:         { mesh: 'front-panel', u: 0.45, v: 0.15, w: 0.50, size: [110, 80, 80] },
-  stitching:     { mesh: 'wrist',       u: 0.55, v: 0.10, w: 0.50, size: [190, 26, 90] },
-  logo:          { mesh: 'front-panel', u: 0.45, v: 0.60, w: 0.50, size: [95, 95, 80] },
-  name:          { mesh: 'front-panel', u: 0.45, v: 0.35, w: 0.50, size: [150, 46, 80] },
-  // De duim-regio (lage X) valt geometrisch onder top-panel / palm-back —
-  // front-panel en palm hebben daar nauwelijks tot geen oppervlak (geteld:
-  // palm 0 vertices onder x=-40, front-panel 363, top-panel 12693,
-  // palm-back 2512). Vandaar deze mesh-keuze i.p.v. de intuïtieve.
-  'outer-thumb': { mesh: 'top-panel',   u: 0.06, v: 0.45, w: 0.50, size: [95, 105, 80] },
-  'inner-thumb': { mesh: 'palm-back',   u: 0.06, v: 0.50, w: 0.50, size: [95, 105, 80] },
-};
+import PROFILE from './model-profile.js';
+import { ZONE_IDS } from './zones.js';
+import { painterFor } from './decal-painters.js';
 
 const COLOR_LERP_SPEED = 8; // hoger = snellere kleurovergang
+const DECAL_TEXTURE_SIZE = 256;
 
-/** Zoekt op een gegeven mesh het échte oppervlaktepunt (+normaal) dat het
- *  dichtst bij een doelpunt binnen zijn eigen bounding box ligt. Brute-force
- *  over alle driehoeken — draait eenmalig per decal bij het laden, dus de
- *  kosten (tot ~100k driehoeken) zijn verwaarloosbaar. */
-// `target` is een WERELD-coördinaat; het resultaat is dat ook. Belangrijk:
-// de driehoeken worden hier expliciet naar wereldruimte getransformeerd vóór
-// de vergelijking. (Eerder werden lokale driehoeken tegen een wereld-target
-// vergeleken — dat gaf systematisch verkeerde ankers zodra het model door
-// fitCameraToObject verplaatst was.)
+/** Zone-id's gegroepeerd op hoe het actieve model ze levert. */
+function zonesByType(type) {
+  return ZONE_IDS.filter((id) => PROFILE.bindings[id]?.type === type);
+}
+
+// ── Geometrie-hulpjes ────────────────────────────────────────────────────────
+
+/**
+ * Dichtstbijzijnde punt op het oppervlak van `mesh` bij wereldpunt `target`.
+ * Werkt volledig in WERELDruimte (driehoeken worden getransformeerd) — het
+ * model wordt namelijk verplaatst bij het inpassen, dus lokaal vergelijken
+ * geeft systematisch verkeerde ankers.
+ */
 function closestSurfacePoint(mesh, target) {
   const pos = mesh.geometry.attributes.position;
   const idx = mesh.geometry.index;
@@ -93,16 +72,10 @@ function closestSurfacePoint(mesh, target) {
 }
 
 /**
- * Kiest een ankerpunt door het ECHTE vertex te zoeken dat het dichtst bij de
- * gevraagde bounding-box-fractie ligt, en daarna pas het exacte oppervlaktepunt.
- *
- * Waarom niet direct closestPointToPoint op de box-fractie: de handschoen is
- * sterk gekromd, dus een punt op de bounding box kan tientallen eenheden ín de
- * lege ruimte naast de vorm liggen. De closest-point-zoektocht landt dan op de
- * dichtstbijzijnde uitstekende rand — waardoor meerdere heel verschillende
- * fracties allemaal op hetzelfde punt uitkomen (waargenomen: 5 verschillende
- * ankers landden binnen enkele eenheden van elkaar). Eerst naar een echt vertex
- * snappen houdt het anker binnen de daadwerkelijke vorm.
+ * Ankerpunt uit een bounding-box-fractie. Snapt eerst naar een ECHT vertex:
+ * de handschoen is sterk gekromd, dus een box-punt kan ver naast de vorm
+ * liggen, waardoor verschillende fracties allemaal op dezelfde uitstekende
+ * rand zouden landen.
  */
 function anchorFromBoxFraction(mesh, u, v, w) {
   const box = new THREE.Box3().setFromObject(mesh);
@@ -111,118 +84,29 @@ function anchorFromBoxFraction(mesh, u, v, w) {
     THREE.MathUtils.lerp(box.min.y, box.max.y, v),
     THREE.MathUtils.lerp(box.min.z, box.max.z, w),
   );
-
   const pos = mesh.geometry.attributes.position;
   const p = new THREE.Vector3();
+  const nearest = new THREE.Vector3();
   let bestD = Infinity;
-  const nearestVertex = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {
     p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
     const d = p.distanceToSquared(target);
-    if (d < bestD) { bestD = d; nearestVertex.copy(p); }
+    if (d < bestD) { bestD = d; nearest.copy(p); }
   }
-  return closestSurfacePoint(mesh, nearestVertex);
+  return closestSurfacePoint(mesh, nearest);
 }
 
 function orientationFromNormal(normal) {
   const dummy = new THREE.Object3D();
-  dummy.position.set(0, 0, 0);
   dummy.lookAt(normal.clone());
   return dummy.rotation.clone();
 }
 
-/** Canvas-texture voor een decal-zone; wordt live herschreven bij kleurwijziging. */
-function makeDecalCanvas(kind) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return { canvas, ctx, texture };
-}
-
-function drawDecal(kind, ctx, hex, extra) {
-  const w = ctx.canvas.width, h = ctx.canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  ctx.save();
-  switch (kind) {
-    case 'piping':
-    case 'trim': {
-      // volle, effen band — kleurvlak dat als bies/afwerkrand oogt
-      ctx.fillStyle = hex;
-      ctx.fillRect(0, h * 0.30, w, h * 0.40);
-      break;
-    }
-    case 'stitching': {
-      ctx.strokeStyle = hex;
-      ctx.lineWidth = 10;
-      ctx.setLineDash([22, 18]);
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(0, h / 2);
-      ctx.lineTo(w, h / 2);
-      ctx.stroke();
-      break;
-    }
-    case 'laces': {
-      ctx.strokeStyle = hex;
-      ctx.lineWidth = 9;
-      ctx.lineCap = 'round';
-      const rows = 4, top = h * 0.12, bottom = h * 0.88, cx = w / 2, spread = w * 0.28;
-      for (let i = 0; i < rows; i++) {
-        const y1 = top + (i / rows) * (bottom - top);
-        const y2 = top + ((i + 1) / rows) * (bottom - top);
-        ctx.beginPath(); ctx.moveTo(cx - spread, y1); ctx.lineTo(cx + spread, y2); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx + spread, y1); ctx.lineTo(cx - spread, y2); ctx.stroke();
-      }
-      ctx.fillStyle = '#0A0B0D';
-      for (let i = 0; i <= rows; i++) {
-        const y = top + (i / rows) * (bottom - top);
-        ctx.beginPath(); ctx.arc(cx - spread, y, 6, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(cx + spread, y, 6, 0, Math.PI * 2); ctx.fill();
-      }
-      break;
-    }
-    case 'logo': {
-      ctx.fillStyle = hex;
-      ctx.save();
-      ctx.translate(w / 2, h / 2 - 14);
-      const s = 2.1;
-      ctx.scale(s, s);
-      ctx.beginPath();
-      ctx.rect(-27, -18, 20.5, 6.5);
-      ctx.rect(-27, -18, 6.5, 31);
-      ctx.rect(-17, -3, 15, 6.5);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.rect(1, -18, 7.5, 31);
-      ctx.moveTo(1, -18); ctx.lineTo(8.5, -18); ctx.lineTo(15.5, -5); ctx.lineTo(22.5, -18); ctx.lineTo(30, -18);
-      ctx.lineTo(30, 13); ctx.lineTo(23, 13); ctx.lineTo(23, -3); ctx.lineTo(18.5, 5.5); ctx.lineTo(12.5, 5.5);
-      ctx.lineTo(8, -3); ctx.lineTo(8, 13); ctx.lineTo(1, 13); ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = hex;
-      ctx.font = '700 15px "Helvetica Neue", Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('FIGHTMARKETING', w / 2, h / 2 + 46);
-      break;
-    }
-    case 'name': {
-      ctx.fillStyle = hex;
-      ctx.font = '800 46px "Helvetica Neue", Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const text = (extra && extra.text) ? extra.text.toUpperCase() : 'YOUR NAME';
-      ctx.fillText(text, w / 2, h / 2, w * 0.92);
-      break;
-    }
-  }
-  ctx.restore();
-}
+// ── Viewer ───────────────────────────────────────────────────────────────────
 
 export function createGloveViewer(canvas, opts = {}) {
+  const profile = opts.profile || PROFILE;
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -242,29 +126,25 @@ export function createGloveViewer(canvas, opts = {}) {
   controls.minDistance = 160;
   controls.maxDistance = 620;
   controls.enablePan = false;
-  controls.target.set(0, 20, 0);
   controls.minPolarAngle = Math.PI * 0.12;
   controls.maxPolarAngle = Math.PI * 0.88;
 
-  // ── Premium studio-belichting ──────────────────────────────────────────
+  // ── Studio-belichting ──────────────────────────────────────────────────
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
   const key = new THREE.DirectionalLight(0xfff2e0, 2.4);
   key.position.set(180, 260, 200);
   scene.add(key);
-
   const fill = new THREE.DirectionalLight(0x9db8ff, 0.9);
   fill.position.set(-220, 80, -160);
   scene.add(fill);
-
   const rim = new THREE.DirectionalLight(0xffd9a0, 1.4);
   rim.position.set(-60, 180, -280);
   scene.add(rim);
-
   scene.add(new THREE.AmbientLight(0x404040, 0.35));
 
-  // Zachte contactschaduw onder het model (radiale gradient-textuur)
+  // Zachte contactschaduw
   const shadowCanvas = document.createElement('canvas');
   shadowCanvas.width = shadowCanvas.height = 256;
   const sctx = shadowCanvas.getContext('2d');
@@ -273,31 +153,27 @@ export function createGloveViewer(canvas, opts = {}) {
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   sctx.fillStyle = grad;
   sctx.fillRect(0, 0, 256, 256);
-  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
-  const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false });
-  const shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), shadowMat);
+  const shadowMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(260, 260),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCanvas), transparent: true, depthWrite: false }),
+  );
   shadowMesh.rotation.x = -Math.PI / 2;
   shadowMesh.position.y = -0.5;
   scene.add(shadowMesh);
 
-  const meshByZone = {};
-  const decalMeshByZone = {};
-  const decalCtxByZone = {};
-  const targetColor = {};
-  const glowGroup = new THREE.Group();
-  scene.add(glowGroup);
+  // ── Zone-registers ─────────────────────────────────────────────────────
+  const meshByNode = {};        // GLB-nodenaam → THREE.Mesh
+  const zoneTargets = {};       // zone-id → { kind, material(s) | decal-context }
+  const targetColor = {};       // zone-id → THREE.Color (voor vloeiende lerp)
+  const zoneText = {};          // zone-id → laatst ingestelde tekst
+  const zoneImage = {};         // zone-id → laatst ingestelde afbeelding
 
   let modelRoot = null;
-  let ready = false;
   let camRadius = 420;
   let camTargetY = 0;
-  let camAnim = null; // { fromPos, toPos, fromTarget, toTarget, t0, dur }
+  let camAnim = null;
 
-  const CAM_PRESETS = {
-    front: { theta: 0.55,          phi: 1.18 },
-    back:  { theta: Math.PI + 0.55, phi: 1.18 },
-    top:   { theta: 0.55,          phi: 0.42 },
-  };
+  const presets = profile.cameraPresets || {};
 
   function fitCameraToObject(object) {
     const box = new THREE.Box3().setFromObject(object);
@@ -308,18 +184,16 @@ export function createGloveViewer(canvas, opts = {}) {
     camRadius = Math.max(size.x, size.y, size.z) * 1.65;
     camTargetY = size.y * 0.42;
     controls.target.set(0, camTargetY, 0);
-    goToPreset('front', 0);
+    goToPreset(Object.keys(presets)[0] || 'front', 0);
     shadowMesh.scale.setScalar(Math.max(size.x, size.z) / 180);
   }
 
-  function sphericalPosition(theta, phi, radius) {
-    const s = new THREE.Spherical(radius, phi, theta);
-    return new THREE.Vector3().setFromSpherical(s).add(controls.target);
-  }
-
   function goToPreset(name, duration = 650) {
-    const preset = CAM_PRESETS[name] || CAM_PRESETS.front;
-    const toPos = sphericalPosition(preset.theta, preset.phi, camRadius);
+    const preset = presets[name] || Object.values(presets)[0];
+    if (!preset) return;
+    const toPos = new THREE.Vector3()
+      .setFromSpherical(new THREE.Spherical(camRadius, preset.phi, preset.theta))
+      .add(controls.target);
     const toTarget = new THREE.Vector3(0, camTargetY, 0);
     if (duration <= 0) {
       camera.position.copy(toPos);
@@ -328,122 +202,174 @@ export function createGloveViewer(canvas, opts = {}) {
       return;
     }
     camAnim = {
-      fromPos: camera.position.clone(),
-      toPos, fromTarget: controls.target.clone(), toTarget,
+      fromPos: camera.position.clone(), toPos,
+      fromTarget: controls.target.clone(), toTarget,
       t0: performance.now(), dur: duration,
     };
   }
 
-  function buildDecal(zone) {
-    const anchor = DECAL_ANCHORS[zone];
-    const baseMesh = meshByZone[anchor.mesh];
-    if (!baseMesh) return;
-    const { point, normal } = anchorFromBoxFraction(baseMesh, anchor.u, anchor.v, anchor.w);
-    const orientation = orientationFromNormal(normal);
-    const size = new THREE.Vector3(...anchor.size);
-    const geometry = new DecalGeometry(baseMesh, point, orientation, size);
+  function makeZoneMaterial() {
+    const d = profile.materialDefaults || {};
+    return new THREE.MeshPhysicalMaterial({
+      color: 0x14161a,
+      roughness: d.roughness ?? 0.5,
+      metalness: d.metalness ?? 0.02,
+      clearcoat: d.clearcoat ?? 0.18,
+      clearcoatRoughness: d.clearcoatRoughness ?? 0.32,
+      envMapIntensity: d.envMapIntensity ?? 1.0,
+    });
+  }
 
-    const { canvas, ctx, texture } = makeDecalCanvas(zone);
-    decalCtxByZone[zone] = { ctx, texture, canvas };
+  /** Bouwt een geprojecteerde decal voor één zone volgens het profiel. */
+  function buildDecalZone(zoneId, anchor) {
+    const baseMesh = meshByNode[anchor.mesh];
+    if (!baseMesh) {
+      console.warn(`[3D] decal "${zoneId}": draagmesh "${anchor.mesh}" niet gevonden.`);
+      return null;
+    }
+    const { point, normal } = anchorFromBoxFraction(baseMesh, anchor.u, anchor.v, anchor.w);
+    const geometry = new DecalGeometry(
+      baseMesh, point, orientationFromNormal(normal), new THREE.Vector3(...anchor.size),
+    );
+
+    const texCanvas = document.createElement('canvas');
+    texCanvas.width = texCanvas.height = DECAL_TEXTURE_SIZE;
+    const ctx = texCanvas.getContext('2d');
+    const texture = new THREE.CanvasTexture(texCanvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
 
     const material = new THREE.MeshStandardMaterial({
-      map: texture,
-      transparent: true,
-      depthTest: true,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -4,
-      roughness: 0.55,
-      metalness: 0.05,
+      map: texture, transparent: true, depthTest: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.55, metalness: 0.05,
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.renderOrder = 10;
     scene.add(mesh);
-    decalMeshByZone[zone] = mesh;
+    return { ctx, texture, canvas: texCanvas, mesh };
   }
 
+  /** Tekent een decal-zone opnieuw met huidige kleur/tekst/afbeelding. */
+  function repaintDecal(zoneId, hex) {
+    const t = zoneTargets[zoneId];
+    if (!t || t.kind !== 'decal') return;
+    const { ctx, texture, canvas: c } = t;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.save();
+    const img = zoneImage[zoneId];
+    if (img) {
+      const scale = Math.min(c.width / img.width, c.height / img.height) * 0.82;
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
+    } else {
+      painterFor(zoneId)(ctx, hex, { text: zoneText[zoneId] });
+    }
+    ctx.restore();
+    texture.needsUpdate = true;
+  }
+
+  // ── Model laden ────────────────────────────────────────────────────────
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
 
   const readyPromise = new Promise((resolve, reject) => {
-    loader.load(
-      opts.modelUrl || MODEL_URL,
-      (gltf) => {
-        modelRoot = gltf.scene;
-        modelRoot.scale.setScalar(1);
+    loader.load(profile.modelUrl, (gltf) => {
+      modelRoot = gltf.scene;
 
-        MESH_ZONES.forEach((zone) => {
-          const obj = modelRoot.getObjectByName(zone);
-          if (!obj) { console.warn('[3D] zone-mesh niet gevonden:', zone); return; }
-          const mat = new THREE.MeshPhysicalMaterial({
-            color: 0x14161a,
-            roughness: 0.5,
-            metalness: 0.02,
-            clearcoat: 0.18,
-            clearcoatRoughness: 0.32,
-            envMapIntensity: 1.0,
+      // Alle meshes indexeren op node-naam
+      modelRoot.traverse((o) => { if (o.isMesh) meshByNode[o.name] = o; });
+
+      // 1) mesh- en material-zones: eigen materiaalinstantie per zone, zodat
+      //    kleuren nooit gedeeld worden (de GLB kan 1 materiaal delen).
+      ZONE_IDS.forEach((zoneId) => {
+        const b = profile.bindings[zoneId];
+        if (!b) return;
+
+        if (b.type === 'mesh') {
+          const mesh = meshByNode[b.node];
+          if (!mesh) { console.warn(`[3D] zone "${zoneId}": mesh "${b.node}" ontbreekt in het model.`); return; }
+          const mat = makeZoneMaterial();
+          mesh.material = mat;
+          zoneTargets[zoneId] = { kind: 'mesh', materials: [mat] };
+          targetColor[zoneId] = new THREE.Color(mat.color.getHex());
+
+        } else if (b.type === 'material') {
+          const mesh = meshByNode[b.node];
+          if (!mesh) { console.warn(`[3D] zone "${zoneId}": mesh "${b.node}" ontbreekt in het model.`); return; }
+          // Materiaalslot(en) met de opgegeven naam binnen dit mesh
+          const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          const hits = [];
+          list.forEach((m, i) => {
+            if (m && m.name === b.material) {
+              const mat = makeZoneMaterial();
+              mat.name = m.name;
+              if (Array.isArray(mesh.material)) mesh.material[i] = mat; else mesh.material = mat;
+              hits.push(mat);
+            }
           });
-          obj.material = mat;
-          meshByZone[zone] = obj;
-          targetColor[zone] = new THREE.Color(mat.color.getHex());
-        });
+          if (!hits.length) { console.warn(`[3D] zone "${zoneId}": materiaal "${b.material}" niet gevonden op "${b.node}".`); return; }
+          zoneTargets[zoneId] = { kind: 'material', materials: hits };
+          targetColor[zoneId] = new THREE.Color(hits[0].color.getHex());
+        }
+      });
 
-        scene.add(modelRoot);
-        fitCameraToObject(modelRoot);
-        // fitCameraToObject verschuift object.position, maar matrixWorld wordt
-        // pas bij de eerstvolgende render herberekend. De decal-ankers hieronder
-        // hebben de bijgewerkte wereldmatrix nodig (Box3/raycasts tegen elk
-        // mesh) — forceer dus een synchrone update vóórdat we ze berekenen.
-        modelRoot.updateMatrixWorld(true);
+      scene.add(modelRoot);
+      fitCameraToObject(modelRoot);
+      // fitCameraToObject verplaatst het model; matrixWorld moet bijgewerkt zijn
+      // vóórdat we decal-ankers berekenen (die werken in wereldruimte).
+      modelRoot.updateMatrixWorld(true);
 
-        DECAL_ZONES.forEach((zone) => {
-          try { buildDecal(zone); } catch (e) { console.warn('[3D] decal-opbouw mislukt:', zone, e); }
-        });
+      // 2) decal-zones — ná het inpassen, want ze hangen aan echte oppervlakken
+      zonesByType('decal').forEach((zoneId) => {
+        try {
+          const built = buildDecalZone(zoneId, profile.bindings[zoneId].anchor);
+          if (built) zoneTargets[zoneId] = { kind: 'decal', ...built };
+        } catch (e) {
+          console.warn(`[3D] decal-opbouw mislukt voor "${zoneId}":`, e);
+        }
+      });
 
-        // subtiele intro: model schaalt/fade-t soepel in via de render-loop.
-        // Veiligheidsnet: mocht requestAnimationFrame om wat voor reden dan
-        // ook niet tikken (bijv. een achtergrond-/onzichtbare tab die de
-        // browser bewust pauzeert), dan garandeert deze timer alsnog dat het
-        // model zichtbaar wordt i.p.v. voor altijd op schaal 0 te blijven staan.
-        modelRoot.scale.setScalar(0.001);
-        glowGroup.userData.introStart = performance.now();
-        resize();
-        setTimeout(() => {
-          if (modelRoot.scale.x < 0.999) {
-            modelRoot.scale.setScalar(1);
-            renderer.render(scene, camera);
-          }
-        }, 1200);
-        ready = true;
-        resolve();
-      },
-      undefined,
-      (err) => reject(err),
-    );
+      // Intro-animatie + veiligheidsnet (zie animate()).
+      modelRoot.scale.setScalar(0.001);
+      modelRoot.userData.introStart = performance.now();
+      resize();
+      setTimeout(() => {
+        if (modelRoot.scale.x < 0.999) {
+          modelRoot.scale.setScalar(1);
+          renderer.render(scene, camera);
+        }
+      }, 1200);
+
+      resolve();
+    }, undefined, reject);
   });
 
-  function setZoneColor(zone, hex) {
-    if (!meshByZone[zone]) return;
-    targetColor[zone] = new THREE.Color(hex);
+  // ── Publieke API ───────────────────────────────────────────────────────
+
+  function getZoneSupport(zoneId) {
+    const b = profile.bindings[zoneId];
+    if (!b) return { supported: false, type: 'unknown', reason: 'Niet in het model-profiel.' };
+    if (b.type === 'unsupported') return { supported: false, type: 'unsupported', reason: b.reason || '' };
+    if (!zoneTargets[zoneId]) return { supported: false, type: b.type, reason: 'Kon niet aan het model gekoppeld worden.' };
+    return { supported: true, type: b.type, reason: '' };
   }
 
-  function setDecalColor(zone, hex, extra) {
-    const d = decalCtxByZone[zone];
-    if (!d) return;
-    drawDecal(zone, d.ctx, hex, extra);
-    d.texture.needsUpdate = true;
+  const isZoneSupported = (zoneId) => getZoneSupport(zoneId).supported;
+
+  function setZoneColor(zoneId, hex) {
+    const t = zoneTargets[zoneId];
+    if (!t) return;
+    if (t.kind === 'decal') repaintDecal(zoneId, hex);
+    else targetColor[zoneId] = new THREE.Color(hex); // vloeiend via animate()
   }
 
-  function setDecalImage(zone, img) {
-    const d = decalCtxByZone[zone];
-    const meshEntry = decalMeshByZone[zone];
-    if (!d || !meshEntry) return;
-    const { ctx, canvas, texture } = d;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const scale = Math.min(canvas.width / img.width, canvas.height / img.height) * 0.82;
-    const w = img.width * scale, h = img.height * scale;
-    ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
-    texture.needsUpdate = true;
+  function setZoneText(zoneId, text, hex) {
+    zoneText[zoneId] = text;
+    if (hex !== undefined) repaintDecal(zoneId, hex);
+  }
+
+  function setZoneImage(zoneId, img, hex) {
+    zoneImage[zoneId] = img;
+    repaintDecal(zoneId, hex);
   }
 
   function resize() {
@@ -456,22 +382,43 @@ export function createGloveViewer(canvas, opts = {}) {
     return true;
   }
 
+  /**
+   * Rondt lopende animaties direct af en rendert één frame. Handig wanneer de
+   * animatielus niet betrouwbaar tikt (achtergrondtabbladen worden door de
+   * browser gethrottled) en als basis voor het maken van productafbeeldingen
+   * of thumbnails van een configuratie.
+   */
+  function renderNow() {
+    for (const zoneId in zoneTargets) {
+      const t = zoneTargets[zoneId];
+      if (t.kind === 'decal' || !targetColor[zoneId]) continue;
+      t.materials.forEach((m) => m.color.copy(targetColor[zoneId]));
+    }
+    if (modelRoot) modelRoot.scale.setScalar(1);
+    if (camAnim) {
+      camera.position.copy(camAnim.toPos);
+      controls.target.copy(camAnim.toTarget);
+      camAnim = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
   const clock = new THREE.Clock();
   function animate() {
     requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.1);
 
-    MESH_ZONES.forEach((zone) => {
-      const mesh = meshByZone[zone];
-      if (!mesh || !targetColor[zone]) return;
-      mesh.material.color.lerp(targetColor[zone], Math.min(1, dt * COLOR_LERP_SPEED));
-    });
+    // Vloeiende kleurovergang voor mesh-/materiaalzones
+    for (const zoneId in zoneTargets) {
+      const t = zoneTargets[zoneId];
+      if (t.kind === 'decal' || !targetColor[zoneId]) continue;
+      t.materials.forEach((m) => m.color.lerp(targetColor[zoneId], Math.min(1, dt * COLOR_LERP_SPEED)));
+    }
 
     if (modelRoot && modelRoot.scale.x < 0.999) {
-      const t = Math.min(1, (performance.now() - glowGroup.userData.introStart) / 700);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const s = THREE.MathUtils.lerp(0.001, 1, eased);
-      modelRoot.scale.setScalar(s);
+      const t = Math.min(1, (performance.now() - modelRoot.userData.introStart) / 700);
+      modelRoot.scale.setScalar(THREE.MathUtils.lerp(0.001, 1, 1 - Math.pow(1 - t, 3)));
     }
 
     if (camAnim) {
@@ -486,37 +433,30 @@ export function createGloveViewer(canvas, opts = {}) {
     renderer.render(scene, camera);
   }
 
-  // Meerdere onafhankelijke triggers voor het formaat — sommige browser-
-  ///omgevingscombinaties leveren geen (tijdige) ResizeObserver-callback op
-  // een net ingevoegd element, dus vertrouwen we niet op één mechanisme:
-  // ResizeObserver (containergrootte) + window-resize (fallback) + een korte
-  // poll direct na start (vangt een 0×0-race bij de allereerste paint) + een
-  // laatste aanroep zodra het model geladen is (gegarandeerd correct tegen
-  // de tijd dat de gebruiker iets ziet).
+  // Meerdere onafhankelijke formaat-triggers: sommige omgevingen leveren geen
+  // (tijdige) ResizeObserver-callback op een net ingevoegd element.
   try {
-    const ro = new ResizeObserver(() => resize());
-    ro.observe(canvas.parentElement);
-  } catch (e) { /* ResizeObserver niet beschikbaar — window-resize vangt dit op */ }
+    new ResizeObserver(() => resize()).observe(canvas.parentElement);
+  } catch (e) { /* window-resize vangt dit op */ }
   window.addEventListener('resize', resize);
-
   let pollTries = 0;
-  const pollResize = () => {
-    const ok = resize();
-    pollTries++;
-    if (!ok && pollTries < 30) requestAnimationFrame(pollResize);
-  };
-  pollResize();
+  (function pollResize() {
+    if (!resize() && pollTries++ < 30) requestAnimationFrame(pollResize);
+  })();
 
   requestAnimationFrame(animate);
 
   return {
     ready: readyPromise,
+    profile,
     setZoneColor,
-    setDecalColor,
-    setDecalImage,
+    setZoneText,
+    setZoneImage,
     goToPreset,
     resize,
-    meshZones: MESH_ZONES,
-    decalZones: DECAL_ZONES,
+    renderNow,
+    isZoneSupported,
+    getZoneSupport,
+    cameraPresetNames: Object.keys(presets),
   };
 }

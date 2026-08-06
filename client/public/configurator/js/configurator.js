@@ -1,66 +1,25 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    FightMarketing — Glove Configurator (UI-laag)
-   Stuurt de 3D-viewer (scene3d.js) aan; bevat geen render-logica zelf.
+   ═══════════════════════════════════════════════════════════════════════════
+   Bouwt zichzelf volledig op uit de productdefinitie (zones.js). Kent geen
+   meshnamen, geen decals, geen modeldetails — dat zit allemaal achter de
+   viewer-API. Een nieuw 3D-model vergt hier dus géén wijziging.
    ═══════════════════════════════════════════════════════════════════════════ */
+
 import { createGloveViewer } from './scene3d.js';
+import { COLORS, ZONES, ZONE_GROUPS, hexOf, defaultColors } from './zones.js';
 
-/* ── Palet: 16 kleuren ─────────────────────────────────────────────────── */
-const COLORS = [
-  { name: 'Black',      hex: '#14161A' },
-  { name: 'White',      hex: '#F5F6F7' },
-  { name: 'Silver',     hex: '#C9CDD3' },
-  { name: 'Gold',       hex: '#C8A23C' },
-  { name: 'Grey',       hex: '#7C828B' },
-  { name: 'Red',        hex: '#C8202E' },
-  { name: 'Wine Red',   hex: '#6E1F2E' },
-  { name: 'Orange',     hex: '#E2701E' },
-  { name: 'Yellow',     hex: '#E8C222' },
-  { name: 'Royal Blue', hex: '#2743C4' },
-  { name: 'Navy Blue',  hex: '#16224A' },
-  { name: 'Sky Blue',   hex: '#4FA8DE' },
-  { name: 'Purple',     hex: '#5F2C90' },
-  { name: 'Pink',       hex: '#DE6A9E' },
-  { name: 'Green',      hex: '#1F7A44' },
-  { name: 'Teal',       hex: '#12857E' },
-];
+const STORE_KEY = 'fm-glove-3d-config-v2'; // v2: 14 zones (Strap toegevoegd)
 
-/* ── De 13 kleurregelaars ────────────────────────────────────────────────
-   kind: 'mesh'  → bestaat als los 3D-object, kleur = echt materiaal
-   kind: 'decal' → bestaat niet als losse geometrie, kleur = canvas-textuur */
-const PARTS = [
-  { key: 'topPanel',   zone: 'top-panel',   kind: 'mesh',  label: 'Top Panel',   def: 'Black' },
-  { key: 'frontPanel', zone: 'front-panel', kind: 'mesh',  label: 'Front Panel', def: 'Black' },
-  { key: 'palm',       zone: 'palm',        kind: 'mesh',  label: 'Palm',        def: 'Black' },
-  { key: 'palmBack',   zone: 'palm-back',   kind: 'mesh',  label: 'Palm Back',   def: 'Black' },
-  { key: 'wrist',      zone: 'wrist',       kind: 'mesh',  label: 'Wrist',       def: 'Black' },
-  { key: 'outerThumb', zone: 'outer-thumb', kind: 'decal', label: 'Outer Thumb', def: 'Black' },
-  { key: 'innerThumb', zone: 'inner-thumb', kind: 'decal', label: 'Inner Thumb', def: 'Black' },
-  { key: 'trim',       zone: 'trim',        kind: 'decal', label: 'Trim',        def: 'Gold' },
-  { key: 'piping',     zone: 'piping',      kind: 'decal', label: 'Piping',      def: 'Gold' },
-  { key: 'laces',      zone: 'laces',       kind: 'decal', label: 'Laces',       def: 'White' },
-  { key: 'stitching',  zone: 'stitching',   kind: 'decal', label: 'Stitching',   def: 'White' },
-  { key: 'logo',       zone: 'logo',        kind: 'decal', label: 'Logo',        def: 'Gold' },
-  { key: 'name',       zone: 'name',        kind: 'decal', label: 'Naam',        def: 'White' },
-];
-
-const STORE_KEY = 'fm-glove-3d-config-v1';
-
-const state = { colors: {}, name: '' };
-PARTS.forEach((p) => { state.colors[p.key] = p.def; });
-
-function hexOf(colorName) {
-  return (COLORS.find((c) => c.name === colorName) || COLORS[0]).hex;
-}
+const state = { colors: defaultColors(), name: '' };
 
 function load() {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-    PARTS.forEach((p) => {
-      if (saved.colors && typeof saved.colors[p.key] === 'string' && hexOf(saved.colors[p.key])) {
-        state.colors[p.key] = saved.colors[p.key];
-      }
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (!saved) return;
+    ZONES.forEach((z) => {
+      const c = saved.colors?.[z.id];
+      if (typeof c === 'string' && COLORS.some((x) => x.name === c)) state.colors[z.id] = c;
     });
     if (typeof saved.name === 'string') state.name = saved.name.slice(0, 12);
   } catch (e) { /* corrupte opslag negeren */ }
@@ -70,10 +29,10 @@ function save() {
 }
 
 /* ── DOM ──────────────────────────────────────────────────────────────── */
-const canvas       = document.getElementById('glove-canvas');
-const stageLoading  = document.getElementById('stage-loading');
-const stageError    = document.getElementById('stage-error');
-const partsWrap     = document.getElementById('parts');
+const canvas         = document.getElementById('glove-canvas');
+const stageLoading   = document.getElementById('stage-loading');
+const stageError     = document.getElementById('stage-error');
+const partsWrap      = document.getElementById('parts');
 const nameInput      = document.getElementById('name-input');
 const resetBtn       = document.getElementById('reset');
 const logoFileInput  = document.getElementById('logo-file');
@@ -81,123 +40,161 @@ const logoUploadText = document.getElementById('logo-upload-text');
 
 const viewer = createGloveViewer(canvas);
 
+/**
+ * Publieke integratiehaak. De omliggende pagina (of straks de React-app en de
+ * cart-koppeling) kan hiermee de huidige configuratie uitlezen of een render
+ * forceren, zonder de interne modules te hoeven importeren.
+ */
+window.FMConfigurator = {
+  viewer,
+  getConfiguration: () => ({
+    modelProfile: viewer.profile.id,
+    colors: { ...state.colors },
+    name: state.name,
+  }),
+  renderNow: () => viewer.renderNow(),
+};
+
+/* ── Kleur/tekst/artwork doorgeven aan de 3D-laag ─────────────────────── */
+function applyZone(zone) {
+  if (!viewer.isZoneSupported(zone.id)) return;
+  const hex = hexOf(state.colors[zone.id]);
+  if (zone.content === 'text') viewer.setZoneText(zone.id, state.name, hex);
+  else viewer.setZoneColor(zone.id, hex);
+}
+const applyAll = () => ZONES.forEach(applyZone);
 
 viewer.ready.then(() => {
   stageLoading.classList.add('is-hidden');
+  buildParts();          // pas bouwen als bekend is wat het model ondersteunt
+  nameInput.value = state.name;
   applyAll();
 }).catch((err) => {
   console.error('[3D] laden mislukt:', err);
   stageLoading.classList.add('is-hidden');
   stageError.hidden = false;
   stageError.textContent =
-    'Het 3D-model kon niet geladen worden. Open deze pagina via een webserver ' +
-    '(bijvoorbeeld http://localhost:5174/configurator/) — direct openen vanaf ' +
-    'je schijf blokkeert het laden van de GLB en de module-imports.';
+    'Het 3D-model kon niet geladen worden. Open deze pagina via een webserver — ' +
+    'direct openen vanaf je schijf blokkeert het laden van de GLB en de modules.';
 });
 
-function applyPart(part) {
-  const hex = hexOf(state.colors[part.key]);
-  if (part.kind === 'mesh') {
-    viewer.setZoneColor(part.zone, hex);
-  } else if (part.key === 'name') {
-    viewer.setDecalColor('name', hex, { text: state.name });
-  } else {
-    viewer.setDecalColor(part.zone, hex);
-  }
-}
-function applyAll() { PARTS.forEach(applyPart); }
-
-/* ── Kleurenraster bouwen ─────────────────────────────────────────────── */
+/* ── Kleurkiezer opbouwen uit de zone-catalogus ───────────────────────── */
 function buildParts() {
-  PARTS.forEach((part, index) => {
-    const row = document.createElement('div');
-    row.className = 'part';
+  partsWrap.innerHTML = '';
 
-    const head = document.createElement('button');
-    head.type = 'button';
-    head.className = 'part-head';
-    head.setAttribute('aria-expanded', 'false');
+  ZONE_GROUPS.forEach((groupName) => {
+    const zonesInGroup = ZONES.filter((z) => z.group === groupName);
+    if (!zonesInGroup.length) return;
 
-    const dot = document.createElement('span');
-    dot.className = 'part-dot';
-    dot.style.background = hexOf(state.colors[part.key]);
+    const heading = document.createElement('div');
+    heading.className = 'part-group';
+    heading.textContent = groupName;
+    partsWrap.appendChild(heading);
 
-    const name = document.createElement('span');
-    name.className = 'part-name';
-    name.textContent = part.label;
-    if (part.kind === 'decal') {
-      const tag = document.createElement('span');
-      tag.className = 'part-tag';
-      tag.textContent = 'decal';
-      name.appendChild(tag);
-    }
+    zonesInGroup.forEach((zone) => {
+      const support = viewer.getZoneSupport(zone.id);
+      const row = document.createElement('div');
+      row.className = 'part' + (support.supported ? '' : ' is-unsupported');
 
-    const value = document.createElement('span');
-    value.className = 'part-value';
-    value.textContent = state.colors[part.key];
+      const head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'part-head';
+      head.setAttribute('aria-expanded', 'false');
+      if (!support.supported) {
+        head.disabled = true;
+        head.title = support.reason || 'Niet beschikbaar op dit model.';
+      }
 
-    const caret = document.createElement('span');
-    caret.className = 'part-caret';
+      const dot = document.createElement('span');
+      dot.className = 'part-dot';
+      dot.style.background = hexOf(state.colors[zone.id]);
 
-    head.append(dot, name, value, caret);
+      const label = document.createElement('span');
+      label.className = 'part-name';
+      label.textContent = zone.label;
+      if (!support.supported) {
+        const tag = document.createElement('span');
+        tag.className = 'part-tag';
+        tag.textContent = 'n.v.t.';
+        label.appendChild(tag);
+      } else if (support.type === 'decal') {
+        const tag = document.createElement('span');
+        tag.className = 'part-tag';
+        tag.textContent = 'decal';
+        tag.title = 'Geprojecteerd — dit model heeft hiervoor geen eigen geometrie.';
+        label.appendChild(tag);
+      }
 
-    const body = document.createElement('div');
-    body.className = 'part-body';
-    const grid = document.createElement('div');
-    grid.className = 'swatches';
+      const value = document.createElement('span');
+      value.className = 'part-value';
+      value.textContent = support.supported ? state.colors[zone.id] : '—';
 
-    COLORS.forEach((c) => {
-      const sw = document.createElement('button');
-      sw.type = 'button';
-      sw.className = 'swatch' + (state.colors[part.key] === c.name ? ' is-selected' : '');
-      sw.style.background = c.hex;
-      sw.title = c.name;
-      sw.setAttribute('aria-label', part.label + ': ' + c.name);
-      sw.addEventListener('click', () => {
-        state.colors[part.key] = c.name;
-        grid.querySelectorAll('.swatch').forEach((s) => s.classList.remove('is-selected'));
-        sw.classList.add('is-selected');
-        dot.style.background = c.hex;
-        value.textContent = c.name;
-        applyPart(part);
-        save();
+      const caret = document.createElement('span');
+      caret.className = 'part-caret';
+
+      head.append(dot, label, value, caret);
+
+      const body = document.createElement('div');
+      body.className = 'part-body';
+      const grid = document.createElement('div');
+      grid.className = 'swatches';
+
+      COLORS.forEach((c) => {
+        const sw = document.createElement('button');
+        sw.type = 'button';
+        sw.className = 'swatch' + (state.colors[zone.id] === c.name ? ' is-selected' : '');
+        sw.style.background = c.hex;
+        sw.title = c.name;
+        sw.setAttribute('aria-label', `${zone.label}: ${c.name}`);
+        sw.addEventListener('click', () => {
+          state.colors[zone.id] = c.name;
+          grid.querySelectorAll('.swatch').forEach((s) => s.classList.remove('is-selected'));
+          sw.classList.add('is-selected');
+          dot.style.background = c.hex;
+          value.textContent = c.name;
+          applyZone(zone);
+          save();
+        });
+        grid.appendChild(sw);
       });
-      grid.appendChild(sw);
-    });
 
-    body.appendChild(grid);
-    row.append(head, body);
-    partsWrap.appendChild(row);
+      body.appendChild(grid);
+      row.append(head, body);
+      partsWrap.appendChild(row);
 
-    head.addEventListener('click', () => {
-      const open = row.classList.contains('is-open');
-      partsWrap.querySelectorAll('.part').forEach((r) => {
-        r.classList.remove('is-open');
-        r.querySelector('.part-head').setAttribute('aria-expanded', 'false');
+      head.addEventListener('click', () => {
+        const open = row.classList.contains('is-open');
+        partsWrap.querySelectorAll('.part').forEach((r) => {
+          r.classList.remove('is-open');
+          r.querySelector('.part-head').setAttribute('aria-expanded', 'false');
+        });
+        if (!open) { row.classList.add('is-open'); head.setAttribute('aria-expanded', 'true'); }
       });
-      if (!open) { row.classList.add('is-open'); head.setAttribute('aria-expanded', 'true'); }
     });
-
-    if (index === 0) { row.classList.add('is-open'); head.setAttribute('aria-expanded', 'true'); }
   });
 }
 
 /* ── Naam ─────────────────────────────────────────────────────────────── */
+const nameZone = ZONES.find((z) => z.content === 'text');
 nameInput.addEventListener('input', () => {
   state.name = nameInput.value.slice(0, 12);
-  const namePart = PARTS.find((p) => p.key === 'name');
-  applyPart(namePart);
+  if (nameZone) applyZone(nameZone);
   save();
 });
 
 /* ── Logo-upload ──────────────────────────────────────────────────────── */
+const artworkZone = ZONES.find((z) => z.content === 'artwork');
 logoFileInput.addEventListener('change', () => {
-  const file = logoFileInput.files && logoFileInput.files[0];
-  if (!file) return;
+  const file = logoFileInput.files?.[0];
+  if (!file || !artworkZone) return;
+  if (!viewer.isZoneSupported(artworkZone.id)) {
+    logoUploadText.textContent = 'Niet beschikbaar op dit model.';
+    return;
+  }
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    viewer.setDecalImage('logo', img);
+    viewer.setZoneImage(artworkZone.id, img, hexOf(state.colors[artworkZone.id]));
     logoUploadText.textContent = file.name;
     URL.revokeObjectURL(url);
   };
@@ -217,22 +214,23 @@ document.querySelectorAll('.view-btn[data-cam]').forEach((btn) => {
     viewer.goToPreset(btn.getAttribute('data-cam'));
   });
 });
-document.getElementById('cam-reset').addEventListener('click', () => {
-  document.querySelectorAll('.view-btn[data-cam]').forEach((b, i) => {
-    const on = i === 0;
+document.getElementById('cam-reset')?.addEventListener('click', () => {
+  const first = viewer.cameraPresetNames[0];
+  document.querySelectorAll('.view-btn[data-cam]').forEach((b) => {
+    const on = b.getAttribute('data-cam') === first;
     b.classList.toggle('is-active', on);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  viewer.goToPreset('front');
+  viewer.goToPreset(first);
 });
 
 /* ── Reset ────────────────────────────────────────────────────────────── */
 resetBtn.addEventListener('click', () => {
-  PARTS.forEach((p) => { state.colors[p.key] = p.def; });
+  state.colors = defaultColors();
   state.name = '';
   nameInput.value = '';
   logoUploadText.textContent = 'Kies een afbeelding';
-  partsWrap.innerHTML = '';
+  if (artworkZone) viewer.setZoneImage(artworkZone.id, null, hexOf(state.colors[artworkZone.id]));
   buildParts();
   applyAll();
   save();
@@ -240,5 +238,3 @@ resetBtn.addEventListener('click', () => {
 
 /* ── Start ────────────────────────────────────────────────────────────── */
 load();
-buildParts();
-nameInput.value = state.name;
