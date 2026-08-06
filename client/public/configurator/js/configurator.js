@@ -32,9 +32,9 @@ const PARTS = [
   { key: 'frontPanel', zone: 'front-panel', kind: 'mesh',  label: 'Front Panel', def: 'Black' },
   { key: 'palm',       zone: 'palm',        kind: 'mesh',  label: 'Palm',        def: 'Black' },
   { key: 'palmBack',   zone: 'palm-back',   kind: 'mesh',  label: 'Palm Back',   def: 'Black' },
-  { key: 'outerThumb', zone: 'outer-thumb', kind: 'mesh',  label: 'Outer Thumb', def: 'Black' },
-  { key: 'innerThumb', zone: 'inner-thumb', kind: 'mesh',  label: 'Inner Thumb', def: 'Black' },
   { key: 'wrist',      zone: 'wrist',       kind: 'mesh',  label: 'Wrist',       def: 'Black' },
+  { key: 'outerThumb', zone: 'outer-thumb', kind: 'decal', label: 'Outer Thumb', def: 'Black' },
+  { key: 'innerThumb', zone: 'inner-thumb', kind: 'decal', label: 'Inner Thumb', def: 'Black' },
   { key: 'trim',       zone: 'trim',        kind: 'decal', label: 'Trim',        def: 'Gold' },
   { key: 'piping',     zone: 'piping',      kind: 'decal', label: 'Piping',      def: 'Gold' },
   { key: 'laces',      zone: 'laces',       kind: 'decal', label: 'Laces',       def: 'White' },
@@ -80,6 +80,7 @@ const logoFileInput  = document.getElementById('logo-file');
 const logoUploadText = document.getElementById('logo-upload-text');
 
 const viewer = createGloveViewer(canvas);
+
 
 viewer.ready.then(() => {
   stageLoading.classList.add('is-hidden');

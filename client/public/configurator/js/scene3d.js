@@ -22,25 +22,34 @@ import { MeshoptDecoder } from './vendor/three/addons/libs/meshopt_decoder.modul
 
 const MODEL_URL = 'assets/boxing_glove_segmented.glb';
 
-export const MESH_ZONES = ['top-panel', 'front-panel', 'palm', 'palm-back', 'outer-thumb', 'inner-thumb', 'wrist'];
-export const DECAL_ZONES = ['piping', 'trim', 'laces', 'stitching', 'logo', 'name'];
+// Duim (Outer/Inner Thumb) is GEEN los mesh meer: deze scan heeft geen
+// scheidbare duim-uitstulping (de duim is volledig vergroeid met de vuist —
+// bevestigd via geïsoleerde render-controle). Een geforceerde nep-scheiding
+// gaf verkeerde/onbetrouwbare zones. Nu net als de andere niet-bestaande
+// onderdelen: een decal op de dichtstbijzijnde échte buurzone.
+export const MESH_ZONES = ['top-panel', 'front-panel', 'palm', 'palm-back', 'wrist'];
+export const DECAL_ZONES = ['piping', 'trim', 'laces', 'stitching', 'logo', 'name', 'outer-thumb', 'inner-thumb'];
 
 // Elke decal-zone: op welk echt mesh hij geprojecteerd wordt + waar op de
 // bounding box van dát mesh (u,v,w = fractie 0..1 langs elke as). Geen
 // aannames over wereld-assen nodig — het dichtstbijzijnde échte
 // oppervlaktepunt op het GENOEMDE mesh wordt via brute-force gezocht.
-// u = links/rechts, v = onder/boven, w = voor/achter — fracties (0..1) binnen
-// de EIGEN bounding box van het aangewezen mesh. De meshes zijn niet symmetrisch
-// rond het model-midden (duim/pols nemen een stuk van de breedte in), dus u=0.5
-// is NIET automatisch het echte midden van de handschoen — onderstaande waarden
-// zijn empirisch gekalibreerd tegen de werkelijke geometrie (zie devnotes).
+// u = links/rechts (X), v = onder/boven (Y, hoogte), w = voor/achter (Z,
+// diepte) — fracties (0..1) binnen de EIGEN bounding box van het aangewezen
+// mesh. Gekalibreerd tegen de v4-geometrie (na contiguïteit-fix + smoothing).
 const DECAL_ANCHORS = {
-  piping:    { mesh: 'top-panel',   u: 0.30, v: 0.06, w: 0.55, size: [120, 14, 36] },
-  trim:      { mesh: 'wrist',       u: 0.69, v: 0.14, w: 0.55, size: [120, 16, 36] },
-  laces:     { mesh: 'front-panel', u: 0.28, v: 0.08, w: 0.55, size: [50, 32, 36] },
-  stitching: { mesh: 'wrist',       u: 0.69, v: 0.88, w: 0.55, size: [120, 12, 36] },
-  logo:      { mesh: 'front-panel', u: 0.28, v: 0.60, w: 0.55, size: [42, 42, 36] },
-  name:      { mesh: 'front-panel', u: 0.28, v: 0.32, w: 0.55, size: [82, 18, 36] },
+  piping:        { mesh: 'top-panel',   u: 0.45, v: 0.10, w: 0.50, size: [190, 30, 90] },
+  trim:          { mesh: 'wrist',       u: 0.55, v: 0.90, w: 0.50, size: [190, 34, 90] },
+  laces:         { mesh: 'front-panel', u: 0.45, v: 0.15, w: 0.50, size: [110, 80, 80] },
+  stitching:     { mesh: 'wrist',       u: 0.55, v: 0.10, w: 0.50, size: [190, 26, 90] },
+  logo:          { mesh: 'front-panel', u: 0.45, v: 0.60, w: 0.50, size: [95, 95, 80] },
+  name:          { mesh: 'front-panel', u: 0.45, v: 0.35, w: 0.50, size: [150, 46, 80] },
+  // De duim-regio (lage X) valt geometrisch onder top-panel / palm-back —
+  // front-panel en palm hebben daar nauwelijks tot geen oppervlak (geteld:
+  // palm 0 vertices onder x=-40, front-panel 363, top-panel 12693,
+  // palm-back 2512). Vandaar deze mesh-keuze i.p.v. de intuïtieve.
+  'outer-thumb': { mesh: 'top-panel',   u: 0.06, v: 0.45, w: 0.50, size: [95, 105, 80] },
+  'inner-thumb': { mesh: 'palm-back',   u: 0.06, v: 0.50, w: 0.50, size: [95, 105, 80] },
 };
 
 const COLOR_LERP_SPEED = 8; // hoger = snellere kleurovergang
@@ -49,12 +58,18 @@ const COLOR_LERP_SPEED = 8; // hoger = snellere kleurovergang
  *  dichtst bij een doelpunt binnen zijn eigen bounding box ligt. Brute-force
  *  over alle driehoeken — draait eenmalig per decal bij het laden, dus de
  *  kosten (tot ~100k driehoeken) zijn verwaarloosbaar. */
+// `target` is een WERELD-coördinaat; het resultaat is dat ook. Belangrijk:
+// de driehoeken worden hier expliciet naar wereldruimte getransformeerd vóór
+// de vergelijking. (Eerder werden lokale driehoeken tegen een wereld-target
+// vergeleken — dat gaf systematisch verkeerde ankers zodra het model door
+// fitCameraToObject verplaatst was.)
 function closestSurfacePoint(mesh, target) {
   const pos = mesh.geometry.attributes.position;
   const idx = mesh.geometry.index;
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
   const tri = new THREE.Triangle();
   const closest = new THREE.Vector3();
+  const m = mesh.matrixWorld;
   let bestDist = Infinity, bestPoint = null, bestNormal = null;
 
   const triCount = idx ? idx.count / 3 : pos.count / 3;
@@ -62,9 +77,9 @@ function closestSurfacePoint(mesh, target) {
     const ia = idx ? idx.getX(i * 3) : i * 3;
     const ib = idx ? idx.getX(i * 3 + 1) : i * 3 + 1;
     const ic = idx ? idx.getX(i * 3 + 2) : i * 3 + 2;
-    a.fromBufferAttribute(pos, ia);
-    b.fromBufferAttribute(pos, ib);
-    c.fromBufferAttribute(pos, ic);
+    a.fromBufferAttribute(pos, ia).applyMatrix4(m);
+    b.fromBufferAttribute(pos, ib).applyMatrix4(m);
+    c.fromBufferAttribute(pos, ic).applyMatrix4(m);
     tri.set(a, b, c);
     tri.closestPointToPoint(target, closest);
     const d = closest.distanceToSquared(target);
@@ -74,14 +89,21 @@ function closestSurfacePoint(mesh, target) {
       bestNormal = tri.getNormal(new THREE.Vector3());
     }
   }
-  // naar wereldcoördinaten (mesh heeft in onze scene een identity-achtige
-  // transform, maar we passen 'm netjes toe voor het geval dat verandert)
-  bestPoint.applyMatrix4(mesh.matrixWorld);
-  const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
-  bestNormal.applyMatrix3(normalMatrix).normalize();
-  return { point: bestPoint, normal: bestNormal };
+  return { point: bestPoint, normal: bestNormal.normalize() };
 }
 
+/**
+ * Kiest een ankerpunt door het ECHTE vertex te zoeken dat het dichtst bij de
+ * gevraagde bounding-box-fractie ligt, en daarna pas het exacte oppervlaktepunt.
+ *
+ * Waarom niet direct closestPointToPoint op de box-fractie: de handschoen is
+ * sterk gekromd, dus een punt op de bounding box kan tientallen eenheden ín de
+ * lege ruimte naast de vorm liggen. De closest-point-zoektocht landt dan op de
+ * dichtstbijzijnde uitstekende rand — waardoor meerdere heel verschillende
+ * fracties allemaal op hetzelfde punt uitkomen (waargenomen: 5 verschillende
+ * ankers landden binnen enkele eenheden van elkaar). Eerst naar een echt vertex
+ * snappen houdt het anker binnen de daadwerkelijke vorm.
+ */
 function anchorFromBoxFraction(mesh, u, v, w) {
   const box = new THREE.Box3().setFromObject(mesh);
   const target = new THREE.Vector3(
@@ -89,7 +111,17 @@ function anchorFromBoxFraction(mesh, u, v, w) {
     THREE.MathUtils.lerp(box.min.y, box.max.y, v),
     THREE.MathUtils.lerp(box.min.z, box.max.z, w),
   );
-  return closestSurfacePoint(mesh, target);
+
+  const pos = mesh.geometry.attributes.position;
+  const p = new THREE.Vector3();
+  let bestD = Infinity;
+  const nearestVertex = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+    const d = p.distanceToSquared(target);
+    if (d < bestD) { bestD = d; nearestVertex.copy(p); }
+  }
+  return closestSurfacePoint(mesh, nearestVertex);
 }
 
 function orientationFromNormal(normal) {
@@ -257,8 +289,6 @@ export function createGloveViewer(canvas, opts = {}) {
 
   let modelRoot = null;
   let ready = false;
-  let idleTimer = 0;
-  let autoRotate = true;
   let camRadius = 420;
   let camTargetY = 0;
   let camAnim = null; // { fromPos, toPos, fromTarget, toTarget, t0, dur }
@@ -302,8 +332,6 @@ export function createGloveViewer(canvas, opts = {}) {
       toPos, fromTarget: controls.target.clone(), toTarget,
       t0: performance.now(), dur: duration,
     };
-    autoRotate = false;
-    idleTimer = 0;
   }
 
   function buildDecal(zone) {
@@ -397,8 +425,6 @@ export function createGloveViewer(canvas, opts = {}) {
   function setZoneColor(zone, hex) {
     if (!meshByZone[zone]) return;
     targetColor[zone] = new THREE.Color(hex);
-    autoRotate = false;
-    idleTimer = 0;
   }
 
   function setDecalColor(zone, hex, extra) {
@@ -406,8 +432,6 @@ export function createGloveViewer(canvas, opts = {}) {
     if (!d) return;
     drawDecal(zone, d.ctx, hex, extra);
     d.texture.needsUpdate = true;
-    autoRotate = false;
-    idleTimer = 0;
   }
 
   function setDecalImage(zone, img) {
@@ -450,13 +474,6 @@ export function createGloveViewer(canvas, opts = {}) {
       modelRoot.scale.setScalar(s);
     }
 
-    if (autoRotate && ready) {
-      idleTimer += dt;
-      if (idleTimer > 1.4) {
-        modelRoot.rotation.y += dt * 0.18;
-      }
-    }
-
     if (camAnim) {
       const t = Math.min(1, (performance.now() - camAnim.t0) / camAnim.dur);
       const eased = 1 - Math.pow(1 - t, 3);
@@ -468,9 +485,6 @@ export function createGloveViewer(canvas, opts = {}) {
     controls.update();
     renderer.render(scene, camera);
   }
-
-  controls.addEventListener('start', () => { autoRotate = false; });
-  controls.addEventListener('end', () => { idleTimer = 0; autoRotate = true; });
 
   // Meerdere onafhankelijke triggers voor het formaat — sommige browser-
   ///omgevingscombinaties leveren geen (tijdige) ResizeObserver-callback op
