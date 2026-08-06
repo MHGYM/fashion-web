@@ -5,14 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FightMarketing — 3D Glove Configurator</title>
 <meta name="description" content="Stel je eigen FightMarketing wedstrijdhandschoen samen in 3D.">
-<script type="importmap">
-{
-  "imports": {
-    "three": "./js/vendor/three/three.module.js",
-    "three/addons/": "./js/vendor/three/addons/"
-  }
-}
-</script>
+<!-- Geen import map nodig: alle modules (eigen + gevendorde three.js-addons)
+     gebruiken relatieve import-paden. Een inline <script type="importmap">
+     zou hier stuklopen op de site-brede CSP (script-src 'self', geen
+     'unsafe-inline'). -->
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
