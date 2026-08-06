@@ -116,15 +116,16 @@ export function createGloveViewer(canvas, opts = {}) {
   const scene = new THREE.Scene();
   scene.background = null;
 
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 5000);
-  camera.position.set(220, 140, 320);
+  // near/far en zoomgrenzen worden in fitCameraToObject() afgeleid uit de
+  // werkelijke modelgrootte — modellen komen in sterk uiteenlopende schalen
+  // binnen (deze twee schelen een factor ~60), dus vaste waarden zouden per
+  // model bijgesteld moeten worden.
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 10000);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.rotateSpeed = 0.75;
-  controls.minDistance = 160;
-  controls.maxDistance = 620;
   controls.enablePan = false;
   controls.minPolarAngle = Math.PI * 0.12;
   controls.maxPolarAngle = Math.PI * 0.88;
@@ -181,11 +182,25 @@ export function createGloveViewer(canvas, opts = {}) {
     const center = box.getCenter(new THREE.Vector3());
     object.position.sub(center);
     object.position.y += size.y / 2;
-    camRadius = Math.max(size.x, size.y, size.z) * 1.65;
-    camTargetY = size.y * 0.42;
+    // De handschoen is langwerpig; de camera moet op de LANGSTE as passen,
+    // niet op de gemiddelde — anders staat hij te dicht en valt de manchet
+    // (of de top) buiten beeld.
+    const extent = Math.max(size.x, size.y, size.z);
+    camRadius = extent * 2.4;
+    camTargetY = size.y * 0.5;
     controls.target.set(0, camTargetY, 0);
+
+    // Zoomgrenzen en clipping meeschalen met het model
+    controls.minDistance = extent * 0.7;
+    controls.maxDistance = extent * 3.0;
+    camera.near = extent * 0.01;
+    camera.far  = extent * 40;
+    camera.updateProjectionMatrix();
+
     goToPreset(Object.keys(presets)[0] || 'front', 0);
-    shadowMesh.scale.setScalar(Math.max(size.x, size.z) / 180);
+    // Contactschaduw op de voetafdruk van het model (PlaneGeometry is 260 groot)
+    shadowMesh.scale.setScalar(Math.max(size.x, size.z) * 1.6 / 260);
+    shadowMesh.position.y = -extent * 0.002;
   }
 
   function goToPreset(name, duration = 650) {

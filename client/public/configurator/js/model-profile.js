@@ -4,11 +4,11 @@
    Wil je een ander 3D-model gebruiken? Wijzig alleen de import hieronder.
    Verder verandert er niets aan de configurator.
 
-       import profile from './models/pro-uv-glove.js';   ← nieuw model
-       import profile from './models/scan-prototype.js'; ← huidig prototype
+       import profile from './models/fm-glove-pro.js';   ← huidig model
+       import profile from './models/pro-uv-glove.js';   ← toekomstig model
    ═══════════════════════════════════════════════════════════════════════════ */
 
-import profile from './models/scan-prototype.js';
+import profile from './models/fm-glove-pro.js';
 import { ZONE_IDS } from './zones.js';
 
 /**
