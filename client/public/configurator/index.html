@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FightMarketing — 3D Glove Configurator</title>
+<meta name="description" content="Stel je eigen FightMarketing wedstrijdhandschoen samen in 3D.">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./js/vendor/three/three.module.js",
+    "three/addons/": "./js/vendor/three/addons/"
+  }
+}
+</script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 108 62" aria-hidden="true">
+      <path d="M0,0 h41 v13 h-27 v11 h22 v13 h-22 v25 h-14 z"/>
+      <path d="M53,0 h15 l13,26 l13,-26 h15 v62 h-14 v-35 l-11,22 h-6 l-11,-22 v35 h-14 z"/>
+    </svg>
+    <span class="brand-text">FIGHT<em>MARKETING</em></span>
+  </div>
+  <div class="topbar-meta">
+    <span class="chip">Pro Series · 3D</span>
+    <span class="topbar-title">Glove Configurator</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ══ LINKS: camera-presets ══ -->
+  <nav class="views" aria-label="Camerastandpunt kiezen">
+    <button class="view-btn is-active" data-cam="front" aria-pressed="true">
+      <svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20,3 C28,3 34,7 36,14 C38,21 37,32 35,38 C34,41 32,42 29,42 L11,42 C8,42 6,41 5,38 C3,32 2,21 4,14 C6,7 12,3 20,3 Z"/></svg>
+      <span>Front</span>
+    </button>
+    <button class="view-btn" data-cam="back" aria-pressed="false">
+      <svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20,3 C28,3 34,7 36,14 C38,21 37,32 35,38 C34,41 32,42 29,42 L11,42 C8,42 6,41 5,38 C3,32 2,21 4,14 C6,7 12,3 20,3 Z"/><path d="M15,18 L25,26 M25,18 L15,26 M15,26 L25,34 M25,26 L15,34" stroke="#0b0b0e" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
+      <span>Back</span>
+    </button>
+    <button class="view-btn" data-cam="top" aria-pressed="false">
+      <svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20,3 C28,3 34,7 36,14 C38,21 37,32 35,38 C34,41 32,42 29,42 L11,42 C8,42 6,41 5,38 C3,32 2,21 4,14 C6,7 12,3 20,3 Z"/><path d="M8,22 h24" stroke="#0b0b0e" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
+      <span>Top</span>
+    </button>
+    <button class="view-btn view-btn-ghost" id="cam-reset" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      <span>Reset</span>
+    </button>
+  </nav>
+
+  <!-- ══ MIDDEN: 3D-podium ══ -->
+  <section class="stage" aria-label="3D-voorbeeldweergave">
+    <div class="stage-glow" aria-hidden="true"></div>
+    <div class="stage-inner">
+      <canvas id="glove-canvas" role="img" aria-label="Draaibare 3D-weergave van de samengestelde handschoen"></canvas>
+      <div id="stage-loading" class="stage-loading">
+        <div class="spinner" aria-hidden="true"></div>
+        <span>3D-model laden…</span>
+      </div>
+      <p id="stage-error" class="stage-error" hidden></p>
+    </div>
+    <div class="stage-caption">Sleep om te draaien · scroll om te zoomen</div>
+  </section>
+
+  <!-- ══ RECHTS: kleurkiezer ══ -->
+  <aside class="panel" aria-label="Kleuren kiezen">
+    <div class="panel-head">
+      <h2>Colour</h2>
+      <button id="reset" class="ghost-btn" type="button">Reset</button>
+    </div>
+
+    <div id="parts" class="parts"></div>
+
+    <div class="panel-block">
+      <label class="field-label" for="name-input">Add your name</label>
+      <input id="name-input" class="text-input" type="text" maxlength="12" placeholder="YOUR NAME" autocomplete="off" spellcheck="false">
+      <p class="hint">Max. 12 tekens — verschijnt direct op de handschoen.</p>
+    </div>
+
+    <div class="panel-block">
+      <span class="field-label">Upload logo <span class="cz-optional">(optioneel)</span></span>
+      <label class="cz-upload" id="logo-upload-label">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span id="logo-upload-text">Kies een afbeelding</span>
+        <input type="file" id="logo-file" accept="image/*" hidden>
+      </label>
+      <p class="hint">Gebruik alleen materiaal waarvan je zelf de rechten hebt.</p>
+    </div>
+  </aside>
+
+</main>
+
+<script type="module" src="js/configurator.js"></script>
+</body>
+</html>

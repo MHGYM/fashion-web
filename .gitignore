@@ -8,3 +8,7 @@ uploads/
 backups/
 *.log
 dist/
+
+# Ruwe/tussentijdse 3D-scanbestanden (werkmateriaal voor de Blender-segmentatie,
+# niet nodig om de site te draaien — alleen assets/boxing_glove_segmented.glb is dat)
+client/public/configurator/assets/3d-source/

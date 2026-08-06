@@ -84,15 +84,16 @@ if (fs.existsSync(clientDist)) {
   // Gehashte assets (assets/index-XXXX.js) mogen eeuwig gecachet worden; de
   // rest (vooral index.html) op no-cache zodat de browser na een nieuwe deploy
   // altijd de actuele versie ophaalt — voorkomt "oude versie blijft hangen".
+  // Alleen Vite's eigen build-output (dist/assets/index-XXXX.js) draagt een
+  // content-hash in de bestandsnaam en mag daarom eeuwig gecachet worden.
+  // Alles daarbuiten — index.html, maar ook vervangbare tekeningen in
+  // public/-submappen zoals assets/customizer/* en configurator/assets/* —
+  // krijgt no-cache, zodat een vervangen bestand meteen zichtbaar is.
+  const hashedAssetsDir = path.join(clientDist, 'assets')
   app.use(express.static(clientDist, {
     setHeaders: (res, filePath) => {
-      // Gehashte build-assets (assets/index-XXXX.js) mogen eeuwig immutable
-      // gecachet worden. De customizer-tekeningen (assets/customizer/*) juist
-      // NIET: die moeten vervangbaar zijn zonder codewijziging, dus no-cache.
-      const inAssets     = filePath.includes(`${path.sep}assets${path.sep}`)
-      const inCustomizer = filePath.includes(`${path.sep}customizer${path.sep}`)
       res.setHeader('Cache-Control',
-        inAssets && !inCustomizer
+        path.dirname(filePath) === hashedAssetsDir
           ? 'public, max-age=31536000, immutable'
           : 'no-cache')
     }
