@@ -1,25 +1,28 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    MODEL-PROFIEL — "fm-glove-pro"
    ═══════════════════════════════════════════════════════════════════════════
-   Gemodelleerde Velcro-wedstrijdhandschoen, omgezet naar configurator-ready.
+   Gemodelleerde Velcro-wedstrijdhandschoen, omgezet naar 3 kleurzones.
 
    Bron: Sketchfab "Boxing gloves" van A1905, CC-BY-4.0.
-   → BIJ PUBLICATIE IS NAAMSVERMELDING VERPLICHT (zie onderaan dit bestand).
+   → BIJ PUBLICATIE IS NAAMSVERMELDING VERPLICHT (zie `attribution` onderaan).
 
-   Hoe de zones tot stand zijn gekomen
-   ───────────────────────────────────
-   Dit model is netjes ge-unwrapt, dus de UV-naden van de 3D-artist vallen
-   samen met de ECHTE paneelranden. De omzetting splitst daarom op UV-eiland;
-   de grenzen zijn dus niet verzonnen maar overgenomen uit het ontwerp.
+   Hoe de zones tot stand kwamen (tools/build-configurator-model.py)
+   ────────────────────────────────────────────────────────────────
+   Het bronmodel is netjes ge-unwrapt, dus de UV-naden van de 3D-artist vallen
+   samen met de ECHTE paneelranden. Er is op UV-eiland gesplitst en daarna
+   samengevoegd tot de drie zones:
 
-   Twee uitzonderingen, expliciet:
-     • back-palm  — de palm is één UV-eiland; de scheiding palm/back-palm is
-                    geometrisch (op hoogte), niet door de artist gelegd.
-     • outer/inner-thumb — de duim is één stuk; gesplitst op oriëntatie
-                    (voorzijde vs palmzijde).
+     front-panel  slagvlak + bovenzijde + volledige duim + piping rond het
+                  lichaam. Eén doorlopend UV-vlak, zodat een geüploade
+                  afbeelding de héle voorkant inclusief duim bedekt.
+     palm         palmzijde, inclusief wat eerder 'back palm' heette.
+     wrist        manchet + strap + trim + manchet-piping + stiksels.
 
-   11 van de 14 zones zijn nu ECHTE meshes (voorheen 5). Alleen Logo en Naam
-   blijven decals — die zijn per definitie dynamisch, want de klant vult ze in.
+   Stiksels zijn samengevoegd i.p.v. apart gehouden: uit een geïsoleerde
+   render bleek het op dit model niet meer dan een dun randje onderlangs de
+   manchet — visueel niet te onderscheiden van de trim.
+
+   Een ander GLB koppelen? Alleen `modelUrl` en `bindings` hoeven te wijzigen.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default {
@@ -29,8 +32,6 @@ export default {
 
   capabilities: {
     hasUVs: true,
-    hasSeparateThumb: true,
-    hasLaces: false,        // Velcro-sluiting, geen veters
     closure: 'velcro',
   },
 
@@ -48,29 +49,21 @@ export default {
     envMapIntensity: 1.0,
   },
 
+  /**
+   * Zone-id (uit zones.js) → mesh in de GLB.
+   * `type: 'mesh'` betekent: eigen object met eigen UV-ruimte, dus zowel
+   * kleur als een UV-brede textuur zijn mogelijk.
+   */
   bindings: {
-    // ── Echte, losse meshes (gesplitst op de UV-naden van de artist) ───────
-    'top-panel':   { type: 'mesh', node: 'top-panel' },
     'front-panel': { type: 'mesh', node: 'front-panel' },
     'palm':        { type: 'mesh', node: 'palm' },
-    'back-palm':   { type: 'mesh', node: 'back-palm' },
-    'outer-thumb': { type: 'mesh', node: 'outer-thumb' },
-    'inner-thumb': { type: 'mesh', node: 'inner-thumb' },
     'wrist':       { type: 'mesh', node: 'wrist' },
-    'strap':       { type: 'mesh', node: 'strap' },
-    'piping':      { type: 'mesh', node: 'piping' },
-    'trim':        { type: 'mesh', node: 'trim' },
-    'stitching':   { type: 'mesh', node: 'stitching' },
-
-    // ── Dynamisch: door de klant ingevuld, kan niet in de GLB zitten ───────
-    'logo': { type: 'decal', anchor: { mesh: 'front-panel', u: 0.50, v: 0.55, w: 0.50, size: [0.9, 0.9, 1.2] } },
-    'name': { type: 'decal', anchor: { mesh: 'front-panel', u: 0.50, v: 0.30, w: 0.50, size: [1.4, 0.4, 1.2] } },
-
-    // ── Niet aanwezig op dit model ────────────────────────────────────────
-    'laces': { type: 'unsupported', reason: 'Dit model is een Velcro-handschoen zonder veters.' },
   },
 
-  /** Verplichte bronvermelding (CC-BY-4.0) — toon dit ergens op de pagina. */
+  /** Niet-kleurbare onderdelen die wel gerenderd worden. */
+  staticNodes: ['lining'],
+
+  /** Verplichte bronvermelding (CC-BY-4.0) — toon dit op de pagina. */
   attribution: {
     title: 'Boxing gloves',
     author: 'A1905',

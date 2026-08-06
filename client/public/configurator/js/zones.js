@@ -1,12 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    PRODUCTDEFINITIE — welke onderdelen heeft een FightMarketing-handschoen?
    ═══════════════════════════════════════════════════════════════════════════
-   Dit bestand is bewust MODEL-ONAFHANKELIJK. Het beschrijft het product zoals
-   de klant het ziet: 14 kleurbare onderdelen, hun volgorde, labels en
-   standaardkleuren. Hier staat NIETS over meshes, GLB-namen of decals.
-
-   Wissel je later naar een professioneel UV-gemapt model, dan blijft dit
-   bestand ongewijzigd — alleen het model-profiel (models/*.js) verandert.
+   Bewust MODEL-ONAFHANKELIJK: hier staat wat de klant kan aanpassen, niet hoe
+   een specifiek 3D-bestand dat levert. Een ander GLB betekent alleen een nieuw
+   model-profiel (models/*.js) — dit bestand en de UI blijven ongewijzigd.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /** Het 16-kleurenpalet. Eén bron van waarheid voor UI én 3D. */
@@ -34,43 +31,49 @@ export function hexOf(colorName) {
 }
 
 /**
- * De 14 kleurbare onderdelen, in de volgorde waarin ze in de UI verschijnen.
+ * De kleurbare onderdelen, in UI-volgorde.
  *
- *  id      — stabiele sleutel; gebruikt in opslag, cart-payload en model-profielen.
- *            NOOIT hernoemen zonder migratie (staat in localStorage/bestellingen).
- *  label   — wat de klant ziet.
- *  group   — voor visuele groepering in het rechterpaneel.
- *  default — standaardkleur (naam uit COLORS).
- *  content — 'color' (alleen kleur) | 'text' (kleur + tekstinvoer)
- *            | 'artwork' (kleur + afbeelding-upload).
+ *  id       — stabiele sleutel (opslag, cart-payload, model-profielen).
+ *  label    — wat de klant ziet.
+ *  default  — standaardkleur (naam uit COLORS).
+ *  artwork  — 'full'  : afbeelding vult de héle zone (UV-breed), met
+ *                       verplaatsen/schalen/roteren.
+ *             'badge' : logo + tekst als kleiner element binnen de zone.
+ *             null    : alleen kleur.
  */
 export const ZONES = [
-  { id: 'top-panel',   label: 'Top Panel',   group: 'Panels',  default: 'Black', content: 'color' },
-  { id: 'front-panel', label: 'Front Panel', group: 'Panels',  default: 'Black', content: 'color' },
-  { id: 'palm',        label: 'Palm',        group: 'Panels',  default: 'Black', content: 'color' },
-  { id: 'back-palm',   label: 'Back Palm',   group: 'Panels',  default: 'Black', content: 'color' },
-  { id: 'outer-thumb', label: 'Outer Thumb', group: 'Thumb',   default: 'Black', content: 'color' },
-  { id: 'inner-thumb', label: 'Inner Thumb', group: 'Thumb',   default: 'Black', content: 'color' },
-  { id: 'wrist',       label: 'Wrist',       group: 'Closure', default: 'Black', content: 'color' },
-  { id: 'strap',       label: 'Strap',       group: 'Closure', default: 'Black', content: 'color' },
-  { id: 'laces',       label: 'Laces',       group: 'Closure', default: 'White', content: 'color' },
-  { id: 'piping',      label: 'Piping',      group: 'Details', default: 'Gold',  content: 'color' },
-  { id: 'trim',        label: 'Trim',        group: 'Details', default: 'Gold',  content: 'color' },
-  { id: 'stitching',   label: 'Stitching',   group: 'Details', default: 'White', content: 'color' },
-  { id: 'logo',        label: 'Logo',        group: 'Branding',default: 'Gold',  content: 'artwork' },
-  { id: 'name',        label: 'Naam',        group: 'Branding',default: 'White', content: 'text' },
+  {
+    id: 'front-panel',
+    label: 'Front Panel',
+    default: 'Black',
+    artwork: 'full',
+    hint: 'Inclusief de volledige duim en de piping rondom.',
+  },
+  {
+    id: 'palm',
+    label: 'Palm',
+    default: 'Black',
+    artwork: null,
+    hint: 'De complete palmzijde.',
+  },
+  {
+    id: 'wrist',
+    label: 'Wrist',
+    default: 'Black',
+    artwork: 'badge',
+    hint: 'Manchet inclusief strap. Plaats hier je logo en naam.',
+  },
 ];
 
 export const ZONE_IDS = ZONES.map((z) => z.id);
 export const ZONE_BY_ID = Object.fromEntries(ZONES.map((z) => [z.id, z]));
 
-/** Groepen in weergavevolgorde, afgeleid van ZONES (geen dubbele lijst). */
-export const ZONE_GROUPS = ZONES.reduce((acc, z) => {
-  if (!acc.includes(z.group)) acc.push(z.group);
-  return acc;
-}, []);
-
-/** Standaardconfiguratie: { 'top-panel': 'Black', ... } */
+/** Standaardconfiguratie: { 'front-panel': 'Black', ... } */
 export function defaultColors() {
   return Object.fromEntries(ZONES.map((z) => [z.id, z.default]));
+}
+
+/** Neutrale begintoestand voor een afbeelding op een zone. */
+export function defaultArtworkTransform() {
+  return { x: 0, y: 0, scale: 1, rotation: 0 };
 }

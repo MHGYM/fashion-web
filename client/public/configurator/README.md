@@ -7,102 +7,94 @@ Live: `/configurator/` · lokaal: serveer `client/public/` en open `/configurato
 
 ---
 
+## De drie zones
+
+| Zone | Omvat | Personalisatie |
+|---|---|---|
+| **Front Panel** | voorkant + bovenzijde + **volledige duim** + piping rondom | kleur · afbeelding over het hele paneel (verplaatsen/schalen/roteren) |
+| **Palm** | complete palmzijde | kleur |
+| **Wrist** | manchet + strap + trim + stiksels | kleur · logo · tekst |
+
+Uploads: een afbeelding op het Front Panel dekt het paneel **inclusief de duim**.
+Logo en tekst horen bij de Wrist.
+
+---
+
 ## Architectuur
 
-De code is bewust gesplitst in **productdefinitie** (verandert nooit) en
-**model-binding** (verandert per 3D-model):
+Bewust gesplitst in **productdefinitie** (verandert nooit) en **model-binding**
+(verandert per 3D-model):
 
 ```
 js/
-├── zones.js                    PRODUCT — de 14 onderdelen + 16 kleuren
-│                               Model-onafhankelijk. Verandert niet bij nieuw model.
+├── zones.js              PRODUCT — de 3 zones + 16 kleuren.
+│                         Model-onafhankelijk; blijft gelijk bij een nieuw model.
 │
-├── model-profile.js            SCHAKELAAR — één import bepaalt het actieve model
+├── model-profile.js      SCHAKELAAR — één import bepaalt het actieve model.
 │
 ├── models/
-│   ├── scan-prototype.js       BINDING — hoe dít model de 14 zones levert
-│   └── pro-uv-glove.example.js Blauwdruk voor een professioneel UV-model
+│   └── fm-glove-pro.js   BINDING — hoe dít GLB de zones levert (meshnamen,
+│                         camerastandpunten, materiaalinstellingen).
 │
-├── decal-painters.js           Hoe een onderdeel eruitziet als het geprojecteerd
-│                               wordt (piping = band, stitching = stippellijn, …)
+├── scene3d.js            GENERIEKE renderer. Kent géén zone- of meshnamen;
+│                         leest alles uit het profiel.
 │
-├── scene3d.js                  GENERIEKE renderer. Kent géén zone- of meshnamen;
-│                               leest alles uit het profiel.
-│
-└── configurator.js             UI. Bouwt zichzelf op uit zones.js.
+└── configurator.js       UI. Bouwt zichzelf op uit zones.js en praat met de
+                          3D-laag uitsluitend via zone-id's.
 ```
 
-**Kernregel:** `scene3d.js` en `configurator.js` bevatten geen enkele meshnaam.
-Wil je een ander model? Dan raak je alleen `models/` + `model-profile.js` aan.
+**Een ander GLB koppelen** vergt alleen een nieuw bestand in `models/` en één
+gewijzigde import in `model-profile.js`. `zones.js`, `configurator.js` en
+`scene3d.js` blijven ongemoeid.
 
 ---
 
-## Een nieuw 3D-model inzetten
+## Hoe kleur en artwork werken
 
-1. Zet het bestand neer als `assets/<naam>.glb`
-   (comprimeren: `npx @gltf-transform/cli optimize in.glb out.glb --compress meshopt`)
+Elke zone krijgt één canvas-textuur die de volledige UV-ruimte van die zone
+beslaat. Daarop wordt getekend: eerst de effen zonekleur, daarna een eventuele
+afbeelding. Omdat het canvas de hele UV dekt, bedekt een upload automatisch het
+complete paneel — bij Front Panel dus inclusief de duim.
 
-2. Bekijk de node- en materiaalnamen:
-   ```
-   npx @gltf-transform/cli inspect assets/<naam>.glb
-   ```
-
-3. Kopieer `models/pro-uv-glove.example.js` naar `models/<naam>.js` en vul per
-   zone in hoe het model die levert (zie binding-types hieronder).
-
-4. Wijzig in `model-profile.js` één regel:
-   ```js
-   import profile from './models/<naam>.js';
-   ```
-
-Klaar. De configurator hoeft verder niet aangepast te worden. Ontbreekt er een
-zone in het profiel, dan waarschuwt de console bij het opstarten en wordt die
-zone als "niet beschikbaar" getoond in plaats van stil te falen.
-
-### Binding-types
-
-| Type | Wanneer | Kwaliteit |
-|---|---|---|
-| `mesh` | Zone is een los, benoemd object in de GLB | Best — scherpe paneelranden |
-| `material` | Zone is een materiaalslot in een gedeeld mesh (typisch bij UV-modellen) | Best |
-| `decal` | Zone bestaat niet als geometrie; wordt geprojecteerd | Benadering |
-| `unsupported` | Dit model kan de zone niet tonen | Zone wordt uitgegrijsd |
+Logo en tekst op de Wrist gaan **niet** via UV maar via een `DecalGeometry`.
+Reden: de manchet-UV is opgeknipt in meerdere, deels gespiegelde eilanden,
+waardoor UV-plaatsing de badge op de verkeerde kant of ondersteboven zet. Een
+decal wordt in 3D geprojecteerd op het punt dat de klant vóór zich ziet.
 
 ---
 
-## Huidige status van het prototype
+## Model omzetten naar configurator-ready
 
-Het actieve model (`scan-prototype`) is een **3D-scan**, geen gemodelleerd
-product. Consequenties, eerlijk benoemd:
+`tools/build-configurator-model.py` draait headless in Blender en splitst een
+bronmodel op **UV-eiland** — dat wil zeggen: langs de naden die de 3D-artist
+zelf heeft gelegd, niet langs verzonnen grenzen.
 
-- **Geen UV-mapping.** Fijne onderdelen (piping, trim, stitching, logo, naam,
-  duim, strap) bestaan niet als geometrie en worden geprojecteerd. Ze zijn
-  kleurbaar, maar volgen niet de echte paneelnaden van een handschoen.
-- **Geen scheidbare duim.** De duim is in de scan vergroeid met de vuist.
-- **Velcro, geen veters.** `laces` staat daarom bewust op `unsupported` in
-  plaats van veters te suggereren die er fysiek niet zijn.
-- Zone-grenzen volgen wiskundige regels (positie + oppervlakterichting), niet
-  de echte naden.
-
-**Voor productiekwaliteit is een gemodelleerde, UV-gemapte handschoen nodig.**
-De configurator is daar volledig op voorbereid: alle 14 zones kunnen dan van
-`decal` naar `mesh`/`material` — zonder één regel wijziging buiten `models/`.
-
----
-
-## Integratiehaak
-
-De pagina exposeert `window.FMConfigurator` voor koppeling aan winkelwagen,
-prijsberekening of het maken van productafbeeldingen:
-
-```js
-FMConfigurator.getConfiguration()
-// → { modelProfile: 'scan-prototype', colors: { 'top-panel': 'Red', … }, name: 'MO' }
-
-FMConfigurator.renderNow()          // rondt animaties af en rendert één frame
-FMConfigurator.viewer.goToPreset('back')
+```bash
+blender --background --python tools/build-configurator-model.py -- \
+  <bron.glb> <uit.glb> <render-map>
 ```
 
-De zone-id's in `colors` (`top-panel`, `back-palm`, `strap`, …) zijn stabiel en
-bedoeld om zo in de bestelling te worden opgeslagen. **Hernoem ze niet zonder
-migratie** — ze staan in `localStorage` en straks in bestelregels.
+Daarna comprimeren (het script exporteert ongecomprimeerd):
+
+```bash
+npx @gltf-transform/cli optimize <uit.glb> <definitief.glb> \
+  --simplify false --join false --palette false --compress meshopt
+```
+
+Voeg `--debug` toe aan het Blender-commando voor felgekleurde zones en
+controlerenders — gebruik dat altijd om te verifiëren dat elke zone dekt wat
+zijn naam belooft.
+
+> **Let op:** de glTF-exporteur laat UV-coördinaten weg als geen enkel materiaal
+> een textuur gebruikt. Het script koppelt daarom een 1×1 placeholder-texture aan
+> elk materiaal. Zonder die truc komt het model zonder `TEXCOORD_0` binnen en
+> werkt de artwork-projectie niet.
+
+---
+
+## Bronvermelding
+
+Het huidige model is **"Boxing gloves" van A1905** (Sketchfab), **CC-BY-4.0**.
+Die licentie vereist **zichtbare naamsvermelding bij publicatie**. De gegevens
+staan in `models/fm-glove-pro.js` onder `attribution`; die moeten nog op de
+pagina getoond worden.

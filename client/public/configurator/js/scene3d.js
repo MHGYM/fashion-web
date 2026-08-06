@@ -1,18 +1,23 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    FightMarketing — 3D Glove Viewer (Three.js)
    ═══════════════════════════════════════════════════════════════════════════
-   GENERIEKE renderer: kent géén enkele zone- of meshnaam. Alles komt uit het
-   actieve model-profiel (model-profile.js). Een nieuw 3D-model vereist alleen
-   een nieuw profiel — dit bestand blijft ongewijzigd.
+   GENERIEKE renderer: kent géén zone- of meshnaam. Alles komt uit het actieve
+   model-profiel (model-profile.js). Een ander GLB vergt alleen een nieuw
+   profiel — dit bestand en de UI blijven ongewijzigd.
 
-   Publieke API (alles per zone-id uit zones.js):
-     viewer.ready                 → Promise, resolvet zodra het model staat
-     viewer.setZoneColor(id, hex) → kleurt de zone, ongeacht mesh/material/decal
-     viewer.setZoneText(id, txt)  → tekst voor tekstzones (bv. 'name')
-     viewer.setZoneImage(id, img) → afbeelding voor artwork-zones (bv. 'logo')
-     viewer.goToPreset(name)      → camerastandpunt uit het profiel
-     viewer.isZoneSupported(id)   → false als dit model de zone niet kan tonen
-     viewer.getZoneSupport(id)    → { supported, type, reason }
+   Kleur en artwork lopen via één canvas-textuur per zone. Dat canvas beslaat
+   de volledige UV-ruimte van de zone, dus een geüploade afbeelding bedekt
+   automatisch het héle paneel (bij front-panel dus inclusief de duim). Op dat
+   canvas kan de afbeelding verplaatst, geschaald en geroteerd worden.
+
+   Publieke API (per zone-id uit zones.js):
+     viewer.ready                      Promise, resolvet zodra het model staat
+     viewer.setZoneColor(id, hex)      zonekleur
+     viewer.setZoneArtwork(id, img, t) afbeelding + { x, y, scale, rotation }
+     viewer.setZoneBadge(id, opts)     logo/tekst binnen een zone
+     viewer.goToPreset(name)           camerastandpunt uit het profiel
+     viewer.isZoneSupported(id)        false als het model de zone niet levert
+     viewer.renderNow()                animaties afronden + één frame renderen
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import * as THREE from './vendor/three/three.module.js';
@@ -23,86 +28,10 @@ import { RoomEnvironment } from './vendor/three/addons/environments/RoomEnvironm
 import { MeshoptDecoder } from './vendor/three/addons/libs/meshopt_decoder.module.js';
 
 import PROFILE from './model-profile.js';
-import { ZONE_IDS } from './zones.js';
-import { painterFor } from './decal-painters.js';
+import { ZONE_IDS, ZONE_BY_ID } from './zones.js';
 
-const COLOR_LERP_SPEED = 8; // hoger = snellere kleurovergang
-const DECAL_TEXTURE_SIZE = 256;
-
-/** Zone-id's gegroepeerd op hoe het actieve model ze levert. */
-function zonesByType(type) {
-  return ZONE_IDS.filter((id) => PROFILE.bindings[id]?.type === type);
-}
-
-// ── Geometrie-hulpjes ────────────────────────────────────────────────────────
-
-/**
- * Dichtstbijzijnde punt op het oppervlak van `mesh` bij wereldpunt `target`.
- * Werkt volledig in WERELDruimte (driehoeken worden getransformeerd) — het
- * model wordt namelijk verplaatst bij het inpassen, dus lokaal vergelijken
- * geeft systematisch verkeerde ankers.
- */
-function closestSurfacePoint(mesh, target) {
-  const pos = mesh.geometry.attributes.position;
-  const idx = mesh.geometry.index;
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
-  const tri = new THREE.Triangle();
-  const closest = new THREE.Vector3();
-  const m = mesh.matrixWorld;
-  let bestDist = Infinity, bestPoint = null, bestNormal = null;
-
-  const triCount = idx ? idx.count / 3 : pos.count / 3;
-  for (let i = 0; i < triCount; i++) {
-    const ia = idx ? idx.getX(i * 3) : i * 3;
-    const ib = idx ? idx.getX(i * 3 + 1) : i * 3 + 1;
-    const ic = idx ? idx.getX(i * 3 + 2) : i * 3 + 2;
-    a.fromBufferAttribute(pos, ia).applyMatrix4(m);
-    b.fromBufferAttribute(pos, ib).applyMatrix4(m);
-    c.fromBufferAttribute(pos, ic).applyMatrix4(m);
-    tri.set(a, b, c);
-    tri.closestPointToPoint(target, closest);
-    const d = closest.distanceToSquared(target);
-    if (d < bestDist) {
-      bestDist = d;
-      bestPoint = closest.clone();
-      bestNormal = tri.getNormal(new THREE.Vector3());
-    }
-  }
-  return { point: bestPoint, normal: bestNormal.normalize() };
-}
-
-/**
- * Ankerpunt uit een bounding-box-fractie. Snapt eerst naar een ECHT vertex:
- * de handschoen is sterk gekromd, dus een box-punt kan ver naast de vorm
- * liggen, waardoor verschillende fracties allemaal op dezelfde uitstekende
- * rand zouden landen.
- */
-function anchorFromBoxFraction(mesh, u, v, w) {
-  const box = new THREE.Box3().setFromObject(mesh);
-  const target = new THREE.Vector3(
-    THREE.MathUtils.lerp(box.min.x, box.max.x, u),
-    THREE.MathUtils.lerp(box.min.y, box.max.y, v),
-    THREE.MathUtils.lerp(box.min.z, box.max.z, w),
-  );
-  const pos = mesh.geometry.attributes.position;
-  const p = new THREE.Vector3();
-  const nearest = new THREE.Vector3();
-  let bestD = Infinity;
-  for (let i = 0; i < pos.count; i++) {
-    p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
-    const d = p.distanceToSquared(target);
-    if (d < bestD) { bestD = d; nearest.copy(p); }
-  }
-  return closestSurfacePoint(mesh, nearest);
-}
-
-function orientationFromNormal(normal) {
-  const dummy = new THREE.Object3D();
-  dummy.lookAt(normal.clone());
-  return dummy.rotation.clone();
-}
-
-// ── Viewer ───────────────────────────────────────────────────────────────────
+const COLOR_LERP_SPEED = 8;
+const TEX_SIZE = 1024;   // canvas per zone; groot genoeg voor scherpe uploads
 
 export function createGloveViewer(canvas, opts = {}) {
   const profile = opts.profile || PROFILE;
@@ -116,10 +45,8 @@ export function createGloveViewer(canvas, opts = {}) {
   const scene = new THREE.Scene();
   scene.background = null;
 
-  // near/far en zoomgrenzen worden in fitCameraToObject() afgeleid uit de
-  // werkelijke modelgrootte — modellen komen in sterk uiteenlopende schalen
-  // binnen (deze twee schelen een factor ~60), dus vaste waarden zouden per
-  // model bijgesteld moeten worden.
+  // near/far en zoomgrenzen worden afgeleid uit de modelgrootte: modellen
+  // komen in sterk uiteenlopende schalen binnen.
   const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 10000);
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -133,16 +60,9 @@ export function createGloveViewer(canvas, opts = {}) {
   // ── Studio-belichting ──────────────────────────────────────────────────
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-
-  const key = new THREE.DirectionalLight(0xfff2e0, 2.4);
-  key.position.set(180, 260, 200);
-  scene.add(key);
-  const fill = new THREE.DirectionalLight(0x9db8ff, 0.9);
-  fill.position.set(-220, 80, -160);
-  scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffd9a0, 1.4);
-  rim.position.set(-60, 180, -280);
-  scene.add(rim);
+  const key = new THREE.DirectionalLight(0xfff2e0, 2.4); key.position.set(180, 260, 200); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x9db8ff, 0.9); fill.position.set(-220, 80, -160); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffd9a0, 1.4); rim.position.set(-60, 180, -280); scene.add(rim);
   scene.add(new THREE.AmbientLight(0x404040, 0.35));
 
   // Zachte contactschaduw
@@ -152,28 +72,19 @@ export function createGloveViewer(canvas, opts = {}) {
   const grad = sctx.createRadialGradient(128, 128, 10, 128, 128, 128);
   grad.addColorStop(0, 'rgba(0,0,0,0.55)');
   grad.addColorStop(1, 'rgba(0,0,0,0)');
-  sctx.fillStyle = grad;
-  sctx.fillRect(0, 0, 256, 256);
+  sctx.fillStyle = grad; sctx.fillRect(0, 0, 256, 256);
   const shadowMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(260, 260),
     new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCanvas), transparent: true, depthWrite: false }),
   );
   shadowMesh.rotation.x = -Math.PI / 2;
-  shadowMesh.position.y = -0.5;
   scene.add(shadowMesh);
 
-  // ── Zone-registers ─────────────────────────────────────────────────────
-  const meshByNode = {};        // GLB-nodenaam → THREE.Mesh
-  const zoneTargets = {};       // zone-id → { kind, material(s) | decal-context }
-  const targetColor = {};       // zone-id → THREE.Color (voor vloeiende lerp)
-  const zoneText = {};          // zone-id → laatst ingestelde tekst
-  const zoneImage = {};         // zone-id → laatst ingestelde afbeelding
-
+  // ── Zone-toestand ──────────────────────────────────────────────────────
+  const zones = {};        // id → { material, ctx, texture, color, artwork, badge }
+  const targetColor = {};  // id → THREE.Color (vloeiende overgang)
   let modelRoot = null;
-  let camRadius = 420;
-  let camTargetY = 0;
-  let camAnim = null;
-
+  let camRadius = 10, camTargetY = 0, camAnim = null;
   const presets = profile.cameraPresets || {};
 
   function fitCameraToObject(object) {
@@ -182,104 +93,161 @@ export function createGloveViewer(canvas, opts = {}) {
     const center = box.getCenter(new THREE.Vector3());
     object.position.sub(center);
     object.position.y += size.y / 2;
-    // De handschoen is langwerpig; de camera moet op de LANGSTE as passen,
-    // niet op de gemiddelde — anders staat hij te dicht en valt de manchet
-    // (of de top) buiten beeld.
+
     const extent = Math.max(size.x, size.y, size.z);
     camRadius = extent * 2.4;
     camTargetY = size.y * 0.5;
     controls.target.set(0, camTargetY, 0);
-
-    // Zoomgrenzen en clipping meeschalen met het model
     controls.minDistance = extent * 0.7;
     controls.maxDistance = extent * 3.0;
     camera.near = extent * 0.01;
-    camera.far  = extent * 40;
+    camera.far = extent * 40;
     camera.updateProjectionMatrix();
 
     goToPreset(Object.keys(presets)[0] || 'front', 0);
-    // Contactschaduw op de voetafdruk van het model (PlaneGeometry is 260 groot)
     shadowMesh.scale.setScalar(Math.max(size.x, size.z) * 1.6 / 260);
     shadowMesh.position.y = -extent * 0.002;
   }
 
   function goToPreset(name, duration = 650) {
-    const preset = presets[name] || Object.values(presets)[0];
-    if (!preset) return;
+    const p = presets[name] || Object.values(presets)[0];
+    if (!p) return;
     const toPos = new THREE.Vector3()
-      .setFromSpherical(new THREE.Spherical(camRadius, preset.phi, preset.theta))
+      .setFromSpherical(new THREE.Spherical(camRadius, p.phi, p.theta))
       .add(controls.target);
     const toTarget = new THREE.Vector3(0, camTargetY, 0);
     if (duration <= 0) {
-      camera.position.copy(toPos);
-      controls.target.copy(toTarget);
-      controls.update();
-      return;
+      camera.position.copy(toPos); controls.target.copy(toTarget); controls.update(); return;
     }
-    camAnim = {
-      fromPos: camera.position.clone(), toPos,
-      fromTarget: controls.target.clone(), toTarget,
-      t0: performance.now(), dur: duration,
-    };
+    camAnim = { fromPos: camera.position.clone(), toPos,
+                fromTarget: controls.target.clone(), toTarget,
+                t0: performance.now(), dur: duration };
   }
 
-  function makeZoneMaterial() {
-    const d = profile.materialDefaults || {};
-    return new THREE.MeshPhysicalMaterial({
-      color: 0x14161a,
-      roughness: d.roughness ?? 0.5,
-      metalness: d.metalness ?? 0.02,
-      clearcoat: d.clearcoat ?? 0.18,
-      clearcoatRoughness: d.clearcoatRoughness ?? 0.32,
-      envMapIntensity: d.envMapIntensity ?? 1.0,
-    });
+  /* ── Zone-canvas tekenen ──────────────────────────────────────────────
+     Volgorde: effen zonekleur → afbeelding (UV-breed, transformeerbaar)
+     → badge (logo + tekst). Zo bedekt een upload het complete paneel en
+     blijft de kleur zichtbaar zolang er geen afbeelding is.               */
+  function repaint(zoneId) {
+    const z = zones[zoneId];
+    if (!z) return;
+    const { ctx } = z;
+    const W = TEX_SIZE, H = TEX_SIZE;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = z.color || '#14161A';
+    ctx.fillRect(0, 0, W, H);
+
+    if (z.artwork && z.artwork.img) {
+      const { img, transform: t } = z.artwork;
+      // Basis: afbeelding 'cover' over het hele UV-vlak, daarna de door de
+      // klant ingestelde verschuiving/schaal/rotatie eromheen.
+      const base = Math.max(W / img.width, H / img.height);
+      const s = base * (t.scale ?? 1);
+      const w = img.width * s, h = img.height * s;
+      ctx.save();
+      ctx.translate(W / 2 + (t.x ?? 0) * W, H / 2 + (t.y ?? 0) * H);
+      ctx.rotate(((t.rotation ?? 0) * Math.PI) / 180);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+
+    z.texture.needsUpdate = true;
   }
 
-  /** Bouwt een geprojecteerde decal voor één zone volgens het profiel. */
-  function buildDecalZone(zoneId, anchor) {
-    const baseMesh = meshByNode[anchor.mesh];
-    if (!baseMesh) {
-      console.warn(`[3D] decal "${zoneId}": draagmesh "${anchor.mesh}" niet gevonden.`);
-      return null;
+  /* ── Badge (logo + tekst) ─────────────────────────────────────────────
+     Bewust GEEN UV-plaatsing: de manchet-UV is opgeknipt in meerdere,
+     deels gespiegelde eilanden, waardoor een badge op de verkeerde kant of
+     ondersteboven belandt. Een decal wordt in 3D geprojecteerd op het punt
+     dat de klant vóór zich ziet, dus positie en oriëntatie kloppen altijd —
+     ook bij een ander model.                                              */
+  function repaintBadge(zoneId) {
+    const z = zones[zoneId];
+    if (!z || !z.badgeCtx) return;
+    const { badgeCtx: ctx, badgeCanvas: c } = z;
+    const W = c.width, H = c.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    // De decal beslaat de hele manchethoogte, maar daarvan is maar een deel
+    // frontaal zichtbaar (de band loopt weg in de rondingen). Logo en tekst
+    // blijven daarom binnen de middelste band van het canvas.
+    // Logo en tekst staan NAAST elkaar op dezelfde hoogte: van de manchet is
+    // maar een smalle horizontale band frontaal zichtbaar (boven verdwijnt hij
+    // onder de handschoen, onder krult hij weg). Boven elkaar zetten laat het
+    // bovenste element buiten beeld vallen.
+    const b = z.badge || {};
+    const BASE_Y = H * 0.66;              // hoogte binnen de zichtbare band
+    const gap = W * 0.03;
+
+    let logoW = 0, logoH = 0;
+    if (b.img) {
+      const s = Math.min(W * 0.18 / b.img.width, H * 0.20 / b.img.height);
+      logoW = b.img.width * s; logoH = b.img.height * s;
     }
-    const { point, normal } = anchorFromBoxFraction(baseMesh, anchor.u, anchor.v, anchor.w);
-    const geometry = new DecalGeometry(
-      baseMesh, point, orientationFromNormal(normal), new THREE.Vector3(...anchor.size),
+    let textW = 0;
+    const fontSize = Math.round(H * (b.img ? 0.11 : 0.15));
+    if (b.text) {
+      ctx.font = `800 ${fontSize}px "Helvetica Neue", Inter, system-ui, sans-serif`;
+      textW = Math.min(ctx.measureText(b.text.toUpperCase()).width, W * 0.5);
+    }
+
+    const totalW = logoW + (logoW && textW ? gap : 0) + textW;
+    let cursor = W / 2 - totalW / 2;
+
+    if (b.img) {
+      ctx.drawImage(b.img, cursor, BASE_Y - logoH / 2, logoW, logoH);
+      cursor += logoW + gap;
+    }
+    if (b.text) {
+      ctx.fillStyle = b.textColor || '#FFFFFF';
+      ctx.font = `800 ${fontSize}px "Helvetica Neue", Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(b.text.toUpperCase(), cursor, BASE_Y, W * 0.5);
+    }
+    z.badgeTexture.needsUpdate = true;
+  }
+
+  /** Bouwt de decal-geometrie voor een badge-zone op het naar voren gerichte
+   *  oppervlak. Eén keer bij het laden; daarna wordt alleen de textuur ververst. */
+  function buildBadgeDecal(zoneId, mesh, frontDir, extent) {
+    const box = new THREE.Box3().setFromObject(mesh);
+    const center = box.getCenter(new THREE.Vector3());
+    const ray = new THREE.Raycaster();
+    ray.set(center.clone().addScaledVector(frontDir, extent * 2), frontDir.clone().negate());
+    const hit = ray.intersectObject(mesh, false)[0];
+    if (!hit) { console.warn(`[3D] badge "${zoneId}": geen oppervlak gevonden.`); return null; }
+
+    const orient = new THREE.Object3D();
+    orient.position.copy(hit.point);
+    orient.lookAt(hit.point.clone().add(hit.face.normal.clone().transformDirection(mesh.matrixWorld)));
+
+    // Alleen de middelste band van de manchet is frontaal zichtbaar: de
+    // bovenkant verdwijnt onder de overhangende handschoen en de onderkant
+    // krult weg. De decal blijft daarom bewust laag.
+    const size = box.getSize(new THREE.Vector3());
+    const dim = new THREE.Vector3(
+      Math.min(size.x, size.z) * 0.95,
+      size.y * 0.48,
+      extent * 0.5,
     );
+    const geo = new DecalGeometry(mesh, hit.point, orient.rotation, dim);
 
-    const texCanvas = document.createElement('canvas');
-    texCanvas.width = texCanvas.height = DECAL_TEXTURE_SIZE;
-    const ctx = texCanvas.getContext('2d');
-    const texture = new THREE.CanvasTexture(texCanvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext('2d');
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
 
-    const material = new THREE.MeshStandardMaterial({
-      map: texture, transparent: true, depthTest: true, depthWrite: false,
-      polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.55, metalness: 0.05,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.renderOrder = 10;
-    scene.add(mesh);
-    return { ctx, texture, canvas: texCanvas, mesh };
-  }
-
-  /** Tekent een decal-zone opnieuw met huidige kleur/tekst/afbeelding. */
-  function repaintDecal(zoneId, hex) {
-    const t = zoneTargets[zoneId];
-    if (!t || t.kind !== 'decal') return;
-    const { ctx, texture, canvas: c } = t;
-    ctx.clearRect(0, 0, c.width, c.height);
-    ctx.save();
-    const img = zoneImage[zoneId];
-    if (img) {
-      const scale = Math.min(c.width / img.width, c.height / img.height) * 0.82;
-      const w = img.width * scale, h = img.height * scale;
-      ctx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
-    } else {
-      painterFor(zoneId)(ctx, hex, { text: zoneText[zoneId] });
-    }
-    ctx.restore();
-    texture.needsUpdate = true;
+    const decal = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      map: tex, transparent: true, depthTest: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.5, metalness: 0.05,
+    }));
+    decal.renderOrder = 10;
+    scene.add(decal);
+    return { badgeCanvas: c, badgeCtx: ctx, badgeTexture: tex, badgeMesh: decal };
   }
 
   // ── Model laden ────────────────────────────────────────────────────────
@@ -289,69 +257,78 @@ export function createGloveViewer(canvas, opts = {}) {
   const readyPromise = new Promise((resolve, reject) => {
     loader.load(profile.modelUrl, (gltf) => {
       modelRoot = gltf.scene;
-
-      // Alle meshes indexeren op node-naam
+      modelRoot.updateMatrixWorld(true);
+      const meshByNode = {};
       modelRoot.traverse((o) => { if (o.isMesh) meshByNode[o.name] = o; });
 
-      // 1) mesh- en material-zones: eigen materiaalinstantie per zone, zodat
-      //    kleuren nooit gedeeld worden (de GLB kan 1 materiaal delen).
+      // Kijkrichting van het standaard-camerastandpunt: bepaalt welke kant
+      // van het model als "voorkant" geldt bij het plaatsen van badges.
+      const firstPreset = Object.values(presets)[0] || { theta: 0, phi: Math.PI / 2 };
+      const frontDir = new THREE.Vector3().setFromSpherical(
+        new THREE.Spherical(1, firstPreset.phi, firstPreset.theta),
+      );
+
+      const d = profile.materialDefaults || {};
+      // Badges worden pas gebouwd nadat het model is ingepast (fitCameraToObject
+      // verplaatst het model; decals hangen aan wereldposities).
+      const pendingBadges = [];
       ZONE_IDS.forEach((zoneId) => {
         const b = profile.bindings[zoneId];
-        if (!b) return;
+        if (!b || b.type !== 'mesh') return;
+        const mesh = meshByNode[b.node];
+        if (!mesh) { console.warn(`[3D] zone "${zoneId}": mesh "${b.node}" ontbreekt.`); return; }
 
-        if (b.type === 'mesh') {
-          const mesh = meshByNode[b.node];
-          if (!mesh) { console.warn(`[3D] zone "${zoneId}": mesh "${b.node}" ontbreekt in het model.`); return; }
-          const mat = makeZoneMaterial();
-          mesh.material = mat;
-          zoneTargets[zoneId] = { kind: 'mesh', materials: [mat] };
-          targetColor[zoneId] = new THREE.Color(mat.color.getHex());
+        const c = document.createElement('canvas');
+        c.width = c.height = TEX_SIZE;
+        const ctx = c.getContext('2d');
+        const texture = new THREE.CanvasTexture(c);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.flipY = false;           // glTF-UV's zijn niet geflipt
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-        } else if (b.type === 'material') {
-          const mesh = meshByNode[b.node];
-          if (!mesh) { console.warn(`[3D] zone "${zoneId}": mesh "${b.node}" ontbreekt in het model.`); return; }
-          // Materiaalslot(en) met de opgegeven naam binnen dit mesh
-          const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          const hits = [];
-          list.forEach((m, i) => {
-            if (m && m.name === b.material) {
-              const mat = makeZoneMaterial();
-              mat.name = m.name;
-              if (Array.isArray(mesh.material)) mesh.material[i] = mat; else mesh.material = mat;
-              hits.push(mat);
-            }
-          });
-          if (!hits.length) { console.warn(`[3D] zone "${zoneId}": materiaal "${b.material}" niet gevonden op "${b.node}".`); return; }
-          zoneTargets[zoneId] = { kind: 'material', materials: hits };
-          targetColor[zoneId] = new THREE.Color(hits[0].color.getHex());
-        }
+        const material = new THREE.MeshPhysicalMaterial({
+          map: texture,
+          color: 0xffffff,               // wit: de textuur bepaalt de kleur
+          roughness: d.roughness ?? 0.45,
+          metalness: d.metalness ?? 0.02,
+          clearcoat: d.clearcoat ?? 0.22,
+          clearcoatRoughness: d.clearcoatRoughness ?? 0.3,
+          envMapIntensity: d.envMapIntensity ?? 1.0,
+        });
+        mesh.material = material;
+
+        const def = ZONE_BY_ID[zoneId];
+        zones[zoneId] = { material, ctx, texture, mesh, color: '#14161A', artwork: null, badge: null };
+        targetColor[zoneId] = new THREE.Color('#14161A');
+        repaint(zoneId);
+        if (def && def.artwork === 'badge') pendingBadges.push({ zoneId, mesh });
+      });
+
+      // Statische onderdelen (voering e.d.) een eigen, dof materiaal geven
+      (profile.staticNodes || []).forEach((n) => {
+        const m = meshByNode[n];
+        if (m) m.material = new THREE.MeshPhysicalMaterial({ color: 0x0d0e10, roughness: 0.85, metalness: 0 });
       });
 
       scene.add(modelRoot);
       fitCameraToObject(modelRoot);
-      // fitCameraToObject verplaatst het model; matrixWorld moet bijgewerkt zijn
-      // vóórdat we decal-ankers berekenen (die werken in wereldruimte).
       modelRoot.updateMatrixWorld(true);
 
-      // 2) decal-zones — ná het inpassen, want ze hangen aan echte oppervlakken
-      zonesByType('decal').forEach((zoneId) => {
-        try {
-          const built = buildDecalZone(zoneId, profile.bindings[zoneId].anchor);
-          if (built) zoneTargets[zoneId] = { kind: 'decal', ...built };
-        } catch (e) {
-          console.warn(`[3D] decal-opbouw mislukt voor "${zoneId}":`, e);
-        }
+      // Nu pas de badge-decals: de wereldposities staan definitief vast.
+      const box = new THREE.Box3().setFromObject(modelRoot);
+      const extent = Math.max(...box.getSize(new THREE.Vector3()).toArray());
+      pendingBadges.forEach(({ zoneId, mesh }) => {
+        const built = buildBadgeDecal(zoneId, mesh, frontDir, extent);
+        if (built) { Object.assign(zones[zoneId], built); repaintBadge(zoneId); }
       });
 
-      // Intro-animatie + veiligheidsnet (zie animate()).
       modelRoot.scale.setScalar(0.001);
       modelRoot.userData.introStart = performance.now();
       resize();
+      // Veiligheidsnet: als requestAnimationFrame niet tikt (achtergrondtab)
+      // blijft het model anders op schaal 0 staan.
       setTimeout(() => {
-        if (modelRoot.scale.x < 0.999) {
-          modelRoot.scale.setScalar(1);
-          renderer.render(scene, camera);
-        }
+        if (modelRoot.scale.x < 0.999) { modelRoot.scale.setScalar(1); renderer.render(scene, camera); }
       }, 1200);
 
       resolve();
@@ -359,32 +336,37 @@ export function createGloveViewer(canvas, opts = {}) {
   });
 
   // ── Publieke API ───────────────────────────────────────────────────────
-
-  function getZoneSupport(zoneId) {
-    const b = profile.bindings[zoneId];
-    if (!b) return { supported: false, type: 'unknown', reason: 'Niet in het model-profiel.' };
-    if (b.type === 'unsupported') return { supported: false, type: 'unsupported', reason: b.reason || '' };
-    if (!zoneTargets[zoneId]) return { supported: false, type: b.type, reason: 'Kon niet aan het model gekoppeld worden.' };
-    return { supported: true, type: b.type, reason: '' };
-  }
-
-  const isZoneSupported = (zoneId) => getZoneSupport(zoneId).supported;
+  const isZoneSupported = (id) => !!zones[id];
 
   function setZoneColor(zoneId, hex) {
-    const t = zoneTargets[zoneId];
-    if (!t) return;
-    if (t.kind === 'decal') repaintDecal(zoneId, hex);
-    else targetColor[zoneId] = new THREE.Color(hex); // vloeiend via animate()
+    const z = zones[zoneId];
+    if (!z) return;
+    z.color = hex;
+    targetColor[zoneId] = new THREE.Color(hex);
+    repaint(zoneId);
   }
 
-  function setZoneText(zoneId, text, hex) {
-    zoneText[zoneId] = text;
-    if (hex !== undefined) repaintDecal(zoneId, hex);
+  /** img=null wist de afbeelding. transform: { x, y, scale, rotation } */
+  function setZoneArtwork(zoneId, img, transform) {
+    const z = zones[zoneId];
+    if (!z) return;
+    z.artwork = img ? { img, transform: transform || { x: 0, y: 0, scale: 1, rotation: 0 } } : null;
+    repaint(zoneId);
   }
 
-  function setZoneImage(zoneId, img, hex) {
-    zoneImage[zoneId] = img;
-    repaintDecal(zoneId, hex);
+  function setZoneArtworkTransform(zoneId, transform) {
+    const z = zones[zoneId];
+    if (!z || !z.artwork) return;
+    z.artwork.transform = transform;
+    repaint(zoneId);
+  }
+
+  /** opts: { img, text, textColor } — losse velden mogen weggelaten worden. */
+  function setZoneBadge(zoneId, opts) {
+    const z = zones[zoneId];
+    if (!z) return;
+    z.badge = { ...(z.badge || {}), ...(opts || {}) };
+    repaintBadge(zoneId);
   }
 
   function resize() {
@@ -397,18 +379,8 @@ export function createGloveViewer(canvas, opts = {}) {
     return true;
   }
 
-  /**
-   * Rondt lopende animaties direct af en rendert één frame. Handig wanneer de
-   * animatielus niet betrouwbaar tikt (achtergrondtabbladen worden door de
-   * browser gethrottled) en als basis voor het maken van productafbeeldingen
-   * of thumbnails van een configuratie.
-   */
+  /** Rondt animaties direct af en rendert één frame (thumbnails, tests). */
   function renderNow() {
-    for (const zoneId in zoneTargets) {
-      const t = zoneTargets[zoneId];
-      if (t.kind === 'decal' || !targetColor[zoneId]) continue;
-      t.materials.forEach((m) => m.color.copy(targetColor[zoneId]));
-    }
     if (modelRoot) modelRoot.scale.setScalar(1);
     if (camAnim) {
       camera.position.copy(camAnim.toPos);
@@ -424,54 +396,39 @@ export function createGloveViewer(canvas, opts = {}) {
     requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.1);
 
-    // Vloeiende kleurovergang voor mesh-/materiaalzones
-    for (const zoneId in zoneTargets) {
-      const t = zoneTargets[zoneId];
-      if (t.kind === 'decal' || !targetColor[zoneId]) continue;
-      t.materials.forEach((m) => m.color.lerp(targetColor[zoneId], Math.min(1, dt * COLOR_LERP_SPEED)));
-    }
-
     if (modelRoot && modelRoot.scale.x < 0.999) {
       const t = Math.min(1, (performance.now() - modelRoot.userData.introStart) / 700);
       modelRoot.scale.setScalar(THREE.MathUtils.lerp(0.001, 1, 1 - Math.pow(1 - t, 3)));
     }
-
     if (camAnim) {
       const t = Math.min(1, (performance.now() - camAnim.t0) / camAnim.dur);
-      const eased = 1 - Math.pow(1 - t, 3);
-      camera.position.lerpVectors(camAnim.fromPos, camAnim.toPos, eased);
-      controls.target.lerpVectors(camAnim.fromTarget, camAnim.toTarget, eased);
+      const e = 1 - Math.pow(1 - t, 3);
+      camera.position.lerpVectors(camAnim.fromPos, camAnim.toPos, e);
+      controls.target.lerpVectors(camAnim.fromTarget, camAnim.toTarget, e);
       if (t >= 1) camAnim = null;
     }
-
     controls.update();
     renderer.render(scene, camera);
   }
 
-  // Meerdere onafhankelijke formaat-triggers: sommige omgevingen leveren geen
-  // (tijdige) ResizeObserver-callback op een net ingevoegd element.
-  try {
-    new ResizeObserver(() => resize()).observe(canvas.parentElement);
-  } catch (e) { /* window-resize vangt dit op */ }
+  try { new ResizeObserver(() => resize()).observe(canvas.parentElement); }
+  catch (e) { /* window-resize vangt dit op */ }
   window.addEventListener('resize', resize);
-  let pollTries = 0;
-  (function pollResize() {
-    if (!resize() && pollTries++ < 30) requestAnimationFrame(pollResize);
-  })();
-
+  let tries = 0;
+  (function poll() { if (!resize() && tries++ < 30) requestAnimationFrame(poll); })();
   requestAnimationFrame(animate);
 
   return {
     ready: readyPromise,
     profile,
     setZoneColor,
-    setZoneText,
-    setZoneImage,
+    setZoneArtwork,
+    setZoneArtworkTransform,
+    setZoneBadge,
     goToPreset,
     resize,
     renderNow,
     isZoneSupported,
-    getZoneSupport,
     cameraPresetNames: Object.keys(presets),
   };
 }
