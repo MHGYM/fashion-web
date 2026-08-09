@@ -5,10 +5,14 @@
    model-profiel (model-profile.js). Een ander GLB vergt alleen een nieuw
    profiel — dit bestand en de UI blijven ongewijzigd.
 
-   Kleur en artwork lopen via één canvas-textuur per zone. Dat canvas beslaat
-   de volledige UV-ruimte van de zone, dus een geüploade afbeelding bedekt
-   automatisch het héle paneel (bij front-panel dus inclusief de duim). Op dat
-   canvas kan de afbeelding verplaatst, geschaald en geroteerd worden.
+   Kleur loopt via één canvas-textuur per zone (dekt de eigen UV-ruimte van
+   die zone). De 'volledige afbeelding'-upload (front-panel) is een APARTE
+   laag: een in 3D geprojecteerde decal die over meerdere meshes tegelijk ligt
+   (front-panel + duim), zodat één upload als één ononderbroken ontwerp over
+   het hele paneel én de duim verschijnt — ook al zijn dat losse meshes met
+   elk hun eigen UV. Zonder afbeelding blijven die meshes gewoon hun eigen,
+   los instelbare kleur tonen. Verplaatsen/schalen/roteren werkt hetzelfde
+   voor beide lagen (drawCoverImage), alleen het canvas erachter verschilt.
 
    Publieke API (per zone-id uit zones.js):
      viewer.ready                      Promise, resolvet zodra het model staat
@@ -32,6 +36,10 @@ import { ZONE_IDS, ZONE_BY_ID } from './zones.js';
 
 const COLOR_LERP_SPEED = 8;
 const TEX_SIZE = 1024;   // canvas per zone; groot genoeg voor scherpe uploads
+
+// Welke zone de 'volledige afbeelding'-upload draagt — bepaald uit de data
+// (zones.js), niet hardcoded op een zone-id, zodat dit generiek blijft.
+const FULL_ZONE_ID = ZONE_IDS.find((id) => ZONE_BY_ID[id].artwork === 'full') || null;
 
 export function createGloveViewer(canvas, opts = {}) {
   // Niet const: de klant kan tijdens de sessie van model wisselen.
@@ -82,7 +90,7 @@ export function createGloveViewer(canvas, opts = {}) {
   scene.add(shadowMesh);
 
   // ── Zone-toestand ──────────────────────────────────────────────────────
-  const zones = {};        // id → { material, ctx, texture, color, artwork, badge }
+  const zones = {};        // id → { material, ctx, texture, mesh, color, badge }
   const targetColor = {};  // id → THREE.Color (vloeiende overgang)
   let modelRoot = null;
   let camRadius = 10, camTargetY = 0, camAnim = null;
@@ -129,35 +137,35 @@ export function createGloveViewer(canvas, opts = {}) {
                 t0: performance.now(), dur: duration };
   }
 
-  /* ── Zone-canvas tekenen ──────────────────────────────────────────────
-     Volgorde: effen zonekleur → afbeelding (UV-breed, transformeerbaar)
-     → badge (logo + tekst). Zo bedekt een upload het complete paneel en
-     blijft de kleur zichtbaar zolang er geen afbeelding is.               */
+  /** Tekent `img` 'cover'-gevuld over een canvas van W×H, met de door de klant
+   *  ingestelde verschuiving/schaal/rotatie eromheen. Gedeeld door de
+   *  per-zone kleurcanvassen en de front-artwork-decal, zodat "verplaatsen/
+   *  schalen/roteren" overal exact hetzelfde gedrag heeft. */
+  function drawCoverImage(ctx, W, H, img, t) {
+    const base = Math.max(W / img.width, H / img.height);
+    const s = base * (t.scale ?? 1);
+    const w = img.width * s, h = img.height * s;
+    ctx.save();
+    ctx.translate(W / 2 + (t.x ?? 0) * W, H / 2 + (t.y ?? 0) * H);
+    ctx.rotate(((t.rotation ?? 0) * Math.PI) / 180);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
+  /* ── Zone-canvas tekenen (effen kleur) ─────────────────────────────────
+     Alleen de zonekleur. Een geüploade afbeelding voor de 'full'-artwork-
+     zone loopt over MEERDERE meshes heen (zie repaintFrontArtwork) en kan
+     dus niet in dit per-zone-canvas getekend worden — die meshes blijven
+     hun eigen kleur tonen tot de decal (die erbovenop ligt) zichtbaar wordt. */
   function repaint(zoneId) {
     const z = zones[zoneId];
     if (!z) return;
     const { ctx } = z;
     const W = TEX_SIZE, H = TEX_SIZE;
-
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = z.color || '#14161A';
     ctx.fillRect(0, 0, W, H);
-
-    if (z.artwork && z.artwork.img) {
-      const { img, transform: t } = z.artwork;
-      // Basis: afbeelding 'cover' over het hele UV-vlak, daarna de door de
-      // klant ingestelde verschuiving/schaal/rotatie eromheen.
-      const base = Math.max(W / img.width, H / img.height);
-      const s = base * (t.scale ?? 1);
-      const w = img.width * s, h = img.height * s;
-      ctx.save();
-      ctx.translate(W / 2 + (t.x ?? 0) * W, H / 2 + (t.y ?? 0) * H);
-      ctx.rotate(((t.rotation ?? 0) * Math.PI) / 180);
-      ctx.drawImage(img, -w / 2, -h / 2, w, h);
-      ctx.restore();
-    }
-
     z.texture.needsUpdate = true;
   }
 
@@ -259,6 +267,100 @@ export function createGloveViewer(canvas, opts = {}) {
     return { badgeCanvas: c, badgeCtx: ctx, badgeTexture: tex, badgeMesh: decal };
   }
 
+  /* ── Front-artwork: één doorlopende afbeelding over meerdere meshes ─────
+     Front Panel en de duim zijn TWEE (of meer) losse meshes met elk hun
+     eigen UV-ruimte — een per-zone canvas zou de afbeelding dus alleen op
+     één van de twee laten zien, met de duim in zijn eigen effen kleur
+     ernaast (precies het manco dat dit systeem oplost). Net als bij de
+     badge wordt daarom een decal geprojecteerd, maar nu met DEZELFDE
+     doos (positie/oriëntatie/afmeting) gedeeld over alle meshes uit
+     artworkGroup — zo valt de afbeelding op elk van die meshes precies op
+     zijn plek, als één ononderbroken ontwerp, ongeacht hun eigen UV's.     */
+  let frontArtwork = null;   // { state:{img,transform}, canvas, ctx, texture, decalMeshes[] }
+
+  function disposeFrontArtwork() {
+    if (!frontArtwork) return;
+    frontArtwork.decalMeshes.forEach((m) => { scene.remove(m); m.geometry.dispose(); });
+    frontArtwork.material.dispose();
+    frontArtwork.texture.dispose();
+    frontArtwork = null;
+  }
+
+  function buildFrontArtworkDecal(meshes, frontDir, materialDefaults) {
+    if (!meshes.length) return null;
+
+    // Vlakke projectie loodrecht op de kijkrichting: 'right' en 'up' t.o.v.
+    // de camera, niet t.o.v. het model — zo blijft een geüploade afbeelding
+    // rechtop staan ongeacht hoe het model zelf georiënteerd is.
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    let right = new THREE.Vector3().crossVectors(worldUp, frontDir).normalize();
+    if (right.lengthSq() < 1e-6) right = new THREE.Vector3(1, 0, 0);
+    const up = new THREE.Vector3().crossVectors(frontDir, right).normalize();
+
+    const box = new THREE.Box3();
+    meshes.forEach((m) => box.union(new THREE.Box3().setFromObject(m)));
+    const center = box.getCenter(new THREE.Vector3());
+    const corners = [
+      new THREE.Vector3(box.min.x, box.min.y, box.min.z), new THREE.Vector3(box.max.x, box.min.y, box.min.z),
+      new THREE.Vector3(box.min.x, box.max.y, box.min.z), new THREE.Vector3(box.max.x, box.max.y, box.min.z),
+      new THREE.Vector3(box.min.x, box.min.y, box.max.z), new THREE.Vector3(box.max.x, box.min.y, box.max.z),
+      new THREE.Vector3(box.min.x, box.max.y, box.max.z), new THREE.Vector3(box.max.x, box.max.y, box.max.z),
+    ];
+    let minR = Infinity, maxR = -Infinity, minU = Infinity, maxU = -Infinity, minF = Infinity, maxF = -Infinity;
+    corners.forEach((c) => {
+      const rel = c.sub(center);
+      minR = Math.min(minR, rel.dot(right)); maxR = Math.max(maxR, rel.dot(right));
+      minU = Math.min(minU, rel.dot(up)); maxU = Math.max(maxU, rel.dot(up));
+      minF = Math.min(minF, rel.dot(frontDir)); maxF = Math.max(maxF, rel.dot(frontDir));
+    });
+    // Ruime marge: de duim mag niet net buiten de doos vallen, en genoeg
+    // diepte dat de hele dikte van het paneel wordt meegenomen.
+    const width = (maxR - minR) * 1.15;
+    const height = (maxU - minU) * 1.15;
+    const depth = Math.max(maxF - minF, width, height) * 1.5;
+    const size = new THREE.Vector3(width, height, depth);
+
+    const orient = new THREE.Object3D();
+    orient.position.copy(center);
+    orient.lookAt(center.clone().add(frontDir));
+
+    const c = document.createElement('canvas');
+    c.width = c.height = TEX_SIZE;
+    const ctx = c.getContext('2d');
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const d = materialDefaults || {};
+    const material = new THREE.MeshPhysicalMaterial({
+      map: tex, transparent: false, depthTest: true, depthWrite: true,
+      polygonOffset: true, polygonOffsetFactor: -2,
+      roughness: d.roughness ?? 0.45, metalness: d.metalness ?? 0.02,
+      clearcoat: d.clearcoat ?? 0.22, clearcoatRoughness: d.clearcoatRoughness ?? 0.3,
+    });
+
+    const decalMeshes = meshes.map((mesh) => {
+      const geo = new DecalGeometry(mesh, center, orient.rotation, size);
+      const dm = new THREE.Mesh(geo, material);
+      dm.renderOrder = 6;
+      dm.visible = false;
+      scene.add(dm);
+      return dm;
+    });
+
+    return { state: null, canvas: c, ctx, texture: tex, material, decalMeshes };
+  }
+
+  function repaintFrontArtwork() {
+    if (!frontArtwork) return;
+    const { ctx, canvas: c } = frontArtwork;
+    const st = frontArtwork.state;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, c.width, c.height);
+    if (st && st.img) drawCoverImage(ctx, c.width, c.height, st.img, st.transform);
+    frontArtwork.texture.needsUpdate = true;
+    frontArtwork.decalMeshes.forEach((m) => { m.visible = !!(st && st.img); });
+  }
+
   // ── Model laden ────────────────────────────────────────────────────────
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
@@ -276,6 +378,7 @@ export function createGloveViewer(canvas, opts = {}) {
     });
     Object.keys(zones).forEach((k) => delete zones[k]);
     Object.keys(targetColor).forEach((k) => delete targetColor[k]);
+    disposeFrontArtwork();
     if (modelRoot) {
       scene.remove(modelRoot);
       // Traverse i.p.v. alleen de zone-materialen: vangt ook statische
@@ -338,7 +441,7 @@ export function createGloveViewer(canvas, opts = {}) {
         mesh.material = material;
 
         const def = ZONE_BY_ID[zoneId];
-        zones[zoneId] = { material, ctx, texture, mesh, color: '#14161A', artwork: null, badge: null };
+        zones[zoneId] = { material, ctx, texture, mesh, color: '#14161A', badge: null };
         targetColor[zoneId] = new THREE.Color('#14161A');
         repaint(zoneId);
         if (def && def.artwork === 'badge') pendingBadges.push({ zoneId, mesh });
@@ -361,6 +464,16 @@ export function createGloveViewer(canvas, opts = {}) {
         const built = buildBadgeDecal(zoneId, mesh, frontDir, extent);
         if (built) { Object.assign(zones[zoneId], built); repaintBadge(zoneId); }
       });
+
+      // Front-artwork-decal: welke meshes daadwerkelijk meedoen hangt af van
+      // wat dít model levert (isZoneSupported per lid van artworkGroup) —
+      // ontbreekt de duim op een toekomstig model, dan valt dit vanzelf
+      // terug op alleen de 'full'-zone zelf.
+      if (FULL_ZONE_ID) {
+        const groupIds = ZONE_BY_ID[FULL_ZONE_ID].artworkGroup || [FULL_ZONE_ID];
+        const artworkMeshes = groupIds.map((id) => zones[id]?.mesh).filter(Boolean);
+        frontArtwork = buildFrontArtworkDecal(artworkMeshes, frontDir, profile.materialDefaults);
+      }
 
       modelRoot.scale.setScalar(0.001);
       modelRoot.userData.introStart = performance.now();
@@ -389,19 +502,19 @@ export function createGloveViewer(canvas, opts = {}) {
     repaint(zoneId);
   }
 
-  /** img=null wist de afbeelding. transform: { x, y, scale, rotation } */
+  /** img=null wist de afbeelding. transform: { x, y, scale, rotation }
+   *  Loopt voor de 'full'-zone via de front-artwork-decal (zie boven) — die
+   *  ene afbeelding dekt daar meerdere meshes tegelijk, ononderbroken. */
   function setZoneArtwork(zoneId, img, transform) {
-    const z = zones[zoneId];
-    if (!z) return;
-    z.artwork = img ? { img, transform: transform || { x: 0, y: 0, scale: 1, rotation: 0 } } : null;
-    repaint(zoneId);
+    if (zoneId !== FULL_ZONE_ID || !frontArtwork) return;
+    frontArtwork.state = img ? { img, transform: transform || { x: 0, y: 0, scale: 1, rotation: 0 } } : null;
+    repaintFrontArtwork();
   }
 
   function setZoneArtworkTransform(zoneId, transform) {
-    const z = zones[zoneId];
-    if (!z || !z.artwork) return;
-    z.artwork.transform = transform;
-    repaint(zoneId);
+    if (zoneId !== FULL_ZONE_ID || !frontArtwork?.state) return;
+    frontArtwork.state.transform = transform;
+    repaintFrontArtwork();
   }
 
   /** opts: { img, text, textColor } — losse velden mogen weggelaten worden. */

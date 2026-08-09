@@ -33,19 +33,30 @@ export function hexOf(colorName) {
 /**
  * De kleurbare onderdelen, in UI-volgorde.
  *
- *  id       — stabiele sleutel (opslag, cart-payload, model-profielen).
- *  label    — wat de klant ziet.
- *  default  — standaardkleur (naam uit COLORS).
- *  artwork  — 'full'  : afbeelding vult de héle zone (UV-breed), met
- *                       verplaatsen/schalen/roteren.
- *             'badge' : logo + tekst als kleiner element binnen de zone.
- *             null    : alleen kleur.
+ *  id            — stabiele sleutel (opslag, cart-payload, model-profielen).
+ *  label         — wat de klant ziet.
+ *  default       — standaardkleur (naam uit COLORS).
+ *  artwork       — 'full'  : afbeelding vult de héle zone (UV-breed), met
+ *                            verplaatsen/schalen/roteren.
+ *                  'badge' : logo + tekst als kleiner element binnen de zone.
+ *                  null    : alleen kleur.
+ *  artworkGroup  — alleen bij artwork:'full'. Zone-id's (incl. deze zone
+ *                  zelf) die SAMEN één doorlopend ontwerp vormen wanneer
+ *                  hier een afbeelding wordt geüpload — bv. het front panel
+ *                  ligt niet als losse rechthoek op de handschoen, maar loopt
+ *                  door over de duim. Die zones blijven wél apart kleurbaar
+ *                  zolang er geen afbeelding is; de renderer projecteert de
+ *                  afbeelding als één geheel over alle meshes in de groep
+ *                  (vergelijkbaar met een sticker die om de vorm heen buigt,
+ *                  niet los per UV-eiland). Ontbreekt dit veld, dan geldt
+ *                  alleen de zone zelf.
  */
 export const ZONES = [
   {
     id: 'front-panel', label: 'Front Panel', group: 'Panelen',
     default: 'Black', artwork: 'full',
-    hint: 'Het slagvlak. Upload hier je eigen afbeelding.',
+    artworkGroup: ['front-panel', 'outer-thumb', 'inner-thumb'],
+    hint: 'Het slagvlak inclusief de volledige duim. Een upload wordt als één doorlopend ontwerp over paneel én duim geplaatst.',
   },
   {
     id: 'palm', label: 'Palm', group: 'Panelen',
@@ -55,12 +66,12 @@ export const ZONES = [
   {
     id: 'outer-thumb', label: 'Outer Thumb', group: 'Duim',
     default: 'Black', artwork: null,
-    hint: 'Buitenzijde van de duim.',
+    hint: 'Buitenzijde van de duim. Kleur zichtbaar zolang er geen afbeelding op het Front Panel staat.',
   },
   {
     id: 'inner-thumb', label: 'Inner Thumb', group: 'Duim',
     default: 'Black', artwork: null,
-    hint: 'Binnenzijde van de duim.',
+    hint: 'Binnenzijde van de duim. Kleur zichtbaar zolang er geen afbeelding op het Front Panel staat.',
   },
   {
     id: 'wrist', label: 'Wrist', group: 'Sluiting',
