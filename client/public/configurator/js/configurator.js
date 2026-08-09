@@ -7,8 +7,9 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { createGloveViewer } from './scene3d.js';
+import { MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID } from './model-profile.js';
 import {
-  COLORS, ZONES, SIZES, PRICING, NAME_FONTS, NAME_SIZES,
+  COLORS, ZONES, ZONE_GROUPS, SIZES, PRICING, NAME_FONTS, NAME_SIZES,
   hexOf, defaultColors, defaultArtworkTransform,
 } from './zones.js';
 
@@ -17,6 +18,7 @@ const API = '/api/customizer';
 const PRODUCT_KEY = 'custom-gloves';
 
 const state = {
+  model: DEFAULT_MODEL_ID,
   colors: defaultColors(),
   artworkTransform: defaultArtworkTransform(),
   hasArtwork: false,
@@ -35,6 +37,7 @@ const euro = (n) => '€' + n.toFixed(2).replace('.', ',');
 // Alleen instellingen, geen afbeeldingen: die zijn te groot voor een URL en
 // blijven bij de klant tot ze bij het bestellen geüpload worden.
 const shareable = () => ({
+  model: state.model,
   colors: state.colors, artworkTransform: state.artworkTransform,
   name: state.name, nameFont: state.nameFont, nameSize: state.nameSize,
   nameColor: state.nameColor, size: state.size,
@@ -42,6 +45,7 @@ const shareable = () => ({
 
 function applySaved(saved) {
   if (!saved) return;
+  if (MODEL_BY_ID[saved.model]) state.model = saved.model;
   ZONES.forEach((z) => {
     const c = saved.colors?.[z.id];
     if (typeof c === 'string' && COLORS.some((x) => x.name === c)) state.colors[z.id] = c;
@@ -75,7 +79,12 @@ function shareUrl() {
 /* ── DOM ──────────────────────────────────────────────────────────────── */
 const $ = (id) => document.getElementById(id);
 const canvas = $('glove-canvas');
-const viewer = createGloveViewer(canvas);
+
+// Eerst de opgeslagen/gedeelde instellingen inlezen, dán de viewer starten:
+// zo wordt bij een gedeelde link met een ander model meteen het juiste bestand
+// geladen in plaats van eerst het standaardmodel en dan omwisselen.
+load();
+const viewer = createGloveViewer(canvas, { profile: MODEL_BY_ID[state.model] });
 
 window.FMConfigurator = {
   viewer,
@@ -112,21 +121,73 @@ function pushBadge() {
 }
 
 /* ── Zonekeuze ────────────────────────────────────────────────────────── */
+function buildModelList() {
+  const wrap = $('model-list');
+  wrap.innerHTML = '';
+  MODELS.forEach((m) => {
+    const btn = el('button', 'model-item' + (m.id === state.model ? ' is-active' : ''));
+    btn.type = 'button';
+    btn.setAttribute('aria-pressed', m.id === state.model ? 'true' : 'false');
+    btn.append(el('span', 'model-name', m.label), el('span', 'model-sub', m.sublabel || ''));
+    btn.addEventListener('click', () => { if (m.id !== state.model) switchModel(m.id); });
+    wrap.appendChild(btn);
+  });
+}
+
+/** Wisselt van 3D-model en zet alle instellingen opnieuw toe. */
+async function switchModel(modelId) {
+  state.model = modelId;
+  buildModelList();
+  $('stage-loading').classList.remove('is-hidden');
+  try {
+    await viewer.loadModel(MODEL_BY_ID[modelId]);
+    // Kleuren/naam opnieuw doorgeven: het nieuwe model heeft verse materialen.
+    pushColors();
+    pushBadge();
+    // Zone-artwork gaat bewust NIET mee: de UV-indeling verschilt per model,
+    // dus een upload zou op een onvoorspelbare plek belanden.
+    state.hasArtwork = false;
+    state.hasLogo = false;
+    if (!viewer.isZoneSupported(state.activeZone)) {
+      state.activeZone = (ZONES.find((z) => viewer.isZoneSupported(z.id)) || ZONES[0]).id;
+    }
+    buildZoneList();
+    buildZoneEditor();
+    renderPrice();
+    showAttribution();
+    save();
+  } catch (e) {
+    console.error('[3D] modelwissel mislukt:', e);
+  }
+  $('stage-loading').classList.add('is-hidden');
+}
+
 function buildZoneList() {
   const wrap = $('zone-list');
   wrap.innerHTML = '';
-  ZONES.forEach((zone) => {
-    const btn = el('button', 'zone-item' + (zone.id === state.activeZone ? ' is-active' : ''));
-    btn.type = 'button';
-    const dot = el('span', 'zone-dot');
-    dot.style.background = hexOf(state.colors[zone.id]);
-    if ((zone.id === FULL_ZONE?.id && state.hasArtwork) ||
-        (zone.id === BADGE_ZONE?.id && state.hasLogo)) dot.classList.add('has-art');
-    const meta = el('span', 'zone-meta');
-    meta.append(el('span', 'zone-name', zone.label), el('span', 'zone-sub', zone.hint));
-    btn.append(dot, meta, el('span', 'zone-caret'));
-    btn.addEventListener('click', () => { state.activeZone = zone.id; buildZoneList(); buildZoneEditor(); });
-    wrap.appendChild(btn);
+  ZONE_GROUPS.forEach((group) => {
+    const inGroup = ZONES.filter((z) => z.group === group);
+    if (!inGroup.length) return;
+    wrap.appendChild(el('div', 'zone-group', group));
+    inGroup.forEach((zone) => {
+      const ok = viewer.isZoneSupported(zone.id);
+      const btn = el('button', 'zone-item'
+        + (zone.id === state.activeZone && ok ? ' is-active' : '')
+        + (ok ? '' : ' is-unsupported'));
+      btn.type = 'button';
+      if (!ok) { btn.disabled = true; btn.title = 'Niet beschikbaar op dit model.'; }
+      const dot = el('span', 'zone-dot');
+      dot.style.background = hexOf(state.colors[zone.id]);
+      if (ok && ((zone.id === FULL_ZONE?.id && state.hasArtwork) ||
+                 (zone.id === BADGE_ZONE?.id && state.hasLogo))) dot.classList.add('has-art');
+      const meta = el('span', 'zone-meta');
+      const name = el('span', 'zone-name', zone.label);
+      if (!ok) name.appendChild(el('span', 'zone-tag', 'n.v.t.'));
+      meta.append(name, el('span', 'zone-sub', zone.hint));
+      btn.append(dot, meta, el('span', 'zone-caret'));
+      btn.addEventListener('click', () => { state.activeZone = zone.id; buildZoneList(); buildZoneEditor(); });
+      wrap.appendChild(btn);
+    });
   });
 }
 
@@ -481,12 +542,11 @@ function showAttribution() {
 }
 
 /* ── Start ────────────────────────────────────────────────────────────── */
-load();
-
 viewer.ready.then(async () => {
   $('stage-loading').classList.add('is-hidden');
   // Wacht op de webfonts, anders tekent het canvas de naam in een fallback.
   if (document.fonts?.ready) { try { await document.fonts.ready; } catch (e) { /* niet kritiek */ } }
+  buildModelList();
   buildZoneList();
   buildZoneEditor();
   buildNamePanel();

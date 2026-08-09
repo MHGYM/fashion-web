@@ -34,7 +34,8 @@ const COLOR_LERP_SPEED = 8;
 const TEX_SIZE = 1024;   // canvas per zone; groot genoeg voor scherpe uploads
 
 export function createGloveViewer(canvas, opts = {}) {
-  const profile = opts.profile || PROFILE;
+  // Niet const: de klant kan tijdens de sessie van model wisselen.
+  let profile = opts.profile || PROFILE;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -85,7 +86,9 @@ export function createGloveViewer(canvas, opts = {}) {
   const targetColor = {};  // id → THREE.Color (vloeiende overgang)
   let modelRoot = null;
   let camRadius = 10, camTargetY = 0, camAnim = null;
-  const presets = profile.cameraPresets || {};
+  // Functie i.p.v. constante: bij een modelwissel horen de presets van het
+  // nieuwe profiel te gelden.
+  const presets = () => profile.cameraPresets || {};
 
   function fitCameraToObject(object) {
     const box = new THREE.Box3().setFromObject(object);
@@ -106,13 +109,13 @@ export function createGloveViewer(canvas, opts = {}) {
     camera.far = extent * 40;
     camera.updateProjectionMatrix();
 
-    goToPreset(Object.keys(presets)[0] || 'front', 0);
+    goToPreset(Object.keys(presets())[0] || "front", 0);
     shadowMesh.scale.setScalar(Math.max(size.x, size.z) * 1.6 / 260);
     shadowMesh.position.y = -extent * 0.002;
   }
 
   function goToPreset(name, duration = 650) {
-    const p = presets[name] || Object.values(presets)[0];
+    const p = presets()[name] || Object.values(presets())[0];
     if (!p) return;
     const toPos = new THREE.Vector3()
       .setFromSpherical(new THREE.Spherical(camRadius, p.phi, p.theta))
@@ -260,7 +263,38 @@ export function createGloveViewer(canvas, opts = {}) {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
 
-  const readyPromise = new Promise((resolve, reject) => {
+  /** Ruimt het huidige model volledig op: GPU-geheugen van een vorig model
+   *  blijft anders hangen bij elke modelwissel. */
+  function disposeModel() {
+    Object.values(zones).forEach((z) => {
+      if (z.badgeMesh) {
+        scene.remove(z.badgeMesh);
+        z.badgeMesh.geometry.dispose();
+        z.badgeMesh.material.map?.dispose();
+        z.badgeMesh.material.dispose();
+      }
+    });
+    Object.keys(zones).forEach((k) => delete zones[k]);
+    Object.keys(targetColor).forEach((k) => delete targetColor[k]);
+    if (modelRoot) {
+      scene.remove(modelRoot);
+      // Traverse i.p.v. alleen de zone-materialen: vangt ook statische
+      // onderdelen (zoals de lining) die geen eigen zone-entry hebben.
+      modelRoot.traverse((o) => {
+        if (!o.isMesh) return;
+        o.geometry?.dispose();
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach((m) => { m?.map?.dispose(); m?.dispose(); });
+      });
+      modelRoot = null;
+    }
+  }
+
+  /** Laadt (of vervangt) het actieve model. Geeft een Promise terug. */
+  function loadModel(newProfile) {
+    if (newProfile) profile = newProfile;
+    disposeModel();
+    return new Promise((resolve, reject) => {
     loader.load(profile.modelUrl, (gltf) => {
       modelRoot = gltf.scene;
       modelRoot.updateMatrixWorld(true);
@@ -269,7 +303,7 @@ export function createGloveViewer(canvas, opts = {}) {
 
       // Kijkrichting van het standaard-camerastandpunt: bepaalt welke kant
       // van het model als "voorkant" geldt bij het plaatsen van badges.
-      const firstPreset = Object.values(presets)[0] || { theta: 0, phi: Math.PI / 2 };
+      const firstPreset = Object.values(presets())[0] || { theta: 0, phi: Math.PI / 2 };
       const frontDir = new THREE.Vector3().setFromSpherical(
         new THREE.Spherical(1, firstPreset.phi, firstPreset.theta),
       );
@@ -339,7 +373,10 @@ export function createGloveViewer(canvas, opts = {}) {
 
       resolve();
     }, undefined, reject);
-  });
+    });
+  }
+
+  const readyPromise = loadModel();
 
   // ── Publieke API ───────────────────────────────────────────────────────
   const isZoneSupported = (id) => !!zones[id];
@@ -436,7 +473,8 @@ export function createGloveViewer(canvas, opts = {}) {
 
   return {
     ready: readyPromise,
-    profile,
+    get profile() { return profile; },   // wijzigt bij een modelwissel
+    loadModel,
     setZoneColor,
     setZoneArtwork,
     setZoneArtworkTransform,
@@ -446,6 +484,6 @@ export function createGloveViewer(canvas, opts = {}) {
     resize,
     renderNow,
     isZoneSupported,
-    cameraPresetNames: Object.keys(presets),
+    get cameraPresetNames() { return Object.keys(presets()); },
   };
 }

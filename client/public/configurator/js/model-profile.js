@@ -1,20 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   ACTIEF MODEL — de enige schakelaar
+   MODELREGISTER — welke handschoenmodellen kan de klant kiezen?
    ═══════════════════════════════════════════════════════════════════════════
-   Wil je een ander 3D-model gebruiken? Wijzig alleen de import hieronder.
-   Verder verandert er niets aan de configurator.
+   Een model toevoegen:
+     1. Zet het .glb in assets/
+     2. Maak een profiel in models/ (kopieer er een als basis)
+     3. Voeg het hieronder toe aan MODELS
 
-       import profile from './models/fm-glove-pro.js';   ← huidig model
-       import profile from './models/pro-uv-glove.js';   ← toekomstig model
+   Verder verandert er niets: zones.js beschrijft het product, scene3d.js
+   rendert generiek en de UI bouwt zichzelf op uit dit register.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-import profile from './models/fm-glove-pro.js';
+import velcro from './models/velcro.js';
+import laceup from './models/laceup.js';
 import { ZONE_IDS } from './zones.js';
 
 /**
- * Controleert bij het opstarten of het profiel elke productzone afhandelt.
- * Vergeet je een zone bij een nieuw model, dan zie je dat meteen in de console
- * i.p.v. dat die zone stilzwijgend niets doet.
+ * Vult ontbrekende zones aan als 'unsupported' zodat een vergeten binding
+ * meteen zichtbaar is in de console i.p.v. stilzwijgend niets te doen.
  */
 function validate(p) {
   const missing = ZONE_IDS.filter((id) => !p.bindings[id]);
@@ -34,4 +36,8 @@ function validate(p) {
   return p;
 }
 
-export default validate(profile);
+export const MODELS = [velcro, laceup].map(validate);
+export const MODEL_BY_ID = Object.fromEntries(MODELS.map((m) => [m.id, m]));
+export const DEFAULT_MODEL_ID = MODELS[0].id;
+
+export default MODELS[0];

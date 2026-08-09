@@ -43,27 +43,49 @@ export function hexOf(colorName) {
  */
 export const ZONES = [
   {
-    id: 'front-panel',
-    label: 'Front Panel',
-    default: 'Black',
-    artwork: 'full',
-    hint: 'Inclusief de volledige duim en de piping rondom.',
+    id: 'front-panel', label: 'Front Panel', group: 'Panelen',
+    default: 'Black', artwork: 'full',
+    hint: 'Het slagvlak. Upload hier je eigen afbeelding.',
   },
   {
-    id: 'palm',
-    label: 'Palm',
-    default: 'Black',
-    artwork: null,
+    id: 'palm', label: 'Palm', group: 'Panelen',
+    default: 'Black', artwork: null,
     hint: 'De complete palmzijde.',
   },
   {
-    id: 'wrist',
-    label: 'Wrist',
-    default: 'Black',
-    artwork: 'badge',
-    hint: 'Manchet inclusief strap. Plaats hier je logo en naam.',
+    id: 'outer-thumb', label: 'Outer Thumb', group: 'Duim',
+    default: 'Black', artwork: null,
+    hint: 'Buitenzijde van de duim.',
+  },
+  {
+    id: 'inner-thumb', label: 'Inner Thumb', group: 'Duim',
+    default: 'Black', artwork: null,
+    hint: 'Binnenzijde van de duim.',
+  },
+  {
+    id: 'wrist', label: 'Wrist', group: 'Sluiting',
+    default: 'Black', artwork: 'badge',
+    hint: 'Manchet. Plaats hier je logo en naam.',
+  },
+  {
+    id: 'laces', label: 'Laces', group: 'Sluiting',
+    default: 'White', artwork: null,
+    hint: 'De veters. Alleen bij het lace-up model.',
+  },
+  {
+    id: 'piping', label: 'Piping', group: 'Details',
+    default: 'Gold', artwork: null,
+    hint: 'De bies langs de naden.',
+  },
+  {
+    id: 'stitching', label: 'Stitching', group: 'Details',
+    default: 'White', artwork: null,
+    hint: 'Het stikwerk.',
   },
 ];
+
+/** Groepen in weergavevolgorde, afgeleid uit ZONES (geen dubbele lijst). */
+export const ZONE_GROUPS = ZONES.reduce((a, z) => (a.includes(z.group) ? a : [...a, z.group]), []);
 
 export const ZONE_IDS = ZONES.map((z) => z.id);
 export const ZONE_BY_ID = Object.fromEntries(ZONES.map((z) => [z.id, z]));

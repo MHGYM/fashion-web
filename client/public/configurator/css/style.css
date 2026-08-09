@@ -126,6 +126,36 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   transform: rotate(45deg); }
 .zone-item.is-active .zone-caret { border-color: var(--gold); }
 
+.zone-item.is-unsupported { opacity: .42; cursor: not-allowed; }
+.zone-item.is-unsupported:hover { border-color: var(--line); transform: none; }
+.zone-item:disabled { pointer-events: none; }
+.zone-item:disabled.is-unsupported { pointer-events: auto; cursor: not-allowed; }
+
+.zone-group {
+  font-size: .62rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--muted); margin: 14px 0 6px; padding-left: 2px;
+}
+.zone-group:first-child { margin-top: 0; }
+
+.zone-tag {
+  margin-left: 8px; padding: 1px 6px; border-radius: 999px;
+  font-size: .58rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--line-2); vertical-align: middle;
+}
+
+/* ── Modelkeuze ────────────────────────────────────────────────────────── */
+.model-list { display: flex; gap: 8px; }
+.model-item {
+  flex: 1; padding: 12px 10px; text-align: center;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: var(--radius);
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.model-item:hover { border-color: var(--line-2); transform: translateY(-1px); }
+.model-item.is-active { border-color: var(--gold-line); background: linear-gradient(180deg, var(--gold-dim), transparent); }
+.model-name { display: block; font-size: .82rem; font-weight: 800; letter-spacing: .01em; color: var(--text); }
+.model-sub  { display: block; font-size: .66rem; color: var(--muted); margin-top: 3px; }
+.model-item.is-active .model-name { color: var(--gold); }
+
 /* ── Swatches ──────────────────────────────────────────────────────────── */
 .swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 9px; }
 .swatch {
