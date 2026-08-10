@@ -4,12 +4,17 @@
    Bouwt zichzelf op uit de productdefinitie (zones.js) en praat met de 3D-laag
    uitsluitend via zone-id's. Kent geen meshnamen of modeldetails: een ander
    GLB vergt hier géén wijziging.
+
+   Flow bewust in deze volgorde (zie index.html): model → onderdeel-tabs →
+   3D-resultaat → kleur/upload voor dát onderdeel — allemaal dicht opeen in
+   dezelfde kolom, zodat "zone kiezen → kleur kiezen → resultaat zien" geen
+   scroll-afstand kost, ook niet op mobiel.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { createGloveViewer } from './scene3d.js';
 import { MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID } from './model-profile.js';
 import {
-  COLORS, ZONES, ZONE_GROUPS, SIZES, PRICING, NAME_FONTS, NAME_SIZES,
+  COLORS, ZONES, SIZES, PRICING, NAME_FONTS, NAME_SIZES,
   hexOf, defaultColors, defaultArtworkTransform,
 } from './zones.js';
 
@@ -86,6 +91,12 @@ const canvas = $('glove-canvas');
 load();
 const viewer = createGloveViewer(canvas, { profile: MODEL_BY_ID[state.model] });
 
+// Het naam-op-de-manchet-blok staat vast in de HTML maar hoort inhoudelijk
+// bij de Wrist-zone: buildZoneEditor() verplaatst dit ENE element erin/eruit
+// (nooit klonen) zodat getypte tekst en gekozen opties nooit verloren gaan.
+const wristNameCard = $('wrist-name-card');
+const detachedHolder = document.createElement('div'); // nooit in de document-DOM; alleen een veilige parkeerplek
+
 window.FMConfigurator = {
   viewer,
   getConfiguration: () => buildConfig(),
@@ -120,7 +131,7 @@ function pushBadge() {
   });
 }
 
-/* ── Zonekeuze ────────────────────────────────────────────────────────── */
+/* ── Model kiezen ─────────────────────────────────────────────────────── */
 function buildModelList() {
   const wrap = $('model-list');
   wrap.innerHTML = '';
@@ -151,7 +162,7 @@ async function switchModel(modelId) {
     if (!viewer.isZoneSupported(state.activeZone)) {
       state.activeZone = (ZONES.find((z) => viewer.isZoneSupported(z.id)) || ZONES[0]).id;
     }
-    buildZoneList();
+    buildZoneTabs();
     buildZoneEditor();
     renderPrice();
     showAttribution();
@@ -162,32 +173,32 @@ async function switchModel(modelId) {
   $('stage-loading').classList.add('is-hidden');
 }
 
-function buildZoneList() {
-  const wrap = $('zone-list');
+/* ── Onderdeel kiezen: compacte pillen boven het 3D-podium ───────────────
+   Bewust GEEN beschrijvende lijst meer (kleurstip + naam + toelichting per
+   rij) — die stond ver van het 3D-resultaat af. De toelichting per zone
+   verschijnt nu als stage-hint, direct bij de viewer zelf.              */
+function buildZoneTabs() {
+  const wrap = $('zone-tabs');
   wrap.innerHTML = '';
-  ZONE_GROUPS.forEach((group) => {
-    const inGroup = ZONES.filter((z) => z.group === group);
-    if (!inGroup.length) return;
-    wrap.appendChild(el('div', 'zone-group', group));
-    inGroup.forEach((zone) => {
-      const ok = viewer.isZoneSupported(zone.id);
-      const btn = el('button', 'zone-item'
-        + (zone.id === state.activeZone && ok ? ' is-active' : '')
-        + (ok ? '' : ' is-unsupported'));
-      btn.type = 'button';
-      if (!ok) { btn.disabled = true; btn.title = 'Niet beschikbaar op dit model.'; }
-      const dot = el('span', 'zone-dot');
-      dot.style.background = hexOf(state.colors[zone.id]);
-      if (ok && ((zone.id === FULL_ZONE?.id && state.hasArtwork) ||
-                 (zone.id === BADGE_ZONE?.id && state.hasLogo))) dot.classList.add('has-art');
-      const meta = el('span', 'zone-meta');
-      const name = el('span', 'zone-name', zone.label);
-      if (!ok) name.appendChild(el('span', 'zone-tag', 'n.v.t.'));
-      meta.append(name, el('span', 'zone-sub', zone.hint));
-      btn.append(dot, meta, el('span', 'zone-caret'));
-      btn.addEventListener('click', () => { state.activeZone = zone.id; buildZoneList(); buildZoneEditor(); });
-      wrap.appendChild(btn);
-    });
+  ZONES.forEach((zone) => {
+    const ok = viewer.isZoneSupported(zone.id);
+    const btn = el('button', 'zone-tab'
+      + (zone.id === state.activeZone && ok ? ' is-active' : '')
+      + (ok ? '' : ' is-unsupported'));
+    btn.type = 'button';
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', zone.id === state.activeZone && ok ? 'true' : 'false');
+    if (!ok) { btn.disabled = true; btn.title = 'Niet beschikbaar op dit model.'; }
+
+    const dot = el('span', 'zone-tab-dot');
+    dot.style.background = hexOf(state.colors[zone.id]);
+    if (ok && ((zone.id === FULL_ZONE?.id && state.hasArtwork) ||
+               (zone.id === BADGE_ZONE?.id && state.hasLogo))) dot.classList.add('has-art');
+
+    btn.append(dot, document.createTextNode(zone.label));
+    if (!ok) btn.appendChild(el('span', 'zone-tab-tag', 'n.v.t.'));
+    btn.addEventListener('click', () => { state.activeZone = zone.id; buildZoneTabs(); buildZoneEditor(); });
+    wrap.appendChild(btn);
   });
 }
 
@@ -268,25 +279,26 @@ function dropzone(titleText, subText, onFile) {
   } };
 }
 
-/* ── Contextueel paneel voor de gekozen zone ──────────────────────────── */
+/* ── Kleur + upload voor de gekozen zone — direct onder het 3D-podium ──── */
 function buildZoneEditor() {
   const zone = ZONES.find((z) => z.id === state.activeZone);
   const box = $('zone-editor');
+
+  // Het naam-paneel bevat live invoer (getypte naam, gekozen opties). Eerst
+  // veilig parkeren als het nu in box zit, want innerHTML='' zou die DOM
+  // anders vernietigen i.p.v. hem alleen te verbergen.
+  if (wristNameCard.parentNode === box) detachedHolder.appendChild(wristNameCard);
   box.innerHTML = '';
   if (!zone) return;
 
   $('stage-title').textContent = zone.label;
-  $('stage-hint').textContent = zone.artwork === 'full'
-    ? 'Kies een kleur of upload een afbeelding — die wordt over het hele paneel gelegd, inclusief de duim.'
-    : zone.artwork === 'badge'
-      ? 'Kies een kleur en plaats hier je logo. De naam stel je rechts in.'
-      : 'Kies een kleur voor dit paneel.';
+  $('stage-hint').textContent = zone.hint;
 
   box.appendChild(el('h2', 'card-title', 'Kleur'));
   box.appendChild(swatchGrid(state.colors[zone.id], (c) => {
     state.colors[zone.id] = c.name;
     viewer.setZoneColor(zone.id, c.hex);
-    buildZoneList();
+    buildZoneTabs();
     save();
   }));
 
@@ -298,7 +310,7 @@ function buildZoneEditor() {
         state.artworkTransform = defaultArtworkTransform();
         state.hasArtwork = true;
         viewer.setZoneArtwork(zone.id, img, state.artworkTransform);
-        buildZoneList(); buildZoneEditor(); renderPrice(); save();
+        buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
     box.appendChild(dz.zone);
 
@@ -314,7 +326,7 @@ function buildZoneEditor() {
       clear.addEventListener('click', () => {
         state.hasArtwork = false;
         viewer.setZoneArtwork(zone.id, null);
-        buildZoneList(); buildZoneEditor(); renderPrice(); save();
+        buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
       tools.append(sx.row, sy.row, ss.row, sr.row, clear);
       box.appendChild(tools);
@@ -328,7 +340,7 @@ function buildZoneEditor() {
       (img) => {
         state.hasLogo = true;
         viewer.setZoneBadge(zone.id, { img });
-        buildZoneList(); buildZoneEditor(); renderPrice(); save();
+        buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
     box.appendChild(dz.zone);
 
@@ -339,14 +351,19 @@ function buildZoneEditor() {
       clear.addEventListener('click', () => {
         state.hasLogo = false;
         viewer.setZoneBadge(zone.id, { img: null });
-        buildZoneList(); buildZoneEditor(); renderPrice(); save();
+        buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
       box.appendChild(clear);
     }
+
+    // Naam hoort bij dit onderdeel — verplaatst (niet herbouwd) het bestaande
+    // paneel hierin, zodat de invoer + luisteraars intact blijven.
+    wristNameCard.hidden = false;
+    box.appendChild(wristNameCard);
   }
 }
 
-/* ── Rechterkolom ─────────────────────────────────────────────────────── */
+/* ── Naam op de manchet (leeft in #wrist-name-card, zie hierboven) ──────── */
 function buildNamePanel() {
   const input = $('name-input');
   input.value = state.name;
@@ -535,10 +552,10 @@ function wireActions() {
 
 function showAttribution() {
   const a = viewer.profile.attribution;
-  if (!a) return;
-  $('attribution').innerHTML =
-    `3D-model “${a.title}” van <a href="${a.authorUrl}" target="_blank" rel="noopener">${a.author}</a>, ` +
-    `gebruikt onder <a href="${a.licenseUrl}" target="_blank" rel="noopener">${a.license}</a>.`;
+  $('attribution').innerHTML = a
+    ? `3D-model “${a.title}” van <a href="${a.authorUrl}" target="_blank" rel="noopener">${a.author}</a>, ` +
+      `gebruikt onder <a href="${a.licenseUrl}" target="_blank" rel="noopener">${a.license}</a>.`
+    : '';
 }
 
 /* ── Start ────────────────────────────────────────────────────────────── */
@@ -547,7 +564,7 @@ viewer.ready.then(async () => {
   // Wacht op de webfonts, anders tekent het canvas de naam in een fallback.
   if (document.fonts?.ready) { try { await document.fonts.ready; } catch (e) { /* niet kritiek */ } }
   buildModelList();
-  buildZoneList();
+  buildZoneTabs();
   buildZoneEditor();
   buildNamePanel();
   buildSizePanel();

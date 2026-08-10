@@ -2,6 +2,11 @@
    FightMarketing — Glove Configurator
    Premium zwart/goud. Vanilla CSS, geen frameworks.
    Typografie sluit aan op de hoofdsite (Inter).
+
+   Lay-out volgt bewust de flow ZONE KIEZEN → 3D-RESULTAAT → KLEUR/UPLOAD als
+   één aaneengesloten kolom (editor-col), met maat/prijs/bestellen ernaast als
+   los blok (col-right). Op mobiel valt dat vanzelf terug op één kolom in
+   precies die volgorde — geen aparte mobiele reorder-logica nodig.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -77,84 +82,73 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 /* ── Layout ────────────────────────────────────────────────────────────── */
 .layout {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr) 350px;
-  gap: 22px;
-  max-width: 1640px;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 20px;
+  max-width: 1500px;
   margin: 0 auto;
-  padding: 22px 28px 32px;
+  padding: 18px 28px 28px;
   align-items: start;
 }
-.col { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 88px; }
+.editor-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.col-right  { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 88px; }
 
 .card {
   background: linear-gradient(180deg, var(--card) 0%, #0F0F13 100%);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: 18px;
+  padding: 16px;
 }
 .card:empty { display: none; }
 .card-title {
   font-size: .72rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase;
-  color: var(--text-2); margin-bottom: 14px;
+  color: var(--text-2); margin-bottom: 12px;
 }
 .card-title .opt {
   font-weight: 500; letter-spacing: .04em; text-transform: none;
   color: var(--muted); font-size: .68rem;
 }
 
-/* ── Zonekeuze ─────────────────────────────────────────────────────────── */
-.zone-list { display: flex; flex-direction: column; gap: 8px; }
-.zone-item {
-  display: flex; align-items: center; gap: 13px; width: 100%;
-  padding: 13px 14px; text-align: left;
-  background: var(--card-2); border: 1px solid var(--line); border-radius: var(--radius);
-  transition: border-color .18s, background .18s, transform .18s;
+/* ── Model kiezen (compacte rij, geen eigen kaart) ───────────────────────── */
+.model-row { display: flex; align-items: center; gap: 12px; }
+.model-row-label {
+  font-size: .66rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-2); white-space: nowrap; flex-shrink: 0;
 }
-.zone-item:hover { border-color: var(--line-2); transform: translateY(-1px); }
-.zone-item.is-active { border-color: var(--gold-line); background: linear-gradient(180deg, var(--gold-dim), transparent); }
-.zone-dot {
-  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
-  border: 1.5px solid rgba(255,255,255,.24);
-  box-shadow: inset 0 2px 3px rgba(255,255,255,.26), 0 2px 5px rgba(0,0,0,.5);
-}
-.zone-dot.has-art { box-shadow: inset 0 2px 3px rgba(255,255,255,.26), 0 0 0 2px var(--gold); }
-.zone-meta { flex: 1; min-width: 0; }
-.zone-name { display: block; font-size: .86rem; font-weight: 700; letter-spacing: .01em; }
-.zone-sub  { display: block; font-size: .7rem; color: var(--muted); margin-top: 2px; }
-.zone-caret { width: 7px; height: 7px; flex-shrink: 0;
-  border-right: 1.8px solid var(--muted); border-top: 1.8px solid var(--muted);
-  transform: rotate(45deg); }
-.zone-item.is-active .zone-caret { border-color: var(--gold); }
-
-.zone-item.is-unsupported { opacity: .42; cursor: not-allowed; }
-.zone-item.is-unsupported:hover { border-color: var(--line); transform: none; }
-.zone-item:disabled { pointer-events: none; }
-.zone-item:disabled.is-unsupported { pointer-events: auto; cursor: not-allowed; }
-
-.zone-group {
-  font-size: .62rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--muted); margin: 14px 0 6px; padding-left: 2px;
-}
-.zone-group:first-child { margin-top: 0; }
-
-.zone-tag {
-  margin-left: 8px; padding: 1px 6px; border-radius: 999px;
-  font-size: .58rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--muted); border: 1px solid var(--line-2); vertical-align: middle;
-}
-
-/* ── Modelkeuze ────────────────────────────────────────────────────────── */
-.model-list { display: flex; gap: 8px; }
+.model-list { display: flex; gap: 8px; flex: 1; }
 .model-item {
-  flex: 1; padding: 12px 10px; text-align: center;
+  flex: 1; padding: 9px 10px; text-align: center;
   background: var(--card-2); border: 1px solid var(--line); border-radius: var(--radius);
   transition: border-color .18s, background .18s, transform .18s;
 }
 .model-item:hover { border-color: var(--line-2); transform: translateY(-1px); }
 .model-item.is-active { border-color: var(--gold-line); background: linear-gradient(180deg, var(--gold-dim), transparent); }
-.model-name { display: block; font-size: .82rem; font-weight: 800; letter-spacing: .01em; color: var(--text); }
-.model-sub  { display: block; font-size: .66rem; color: var(--muted); margin-top: 3px; }
+.model-name { display: block; font-size: .78rem; font-weight: 800; letter-spacing: .01em; color: var(--text); }
+.model-sub  { display: block; font-size: .62rem; color: var(--muted); margin-top: 1px; }
 .model-item.is-active .model-name { color: var(--gold); }
+
+/* ── Onderdeel kiezen: compacte pillen, direct boven het 3D-resultaat ───── */
+.zone-tabs { display: flex; flex-wrap: wrap; gap: 7px; }
+.zone-tab {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 13px; border-radius: 999px; white-space: nowrap;
+  background: var(--card-2); border: 1px solid var(--line); color: var(--text-2);
+  font-size: .76rem; font-weight: 700;
+  transition: border-color .18s, background .18s, color .18s, transform .18s;
+}
+.zone-tab:hover { border-color: var(--line-2); color: var(--text); transform: translateY(-1px); }
+.zone-tab.is-active { border-color: var(--gold-line); background: linear-gradient(180deg, var(--gold-dim), transparent); color: var(--gold); }
+.zone-tab-dot {
+  width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,.24);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.25);
+}
+.zone-tab-dot.has-art { box-shadow: inset 0 1px 2px rgba(255,255,255,.25), 0 0 0 2px var(--gold); }
+.zone-tab.is-unsupported { opacity: .4; cursor: not-allowed; }
+.zone-tab.is-unsupported:hover { border-color: var(--line); color: var(--text-2); transform: none; }
+.zone-tab-tag {
+  font-size: .55rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted);
+}
 
 /* ── Swatches ──────────────────────────────────────────────────────────── */
 .swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 9px; }
@@ -178,12 +172,12 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 /* ── Uploadvak ─────────────────────────────────────────────────────────── */
 .dropzone {
   border: 1.5px dashed var(--line-2); border-radius: var(--radius);
-  padding: 22px 16px; text-align: center; cursor: pointer;
+  padding: 20px 16px; text-align: center; cursor: pointer;
   transition: border-color .18s, background .18s;
-  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
 .dropzone:hover, .dropzone.is-over { border-color: var(--gold); background: var(--gold-dim); }
-.dropzone svg { width: 26px; height: 26px; color: var(--muted); }
+.dropzone svg { width: 24px; height: 24px; color: var(--muted); }
 .dropzone:hover svg, .dropzone.is-over svg { color: var(--gold); }
 .dropzone-title { font-size: .8rem; font-weight: 600; color: var(--text-2); }
 .dropzone-sub { font-size: .68rem; color: var(--muted); }
@@ -208,13 +202,18 @@ input[type=range]::-moz-range-thumb {
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .divider { height: 1px; background: var(--line); margin: 14px 0; }
 
+/* Naam-op-de-manchet: geen eigen kaart (die zit al in #zone-editor), alleen
+   een scheidingslijn erboven — verplaatst door JS, ziet er zo als één geheel
+   uit met de logo-upload erboven. */
+.editor-sub { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+
 /* ── Podium ────────────────────────────────────────────────────────────── */
 .stage {
   border: 1px solid var(--line); border-radius: var(--radius-lg);
   background: radial-gradient(720px 520px at 50% 26%, #1B1B23 0%, #101015 58%, #0A0A0D 100%);
-  padding: 22px 20px 18px;
+  padding: 20px 20px 16px;
   display: flex; flex-direction: column; align-items: center;
-  min-height: 660px;
+  min-height: 600px;
   position: relative; overflow: hidden;
 }
 .stage::before {
@@ -227,7 +226,7 @@ input[type=range]::-moz-range-thumb {
   color: var(--gold);
 }
 .stage-head p { font-size: .8rem; color: var(--text-2); margin-top: 6px; max-width: 44ch; }
-.stage-inner { position: relative; width: 100%; flex: 1; min-height: 460px; }
+.stage-inner { position: relative; width: 100%; flex: 1; min-height: 420px; }
 #glove-canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #glove-canvas:active { cursor: grabbing; }
 .stage-loading {
@@ -362,7 +361,7 @@ input[type=range]::-moz-range-thumb {
 /* ── Trustbalk + bronvermelding ────────────────────────────────────────── */
 .trust-bar {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px;
-  max-width: 1640px; margin: 0 auto; padding: 0 28px 22px;
+  max-width: 1500px; margin: 0 auto; padding: 0 28px 22px;
 }
 .trust-bar > div {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
@@ -372,26 +371,22 @@ input[type=range]::-moz-range-thumb {
 .trust-bar span { font-size: .7rem; color: var(--muted); }
 
 .attribution {
-  max-width: 1640px; margin: 0 auto; padding: 0 28px 26px;
+  max-width: 1500px; margin: 0 auto; padding: 0 28px 26px;
   font-size: .66rem; color: var(--muted); line-height: 1.6;
 }
 .attribution a { color: var(--text-2); }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
-@media (max-width: 1340px) {
-  .layout { grid-template-columns: 320px minmax(0,1fr); }
-  .col-right { grid-column: 1 / -1; position: static;
-    display: grid; grid-template-columns: repeat(3, 1fr); align-items: start; }
-}
-@media (max-width: 1000px) {
+@media (max-width: 900px) {
   .topnav { display: none; }
-  .layout { grid-template-columns: minmax(0,1fr); padding: 16px 16px 24px; }
-  .col { position: static; }
-  .col-right { grid-template-columns: 1fr; }
-  .stage { min-height: 520px; }
-  .stage-inner { min-height: 360px; }
-  .trust-bar { grid-template-columns: repeat(2, 1fr); padding: 0 16px 18px; }
-  .attribution { padding: 0 16px 22px; }
+  .layout { grid-template-columns: minmax(0,1fr); padding: 12px 12px 20px; gap: 14px; }
+  .col-right { position: static; }
+  .model-row { gap: 10px; }
+  .model-row-label { font-size: .6rem; }
+  .stage { min-height: 460px; padding: 16px 14px 12px; }
+  .stage-inner { min-height: 300px; }
+  .trust-bar { grid-template-columns: repeat(2, 1fr); padding: 0 12px 18px; }
+  .attribution { padding: 0 12px 22px; }
 }
 @media (max-width: 560px) {
   .topbar { padding: 13px 16px; gap: 12px; }
@@ -399,6 +394,7 @@ input[type=range]::-moz-range-thumb {
   .swatches { grid-template-columns: repeat(6, 1fr); }
   .trust-bar { grid-template-columns: 1fr; }
   .view-bar button { padding: 7px 10px; font-size: .64rem; }
+  .zone-tab { padding: 7px 11px; font-size: .72rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }

@@ -31,60 +31,59 @@
 
 <main class="layout">
 
-  <!-- ══ LINKS: zonekeuze + bediening van de gekozen zone ══ -->
-  <aside class="col col-left">
-    <section class="card">
-      <h2 class="card-title">Model</h2>
-      <div id="model-list" class="model-list" role="group" aria-label="Handschoenmodel"></div>
-    </section>
+  <!-- ══ Bewerk-kolom: model → onderdeel → 3D-resultaat → kleur/upload,
+       in die volgorde, bewust dicht op elkaar. ══ -->
+  <div class="editor-col">
 
-    <section class="card">
-      <h2 class="card-title">Stel je handschoen samen</h2>
-      <div id="zone-list" class="zone-list"></div>
-    </section>
-
-    <section class="card" id="zone-editor">
-      <!-- wordt gevuld op basis van de gekozen zone -->
-    </section>
-  </aside>
-
-  <!-- ══ MIDDEN: 3D-podium ══ -->
-  <section class="stage">
-    <div class="stage-head">
-      <h1 id="stage-title">Front Panel</h1>
-      <p id="stage-hint">Kies een kleur of upload je eigen afbeelding.</p>
+    <div class="model-row">
+      <span class="model-row-label">Model</span>
+      <div id="model-list" class="model-list"></div>
     </div>
 
-    <div class="stage-inner">
-      <canvas id="glove-canvas" role="img" aria-label="Draaibare 3D-weergave van je handschoen"></canvas>
-      <div id="stage-loading" class="stage-loading">
-        <div class="spinner" aria-hidden="true"></div>
-        <span>3D-model laden…</span>
+    <nav id="zone-tabs" class="zone-tabs" role="tablist" aria-label="Onderdeel kiezen"></nav>
+
+    <section class="stage">
+      <div class="stage-head">
+        <h1 id="stage-title">Front Panel</h1>
+        <p id="stage-hint">Kies een kleur of upload je eigen afbeelding.</p>
       </div>
-      <p id="stage-error" class="stage-error" hidden></p>
-    </div>
 
-    <div class="view-bar" role="group" aria-label="Weergave">
-      <button type="button" data-cam="front" class="is-active" aria-pressed="true">Voor</button>
-      <button type="button" data-cam="back" aria-pressed="false">Achter</button>
-      <button type="button" data-cam="top" aria-pressed="false">Boven</button>
-      <span class="view-sep" aria-hidden="true"></span>
-      <button type="button" id="zoom-out" title="Uitzoomen" aria-label="Uitzoomen">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="m20 20-3.5-3.5"/></svg>
-      </button>
-      <button type="button" id="zoom-in" title="Inzoomen" aria-label="Inzoomen">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6"/><path d="m20 20-3.5-3.5"/></svg>
-      </button>
-      <button type="button" id="cam-reset" title="Beeld herstellen" aria-label="Beeld herstellen">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
-      </button>
-    </div>
-    <p class="stage-foot">Sleep om te draaien · scroll om te zoomen</p>
-  </section>
+      <div class="stage-inner">
+        <canvas id="glove-canvas" role="img" aria-label="Draaibare 3D-weergave van je handschoen"></canvas>
+        <div id="stage-loading" class="stage-loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>3D-model laden…</span>
+        </div>
+        <p id="stage-error" class="stage-error" hidden></p>
+      </div>
 
-  <!-- ══ RECHTS: naam, maat, prijs, bestellen ══ -->
-  <aside class="col col-right">
-    <section class="card">
+      <div class="view-bar" role="group" aria-label="Weergave">
+        <button type="button" data-cam="front" class="is-active" aria-pressed="true">Voor</button>
+        <button type="button" data-cam="back" aria-pressed="false">Achter</button>
+        <button type="button" data-cam="top" aria-pressed="false">Boven</button>
+        <span class="view-sep" aria-hidden="true"></span>
+        <button type="button" id="zoom-out" title="Uitzoomen" aria-label="Uitzoomen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button type="button" id="zoom-in" title="Inzoomen" aria-label="Inzoomen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button type="button" id="cam-reset" title="Beeld herstellen" aria-label="Beeld herstellen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
+        </button>
+      </div>
+      <p class="stage-foot">Sleep om te draaien · scroll om te zoomen</p>
+    </section>
+
+    <!-- Direct onder het 3D-resultaat: kleur voor de gekozen zone, en
+         (afhankelijk van de zone) afbeelding- of logo-upload. -->
+    <section class="card zone-editor-card" id="zone-editor"></section>
+
+    <!-- Naam op de manchet staat vast in de DOM maar wordt door JS verplaatst
+         in #zone-editor zodra de Wrist-zone actief is — zo hoort het bij het
+         onderdeel waar het bij hoort, en blijft de getypte naam behouden bij
+         het wisselen van zone of model (dezelfde inputs verhuizen mee). -->
+    <div class="editor-sub" id="wrist-name-card" hidden>
       <h2 class="card-title">Naam op de manchet <span class="opt">optioneel</span></h2>
       <input id="name-input" class="input" type="text" maxlength="14"
              placeholder="JOUW NAAM" autocomplete="off" spellcheck="false">
@@ -96,8 +95,12 @@
         <span class="field-label no-margin">Tekstkleur</span>
         <div id="name-color" class="mini-swatches"></div>
       </div>
-    </section>
+    </div>
 
+  </div>
+
+  <!-- ══ Maat, prijs en bestellen — los van de bewerk-flow. ══ -->
+  <aside class="col-right">
     <section class="card">
       <h2 class="card-title">Maat</h2>
       <div id="size-row" class="chip-row" role="group" aria-label="Maat"></div>

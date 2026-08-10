@@ -1,6 +1,25 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    MODEL-PROFIEL — Velcro
    ═══════════════════════════════════════════════════════════════════════════
+   ⚠ PLAATSHOUDER-MODEL — wordt later vervangen door een nieuw Velcro-ontwerp.
+   Dit 3D-model is bewust niet verder gepolijst; de klant heeft expliciet
+   gevraagd om er nu geen tijd in te steken. Wél moet de Velcro-KEUZE zelf
+   in de configurator blijven werken, zodat klanten kunnen wisselen tussen
+   Velcro en Lace-Up.
+
+   Vervangen zodra het nieuwe model er is — geen enkele wijziging nodig aan
+   de UI, scene3d.js of model-profile.js:
+     1. Zet het nieuwe .glb in assets/ (bv. assets/fm-glove-velcro.glb
+        overschrijven, of een nieuwe bestandsnaam + modelUrl hieronder).
+     2. Werk `bindings` hieronder bij naar de meshnamen van het nieuwe model
+        (per zone-id uit zones.js: front-panel, palm, outer-thumb,
+        inner-thumb, wrist, laces, piping, stitching).
+     3. `cameraPresets` / `materialDefaults` / `attribution` naar wens
+        aanpassen aan het nieuwe model/de nieuwe bronlicentie.
+   Dat is alles — dit bestand is het ENIGE aanspreekpunt voor een Velcro-
+   modelwissel.
+
+   Huidig (tijdelijk) model:
    Gemodelleerde velcro-wedstrijdhandschoen.
    Bron: Sketchfab "Boxing gloves" van A1905, CC-BY-4.0 → naamsvermelding
    verplicht bij publicatie (zie `attribution`).
