@@ -55,7 +55,7 @@ export const ZONES = [
   {
     id: 'front-panel', label: 'Front Panel', group: 'Panelen',
     default: 'Black', artwork: 'full',
-    artworkGroup: ['front-panel', 'outer-thumb', 'inner-thumb'],
+    artworkGroup: ['front-panel', 'outer-thumb', 'inner-thumb', 'thumb-strip'],
     hint: 'Het slagvlak inclusief de volledige duim. Een upload wordt als één doorlopend ontwerp over paneel én duim geplaatst.',
   },
   {
@@ -72,6 +72,15 @@ export const ZONES = [
     id: 'inner-thumb', label: 'Inner Thumb', group: 'Duim',
     default: 'Black', artwork: null,
     hint: 'Binnenzijde van de duim. Kleur zichtbaar zolang er geen afbeelding op het Front Panel staat.',
+  },
+  {
+    // Naad tussen duim en palm — apart mesh, aangewezen door een klant die
+    // hem niet kon herkleuren (zat destijds samengevoegd in de statische
+    // voering). Alleen Lace-Up heeft deze als losse geometrie; op Velcro
+    // n.v.t. (zie models/velcro.js).
+    id: 'thumb-strip', label: 'Thumb Strip', group: 'Duim',
+    default: 'Black', artwork: null,
+    hint: 'De naad tussen duim en palm. Kleur zichtbaar zolang er geen afbeelding op het Front Panel staat.',
   },
   {
     id: 'wrist', label: 'Wrist', group: 'Sluiting',

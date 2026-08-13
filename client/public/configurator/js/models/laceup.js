@@ -14,6 +14,14 @@
    Ook zat er een 'Inner_Black.001' in die ver buiten de handschoen lag en
    niets zichtbaars renderde; die is bij de omzetting verwijderd omdat hij
    alleen de bounding box (en daarmee het camerakader) scheeftrok.
+
+   thumb-strip (bron: Inner_Strip) — toegevoegd nadat een klant een reep
+   tussen duim en palm aanwees die niet herkleurbaar was. Die naad bleek uit
+   twee losse meshes te bestaan: Thum_Inner (al "inner-thumb") en Inner_Strip,
+   die zonder eigen zone in de statische voering zat. Nu een eigen zone —
+   geverifieerd met isolatierenders vanuit dezelfde hoek als de klantfoto.
+   'Inner_Black' is een ander onderdeel (het stiksel in de vetergeul) en
+   blijft terecht in 'lining'.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default {
@@ -40,6 +48,7 @@ export default {
     'palm':        { type: 'mesh', node: 'palm' },
     'outer-thumb': { type: 'mesh', node: 'outer-thumb' },
     'inner-thumb': { type: 'mesh', node: 'inner-thumb' },
+    'thumb-strip': { type: 'mesh', node: 'thumb-strip' },
     'wrist':       { type: 'mesh', node: 'wrist' },
     'laces':       { type: 'mesh', node: 'laces' },
     'piping':      { type: 'mesh', node: 'piping' },

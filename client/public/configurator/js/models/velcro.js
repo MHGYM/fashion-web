@@ -13,7 +13,7 @@
         overschrijven, of een nieuwe bestandsnaam + modelUrl hieronder).
      2. Werk `bindings` hieronder bij naar de meshnamen van het nieuwe model
         (per zone-id uit zones.js: front-panel, palm, outer-thumb,
-        inner-thumb, wrist, laces, piping, stitching).
+        inner-thumb, thumb-strip, wrist, laces, piping, stitching).
      3. `cameraPresets` / `materialDefaults` / `attribution` naar wens
         aanpassen aan het nieuwe model/de nieuwe bronlicentie.
    Dat is alles — dit bestand is het ENIGE aanspreekpunt voor een Velcro-
@@ -58,6 +58,10 @@ export default {
     'piping':      { type: 'mesh', node: 'piping' },
     'stitching':   { type: 'mesh', node: 'stitching' },
     'laces':       { type: 'unsupported', reason: 'Dit model heeft een klittenbandsluiting, geen veters.' },
+    // Dit bronmodel heeft geen los mesh voor de naad tussen duim en palm —
+    // die zit hier vast aan de duim. Niet kunstmatig gesplitst: de klant
+    // heeft expliciet gevraagd dit placeholder-model niet te bewerken.
+    'thumb-strip': { type: 'unsupported', reason: 'Dit onderdeel is op dit model niet als losse geometrie beschikbaar.' },
   },
 
   staticNodes: ['lining'],

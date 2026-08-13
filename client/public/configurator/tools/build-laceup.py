@@ -1,5 +1,5 @@
 """
-Zet 'Back Cuff Padding Design.glb' om naar configurator-ready (8 zones).
+Zet 'Back Cuff Padding Design.glb' om naar configurator-ready (9 zones).
 
 Dit model is al netjes per onderdeel gescheiden door de 3D-artist; er hoeft
 niets gesplitst te worden. Alleen: hernoemen naar onze zone-id's, het
@@ -9,6 +9,17 @@ LET OP — de namen van de artist zijn omgedraaid t.o.v. de intuïtie:
   Back_Palm  = de VOORKANT (slagvlak)      -> front-panel
   Front_Palm = de PALMZIJDE                -> palm
 Geverifieerd met geïsoleerde renders per mesh.
+
+thumb-strip (bron: Inner_Strip) — apart geverifieerd n.a.v. klantfeedback:
+een klant wees een zichtbare reep aan tussen duim en palm (palmzijde) die
+niet reageerde op kleurwijzigingen. Isolatierenders vanuit exact dezelfde
+hoek als de screenshot van de klant lieten zien dat die naad uit TWEE
+losse meshes bestaat die elkaar niet overlappen:
+  - Thum_Inner  (bovenste helft van de naad)   -> was al zone "inner-thumb"
+  - Inner_Strip (onderste helft van de naad)   -> zat in 'lining' (statisch,
+    niet kleurbaar) — DAT was het manco. Nu een eigen zone: thumb-strip.
+'Inner_Black' is een ander, niet-verward onderdeel (het stiksel middenin de
+vetergeul) en blijft terecht in 'lining'.
 """
 import bpy, sys, os, math
 from mathutils import Vector
@@ -31,7 +42,7 @@ MAP = {
     "Stitching":       "stitching",
     "Thumb_Outer":     "outer-thumb",
     "Thum_Inner":      "inner-thumb",   # typefout zit in het bronbestand
-    "Inner_Strip":     None,
+    "Inner_Strip":     "thumb-strip",
     "Inner_Black":     None,
     # Ligt ver buiten de handschoen (Y tot 2.12 terwijl de rest binnen ~0.6
     # blijft) en rendert niets zichtbaars: een vergeten duplicaat dat alleen
@@ -44,6 +55,7 @@ DEBUG_COLORS = {
     "wrist": (0.95,0.85,0.10,1),       "laces": (1.00,1.00,1.00,1),
     "piping": (0.10,0.55,0.95,1),      "stitching": (0.95,0.35,0.95,1),
     "outer-thumb": (0.60,0.30,0.95,1), "inner-thumb": (0.95,0.55,0.05,1),
+    "thumb-strip": (0.10,0.90,0.90,1),
 }
 NEUTRAL = (0.30,0.30,0.32,1)
 STATIC  = (0.05,0.05,0.06,1)
