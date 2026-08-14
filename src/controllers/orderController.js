@@ -2,6 +2,7 @@ const db = require('../db')
 const mollie = require('../services/mollie')
 const { APP_URL, BTW_PCT, FREE_SHIPPING_THRESHOLD, SHIPPING_COST } = require('../config')
 const { isEmail, isStr, optStr, bad } = require('../middleware/validate')
+const { parseCustomConfig, buildProductionSpecPdf, streamProductionZip } = require('../services/productionFiles')
 
 /** Wraps async handlers so thrown errors reach Express error middleware */
 const wrap = fn => (req, res, next) =>
@@ -244,4 +245,41 @@ const adminDeleteOrder = wrap(async (req, res) => {
   res.json({ message: 'Bestelling verwijderd.' })
 })
 
-module.exports = { createOrder, myOrders, getOrder, adminListOrders, adminGetOrder, adminUpdateOrderStatus, adminDeleteOrder }
+// ── Productiebestanden (custom-configurator order-items) ────────────────────
+
+/** Haalt order + één order_item op, met een expliciete check dat het item
+ *  écht bij deze order hoort (voorkomt dat itemId van een andere order
+ *  gebruikt kan worden). */
+const getOrderAndItem = async (orderId, itemId) => {
+  const oR = await db.execute({
+    sql: 'SELECT o.*, u.email as customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?',
+    args: [orderId],
+  })
+  const order = oR.rows[0]
+  if (!order) return { order: null, item: null }
+  const iR = await db.execute({ sql: 'SELECT * FROM order_items WHERE id = ? AND order_id = ?', args: [itemId, orderId] })
+  return { order, item: iR.rows[0] || null }
+}
+
+const adminProductionSpecPdf = wrap(async (req, res) => {
+  const { order, item } = await getOrderAndItem(req.params.id, req.params.itemId)
+  if (!order || !item) return res.status(404).json({ error: 'Niet gevonden.' })
+  const config = parseCustomConfig(item)
+  const pdf = await buildProductionSpecPdf(order, item, config)
+  const name = config?.designId || `order-${order.id}-item-${item.id}`
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="production-spec-${name}.pdf"`)
+  res.send(pdf)
+})
+
+const adminProductionZip = wrap(async (req, res) => {
+  const { order, item } = await getOrderAndItem(req.params.id, req.params.itemId)
+  if (!order || !item) return res.status(404).json({ error: 'Niet gevonden.' })
+  const config = parseCustomConfig(item)
+  await streamProductionZip(res, order, item, config)
+})
+
+module.exports = {
+  createOrder, myOrders, getOrder, adminListOrders, adminGetOrder, adminUpdateOrderStatus, adminDeleteOrder,
+  adminProductionSpecPdf, adminProductionZip,
+}

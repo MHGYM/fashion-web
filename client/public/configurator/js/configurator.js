@@ -28,6 +28,14 @@ const state = {
   artworkTransform: defaultArtworkTransform(),
   hasArtwork: false,
   hasLogo: false,
+  // Origineel geüploade bestanden (File-objecten) — bewaard náást de Image
+  // die de 3D-preview draagt, puur zodat het EXACTE originele bestand
+  // (resolutie/formaat ongewijzigd) meegestuurd kan worden bij "In
+  // winkelwagen". Nooit opgeslagen/gedeeld via localStorage (te groot, en
+  // een File overleeft een paginaherlaad toch niet) — alleen in-memory
+  // zolang de klant op deze pagina is.
+  artworkFile: null,
+  logoFile: null,
   name: '',
   nameFont: NAME_FONTS[0].id,
   nameSize: 'm',
@@ -164,6 +172,8 @@ async function switchModel(modelId) {
     // dus een upload zou op een onvoorspelbare plek belanden.
     state.hasArtwork = false;
     state.hasLogo = false;
+    state.artworkFile = null;
+    state.logoFile = null;
     if (!viewer.isZoneSupported(state.activeZone)) {
       state.activeZone = (ZONES.find((z) => viewer.isZoneSupported(z.id)) || ZONES[0]).id;
     }
@@ -341,9 +351,10 @@ function buildZoneEditor() {
     box.appendChild(hFull);
     box.appendChild(el('p', 'hint', 'Upload je eigen logo op de Front Panel — het dekt automatisch het hele paneel én de duim, als één geheel.'));
     const dz = dropzone('Sleep je logo hierheen', 'of klik om te kiezen · PNG, JPG of SVG · max 5MB',
-      (img) => {
+      (img, file) => {
         state.artworkTransform = defaultArtworkTransform();
         state.hasArtwork = true;
+        state.artworkFile = file || null;
         viewer.setZoneArtwork(zone.id, img, state.artworkTransform);
         buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
@@ -360,6 +371,7 @@ function buildZoneEditor() {
       clear.type = 'button';
       clear.addEventListener('click', () => {
         state.hasArtwork = false;
+        state.artworkFile = null;
         viewer.setZoneArtwork(zone.id, null);
         buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
@@ -377,8 +389,9 @@ function buildZoneEditor() {
     hBadge.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.customLogo)}`));
     box.appendChild(hBadge);
     const dz = dropzone('Sleep je logo hierheen', 'of klik om te kiezen · PNG met transparantie werkt het best',
-      (img) => {
+      (img, file) => {
         state.hasLogo = true;
+        state.logoFile = file || null;
         viewer.setZoneBadge(zone.id, { img });
         buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
@@ -390,6 +403,7 @@ function buildZoneEditor() {
       clear.style.marginTop = '10px';
       clear.addEventListener('click', () => {
         state.hasLogo = false;
+        state.logoFile = null;
         viewer.setZoneBadge(zone.id, { img: null });
         buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
       });
@@ -478,6 +492,10 @@ function renderPrice() {
 }
 
 /* ── Configuratie voor de winkelwagen ─────────────────────────────────── */
+
+/** Lichte, synchrone momentopname (geen uploads) — gebruikt door
+ *  window.FMConfigurator.getConfiguration() voor debug/inspectie. De
+ *  daadwerkelijke "In winkelwagen"-config komt uit buildProductionConfig(). */
 function buildConfig() {
   const zoneColors = {};
   ZONES.forEach((z) => { zoneColors[z.label] = state.colors[z.id]; });
@@ -494,6 +512,134 @@ function buildConfig() {
       font: (NAME_FONTS.find((f) => f.id === state.nameFont) || {}).label,
       size: state.nameSize,
     } : null,
+  };
+}
+
+/** Leesbaar, verifieerbaar ontwerp-ID — reist mee in de config (order_items.
+ *  custom_config) én is de mapnaam onder UPLOADS_DIR/designs/ waar de
+ *  productiebestanden van dit ontwerp staan. Aangemaakt bij "In winkelwagen":
+ *  vanaf dat moment is een ontwerp pas "compleet" (zie orderaanvraag). */
+function makeDesignId() {
+  const stamp = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `FM-${stamp}-${rand}`;
+}
+
+/** Upload één productiebestand (origineel/artwork/preview) voor `designId`.
+ *  Zelfde auth-patroon als de rest van deze pagina (token uit localStorage,
+ *  want dit is een losstaande statische pagina buiten de React-SPA). */
+async function uploadDesignAsset(designId, kind, zone, blob, filename) {
+  const token = localStorage.getItem('sf_token');
+  const fd = new FormData();
+  fd.append('kind', kind);
+  fd.append('zone', zone);
+  fd.append('file', blob, filename);
+  const res = await fetch(`${API}/design-asset/${designId}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Uploaden van een productiebestand is mislukt.');
+  }
+  return (await res.json()).url;
+}
+
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
+}
+
+/** dataURL → Blob zonder fetch(): fetch('data:...') wordt door de CSP
+ *  (connect-src/default-src 'self', geen data:) geblokkeerd, ook al mag
+ *  data: wél als <img src>/canvas-bron (img-src staat dat toe). atob() is
+ *  geen netwerkverzoek en valt dus buiten de CSP. */
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = dataUrl.split(',');
+  const mime = (header.match(/data:([^;]+)/) || [])[1] || 'image/png';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+/**
+ * Bouwt de volledige productieconfiguratie EN uploadt daarbij de bestanden
+ * die de fabrikant nodig heeft: het originele klantbestand (ongewijzigde
+ * resolutie/formaat), het artwork exact zoals het op de handschoen
+ * gepositioneerd is (hoge resolutie, dezelfde tekenfunctie als de live 3D-
+ * textuur maar op een grotere losse canvas), en een scherpe glove-preview.
+ * Alleen aangeroepen bij "In winkelwagen" — dán is een ontwerp "compleet".
+ */
+async function buildProductionConfig(designId) {
+  const zoneColors = {};
+  ZONES.forEach((z) => { zoneColors[z.label] = state.colors[z.id]; });
+
+  let customImage = null;
+  if (state.hasArtwork) {
+    customImage = { placement: 'Front Panel (incl. duim)', transform: { ...state.artworkTransform } };
+    if (state.artworkFile) {
+      customImage.originalFilename = state.artworkFile.name;
+      customImage.originalMimeType = state.artworkFile.type || null;
+      customImage.originalUrl = await uploadDesignAsset(designId, 'original', 'front-panel', state.artworkFile, state.artworkFile.name);
+    }
+    const artCanvas = viewer.getZoneArtworkCanvas(FULL_ZONE.id, 2048);
+    if (artCanvas) {
+      const blob = await canvasToPngBlob(artCanvas);
+      if (blob) customImage.artworkUrl = await uploadDesignAsset(designId, 'artwork', 'front-panel', blob, 'front-panel-artwork.png');
+    }
+  }
+
+  let wristLogo = null;
+  if (state.hasLogo) {
+    wristLogo = { placement: 'Manchet' };
+    if (state.logoFile) {
+      wristLogo.originalFilename = state.logoFile.name;
+      wristLogo.originalMimeType = state.logoFile.type || null;
+      wristLogo.originalUrl = await uploadDesignAsset(designId, 'original', 'wrist', state.logoFile, state.logoFile.name);
+    }
+    const artCanvas = BADGE_ZONE ? viewer.getZoneArtworkCanvas(BADGE_ZONE.id, 1600) : null;
+    if (artCanvas) {
+      const blob = await canvasToPngBlob(artCanvas);
+      if (blob) wristLogo.artworkUrl = await uploadDesignAsset(designId, 'artwork', 'wrist', blob, 'wrist-logo-artwork.png');
+    }
+  }
+
+  let glovePreviewUrl = null;
+  {
+    viewer.renderNow();
+    const dataUrl = viewer.captureHighResPNG({ width: 1600, height: 1600, preset: viewer.cameraPresetNames[0] });
+    const previewBlob = dataUrlToBlob(dataUrl);
+    glovePreviewUrl = await uploadDesignAsset(designId, 'preview', 'general', previewBlob, 'glove-preview.png');
+  }
+
+  const nameObj = state.name.trim() ? {
+    text: state.name.trim(),
+    color: state.nameColor,
+    font: (NAME_FONTS.find((f) => f.id === state.nameFont) || {}).label,
+    size: state.nameSize,
+  } : null;
+
+  // Zelfde toeslag-regels als renderPrice() hierboven — puur informatief
+  // (de server berekent de daadwerkelijk in rekening gebrachte prijs zelf
+  // opnieuw bij /cart), maar wél nodig zodat de productiespecificatie een
+  // eigen, leesbare prijsopbouw kan tonen zonder de UI-tekst te dupliceren.
+  const logoSurcharge = (state.hasArtwork || state.hasLogo) ? PRICING.customLogo : 0;
+  const embroiderySurcharge = nameObj ? PRICING.wristName : 0;
+  const displayedTotal = Math.round((PRICING.base + logoSurcharge + embroiderySurcharge) * 100) / 100;
+
+  return {
+    designId,
+    product: 'Custom Gloves',
+    modelProfile: viewer.profile.id,
+    modelLabel: viewer.profile.label,
+    size: state.size,
+    colors: zoneColors,
+    customImage,
+    wristLogo,
+    name: nameObj,
+    glovePreviewUrl,
+    pricing: { base: PRICING.base, logoSurcharge, embroiderySurcharge, displayedTotal },
   };
 }
 
@@ -522,14 +668,26 @@ function wireActions() {
     const msg = $('cart-msg');
     const btn = $('add-to-cart');
     msg.hidden = false; msg.className = 'cart-msg';
+
+    // Zelfde boodschap als voorheen bij een 401 van de server, maar nu al
+    // vóóraf gecontroleerd: zo worden er geen productiebestanden geüpload
+    // voor een sessie die toch niet ingelogd is.
+    const token = localStorage.getItem('sf_token');
+    if (!token) {
+      msg.className = 'cart-msg is-err';
+      msg.innerHTML = 'Log eerst in om te bestellen. <a href="/login">Naar inloggen →</a>';
+      return;
+    }
+
     msg.textContent = 'Bezig met toevoegen…';
     btn.disabled = true;
     try {
-      const token = localStorage.getItem('sf_token');
+      const designId = makeDesignId();
+      const config = await buildProductionConfig(designId);
       const res = await fetch(`${API}/cart`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ productKey: PRODUCT_KEY, size: state.size, config: buildConfig() }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productKey: PRODUCT_KEY, size: state.size, config }),
       });
       if (res.status === 401) {
         msg.className = 'cart-msg is-err';
@@ -544,7 +702,7 @@ function wireActions() {
       }
     } catch (e) {
       msg.className = 'cart-msg is-err';
-      msg.textContent = 'Geen verbinding met de server.';
+      msg.textContent = e?.message || 'Geen verbinding met de server.';
     }
     btn.disabled = !state.size;
   });
@@ -565,6 +723,7 @@ function wireActions() {
     state.colors = defaultColors();
     state.artworkTransform = defaultArtworkTransform();
     state.hasArtwork = false; state.hasLogo = false;
+    state.artworkFile = null; state.logoFile = null;
     state.name = ''; state.size = '';
     state.nameFont = NAME_FONTS[0].id; state.nameSize = 'm'; state.nameColor = 'White';
     if (FULL_ZONE) viewer.setZoneArtwork(FULL_ZONE.id, null);

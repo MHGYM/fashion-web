@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, ShoppingBag, Tag, Home, Image as ImageIcon,
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp,
   ArrowLeft, Eye, EyeOff, Search, RefreshCw, Star, Shield, CalendarClock, Percent,
-  Euro, Users
+  Euro, Users, Download, FileText
 } from 'lucide-react'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
@@ -691,6 +691,78 @@ function CategoriesTab({ categories, onRefresh }) {
   )
 }
 
+// ── Productiebestanden (custom-configurator order-items) ───────────────────
+function parseCustomConfig(raw) {
+  if (!raw) return null
+  try { const c = JSON.parse(raw); return c && typeof c === 'object' ? c : null } catch { return null }
+}
+
+/** PRODUCTIEBESTANDEN — alleen zichtbaar onder order-items die uit de
+ *  configurator komen (custom_config aanwezig). Render null voor gewone
+ *  producten, dus geen enkel visueel verschil voor de rest van de lijst. */
+function ProductionFiles({ orderId, item }) {
+  const config = parseCustomConfig(item.custom_config)
+  if (!config) return null
+
+  const download = async (kind) => {
+    try {
+      const endpoint = kind === 'pdf' ? 'production-spec.pdf' : 'production-package.zip'
+      const res = await api.get(`/orders/admin/${orderId}/items/${item.id}/${endpoint}`, { responseType: 'blob' })
+      const blobUrl = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = kind === 'pdf'
+        ? `production-spec-${config.designId || item.id}.pdf`
+        : `${config.designId || `order-${orderId}-item-${item.id}`}.zip`
+      a.click()
+      URL.revokeObjectURL(blobUrl)
+    } catch (e) {
+      alert('Downloaden mislukt.')
+    }
+  }
+
+  const frontImage = config.customImage || null
+  const wristLogo = config.wristLogo || (config.logo ? { placement: 'Manchet', originalUrl: config.logo.url, artworkUrl: config.logo.url } : null)
+
+  const linkBtn = { padding:'6px 11px', border:'1px solid #ddd', borderRadius:6, background:'#fff', cursor:'pointer', fontSize:'0.76rem', fontWeight:600, display:'inline-flex', alignItems:'center', gap:5, marginRight:8, marginBottom:8, textDecoration:'none', color:'#333' }
+
+  return (
+    <div style={{ marginTop:10, padding:'12px 14px', background:'#fafafa', border:'1px solid #eee', borderRadius:8 }}>
+      <div style={{ fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.1em', color:'#999', textTransform:'uppercase', marginBottom:9 }}>
+        Productiebestanden{config.designId ? ` · ${config.designId}` : ''}
+      </div>
+
+      {config.glovePreviewUrl && (
+        <img src={config.glovePreviewUrl} alt="Preview van de geconfigureerde handschoen"
+          style={{ width:130, height:130, objectFit:'contain', borderRadius:6, border:'1px solid #eee', background:'#fff', marginBottom:10, display:'block' }} />
+      )}
+
+      {frontImage && (
+        <div style={{ marginBottom:6 }}>
+          <div style={{ fontSize:'0.76rem', fontWeight:600, marginBottom:4, color:'#555' }}>Front Panel-afbeelding</div>
+          {frontImage.originalUrl && <a href={frontImage.originalUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}><Download size={12}/> Origineel bestand downloaden</a>}
+          {frontImage.artworkUrl && <a href={frontImage.artworkUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}><Download size={12}/> Productie-artwork downloaden</a>}
+        </div>
+      )}
+
+      {wristLogo && (
+        <div style={{ marginBottom:6 }}>
+          <div style={{ fontSize:'0.76rem', fontWeight:600, marginBottom:4, color:'#555' }}>Manchet-logo</div>
+          {wristLogo.originalUrl && <a href={wristLogo.originalUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}><Download size={12}/> Origineel bestand downloaden</a>}
+          {wristLogo.artworkUrl && wristLogo.artworkUrl !== wristLogo.originalUrl && <a href={wristLogo.artworkUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}><Download size={12}/> Productie-artwork downloaden</a>}
+        </div>
+      )}
+
+      <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid #eee' }}>
+        <button type="button" onClick={() => download('pdf')} style={linkBtn}><FileText size={12}/> Productiespecificatie downloaden</button>
+        <button type="button" onClick={() => download('zip')} style={{ ...linkBtn, background:'#000', color:'#fff', borderColor:'#000' }}>
+          <Download size={12}/> Download productiepakket
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Orders tab ────────────────────────────────────────────────────────────────
 function OrdersTab({ orders, onStatusChange, onRefresh }) {
   const [filter,      setFilter]  = useState('all')
@@ -778,12 +850,15 @@ function OrdersTab({ orders, onStatusChange, onRefresh }) {
                 <div style={{ marginBottom:'1.5rem' }}>
                   <div style={{ fontSize:'0.7rem', fontWeight:700, letterSpacing:'0.12em', color:'#aaa', textTransform:'uppercase', marginBottom:'0.75rem' }}>Producten</div>
                   {detailOrder.items?.map((item, i) => (
-                    <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid #f5f5f5' }}>
-                      <div>
-                        <div style={{ fontWeight:600, fontSize:'0.9rem' }}>{item.name}</div>
-                        <div style={{ fontSize:'0.78rem', color:'#888' }}>Maat: {item.size}{item.color ? ` · ${item.color}` : ''} · Aantal: {item.quantity}</div>
+                    <div key={i} style={{ padding:'10px 0', borderBottom:'1px solid #f5f5f5' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between' }}>
+                        <div>
+                          <div style={{ fontWeight:600, fontSize:'0.9rem' }}>{item.name}</div>
+                          <div style={{ fontSize:'0.78rem', color:'#888' }}>Maat: {item.size}{item.color ? ` · ${item.color}` : ''} · Aantal: {item.quantity}</div>
+                        </div>
+                        <div style={{ fontWeight:700, fontSize:'0.9rem' }}>€{(Number(item.price) * item.quantity).toFixed(2)}</div>
                       </div>
-                      <div style={{ fontWeight:700, fontSize:'0.9rem' }}>€{(Number(item.price) * item.quantity).toFixed(2)}</div>
+                      <ProductionFiles orderId={detailOrder.id} item={item} />
                     </div>
                   ))}
                 </div>

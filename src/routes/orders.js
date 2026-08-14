@@ -9,4 +9,6 @@ router.get('/admin', authenticate, requireAdmin, ctrl.adminListOrders)
 router.get('/admin/:id', authenticate, requireAdmin, ctrl.adminGetOrder)
 router.put('/admin/:id/status', authenticate, requireAdmin, ctrl.adminUpdateOrderStatus)
 router.delete('/admin/:id', authenticate, requireAdmin, ctrl.adminDeleteOrder)
+router.get('/admin/:id/items/:itemId/production-spec.pdf', authenticate, requireAdmin, ctrl.adminProductionSpecPdf)
+router.get('/admin/:id/items/:itemId/production-package.zip', authenticate, requireAdmin, ctrl.adminProductionZip)
 module.exports = router

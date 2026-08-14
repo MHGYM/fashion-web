@@ -187,11 +187,12 @@ export function createGloveViewer(canvas, opts = {}) {
      ondersteboven belandt. Een decal wordt in 3D geprojecteerd op het punt
      dat de klant vóór zich ziet, dus positie en oriëntatie kloppen altijd —
      ook bij een ander model.                                              */
-  function repaintBadge(zoneId) {
-    const z = zones[zoneId];
-    if (!z || !z.badgeCtx) return;
-    const { badgeCtx: ctx, badgeCanvas: c } = z;
-    const W = c.width, H = c.height;
+  /** Zuivere tekenfunctie (canvas-afmeting/badge-data als parameter) zodat
+   *  dezelfde opmaak ook op een aparte, grotere canvas gebruikt kan worden
+   *  voor een hoge-resolutie productie-export — zonder de live badge-canvas
+   *  (512×512, zie repaintBadge) aan te raken. Alle maten zijn relatief aan
+   *  W/H, dus dit schaalt naar elke canvasgrootte. */
+  function paintBadge(ctx, W, H, b) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
@@ -202,7 +203,7 @@ export function createGloveViewer(canvas, opts = {}) {
     // maar een smalle horizontale band frontaal zichtbaar (boven verdwijnt hij
     // onder de handschoen, onder krult hij weg). Boven elkaar zetten laat het
     // bovenste element buiten beeld vallen.
-    const b = z.badge || {};
+    b = b || {};
     const BASE_Y = H * 0.66;              // hoogte binnen de zichtbare band
     const gap = W * 0.03;
 
@@ -252,6 +253,12 @@ export function createGloveViewer(canvas, opts = {}) {
       ctx.fillStyle = base;
       ctx.fillText(label, cursor, BASE_Y, maxW);
     }
+  }
+
+  function repaintBadge(zoneId) {
+    const z = zones[zoneId];
+    if (!z || !z.badgeCtx) return;
+    paintBadge(z.badgeCtx, z.badgeCanvas.width, z.badgeCanvas.height, z.badge);
     z.badgeTexture.needsUpdate = true;
   }
 
@@ -562,6 +569,48 @@ export function createGloveViewer(canvas, opts = {}) {
     repaintBadge(zoneId);
   }
 
+  /** Rendert het huidige artwork van een zone op een NIEUWE, losstaande canvas
+   *  op `size`×`size` — voor productie-export, dus onafhankelijk van TEX_SIZE
+   *  (de kleinere, prestatiegerichte canvas die de live 3D-textuur draagt).
+   *  Retourneert null als de zone geen (ondersteunde) artwork-laag heeft of
+   *  leeg is. Raakt de live 3D-scene niet aan. */
+  function getZoneArtworkCanvas(zoneId, size = 2048) {
+    if (zoneId === FULL_ZONE_ID) {
+      if (!frontArtwork?.state?.img) return null;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      drawCoverImage(c.getContext('2d'), size, size, frontArtwork.state.img, frontArtwork.state.transform);
+      return c;
+    }
+    const z = zones[zoneId];
+    if (z?.badge && (z.badge.img || z.badge.text)) {
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      paintBadge(c.getContext('2d'), size, size, z.badge);
+      return c;
+    }
+    return null;
+  }
+
+  /** Rendert één frame op `width`×`height` en geeft een PNG data-URL terug,
+   *  voor een scherpe glove-preview t.b.v. productie-export. Herstelt de
+   *  live viewport meteen na het lezen van de pixels — er wordt tussentijds
+   *  niet geyield naar het scherm, dus de klant ziet geen flits/sprong. */
+  function captureHighResPNG({ width = 1600, height = 1600, preset } = {}) {
+    const prevPixelRatio = renderer.getPixelRatio();
+    if (preset) goToPreset(preset, 0);
+    renderer.setPixelRatio(1);
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderNow();
+    const dataUrl = canvas.toDataURL('image/png');
+    renderer.setPixelRatio(prevPixelRatio);
+    resize();
+    renderNow();
+    return dataUrl;
+  }
+
   /** Zoomt in (factor < 1) of uit (factor > 1), binnen de grenzen van OrbitControls. */
   function zoom(factor) {
     const dir = camera.position.clone().sub(controls.target);
@@ -629,6 +678,8 @@ export function createGloveViewer(canvas, opts = {}) {
     setZoneArtwork,
     setZoneArtworkTransform,
     setZoneBadge,
+    getZoneArtworkCanvas,
+    captureHighResPNG,
     goToPreset,
     zoom,
     resize,
