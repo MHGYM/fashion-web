@@ -3,9 +3,19 @@ const { bad } = require('../middleware/validate')
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)
 
-// Moet gelijk blijven aan PRICING.nameEmbroiderySurcharge in de frontend-config.
+// Moet gelijk blijven aan PRICING.nameEmbroiderySurcharge in client/src/customizer/config.js
+// (de oude, los toegankelijke SVG-customizer voor o.a. Custom Shin Guards).
 const NAME_EMBROIDERY = 10
 const CUSTOM_SLUGS = ['custom-gloves', 'custom-shinguards']
+
+// Vaste prijsopbouw voor de bokshandschoen-configurator (3D). Moet exact
+// gelijk blijven aan PRICING in client/public/configurator/js/zones.js.
+// Bewust NIET afgeleid van products.price: die kolom wordt door de seed in
+// schema.js bij elke serverstart teruggezet naar een vaste waarde, dus een
+// los aangepast products.price-record zou hier stilzwijgend genegeerd
+// worden — deze constante is de daadwerkelijke bron van waarheid voor wat
+// een klant betaalt.
+const CUSTOM_GLOVE_PRICING = { base: 129.95, customLogo: 12.95, wristName: 12.95 }
 
 /** GET /api/customizer/products — de twee custom producten + maten→variant_id + basisprijs */
 const products = wrap(async (req, res) => {
@@ -41,8 +51,26 @@ const addToCart = wrap(async (req, res) => {
   const variant = vR.rows[0]
   if (!variant) return bad(res, 'Ongeldige maat.')
 
-  const embroidered = config?.name?.style === 'Embroidered'
-  const price = Math.round((product.price + (embroidered ? NAME_EMBROIDERY : 0)) * 100) / 100
+  // Geldt voor beide customizer-varianten: de 3D-configurator zet nooit een
+  // `name.style` (daar is een ingevulde naam altijd geborduurd), de oude SVG-
+  // customizer wél ('Printed' | 'Embroidered'). Alleen expliciet 'Printed'
+  // is dus toeslagvrij; elke andere ingevulde naam (incl. geen style-veld)
+  // telt als borduring.
+  const embroidered = !!config?.name && config.name.style !== 'Printed'
+
+  let price
+  if (productKey === 'custom-gloves') {
+    // Eigen logo/afbeelding: 3D-configurator zet customImage en/of
+    // wristLogo, de oude SVG-customizer zet logo — één vaste toeslag,
+    // ongeacht welke van deze gebruikt is of of er meerdere tegelijk zijn.
+    const hasLogo = !!(config?.customImage || config?.wristLogo || config?.logo)
+    price = CUSTOM_GLOVE_PRICING.base
+      + (hasLogo ? CUSTOM_GLOVE_PRICING.customLogo : 0)
+      + (embroidered ? CUSTOM_GLOVE_PRICING.wristName : 0)
+  } else {
+    price = product.price + (embroidered ? NAME_EMBROIDERY : 0)
+  }
+  price = Math.round(price * 100) / 100
 
   const configStr = JSON.stringify(config)
   if (configStr.length > 8000) return bad(res, 'Configuratie te groot.')

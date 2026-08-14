@@ -234,7 +234,13 @@ async function ensureSchema() {
         if (!v.rows[0]) await db.execute({ sql: 'INSERT INTO product_variants (product_id, size, stock) VALUES (?,?,9999)', args: [pid, size] })
       }
     }
-    await seedCustom('custom-gloves',     'Custom Gloves',      69.95, ['8oz', '10oz', '12oz', '14oz', '16oz'])
+    // 129.95 moet gelijk blijven aan PRICING.base in
+    // client/public/configurator/js/zones.js EN aan CUSTOM_GLOVE_PRICING.base
+    // in customizerController.js — dit is de basisprijs die de klant overal
+    // ziet en betaalt. Was per ongeluk 69.95 (oude/nooit-bijgewerkte waarde),
+    // waardoor de daadwerkelijk in rekening gebrachte prijs structureel
+    // afweek van wat de configurator liet zien.
+    await seedCustom('custom-gloves',     'Custom Gloves',      129.95, ['8oz', '10oz', '12oz', '14oz', '16oz'])
     await seedCustom('custom-shinguards', 'Custom Shin Guards', 49.95, ['S', 'M', 'L', 'XL'])
   } catch (e) { console.error('[DB] custom-producten seed:', e.message) }
 
