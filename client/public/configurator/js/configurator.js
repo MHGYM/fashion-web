@@ -304,10 +304,14 @@ function buildZoneEditor() {
 
   if (zone.artwork === 'full') {
     box.appendChild(el('div', 'divider'));
-    const hFull = el('h2', 'card-title', 'Eigen afbeelding');
+    // "Eigen logo", niet "Eigen afbeelding": moet letterlijk overeenkomen met
+    // de regel "Eigen logo" die renderPrice() al toont, anders herkent een
+    // klant dit niet als dezelfde toeslag/functie.
+    const hFull = el('h2', 'card-title', 'Eigen logo');
     hFull.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.customLogo)}`));
     box.appendChild(hFull);
-    const dz = dropzone('Sleep je afbeelding hierheen', 'of klik om te kiezen · PNG, JPG of SVG · max 5MB',
+    box.appendChild(el('p', 'hint', 'Upload je eigen logo op de Front Panel — het dekt automatisch het hele paneel én de duim, als één geheel.'));
+    const dz = dropzone('Sleep je logo hierheen', 'of klik om te kiezen · PNG, JPG of SVG · max 5MB',
       (img) => {
         state.artworkTransform = defaultArtworkTransform();
         state.hasArtwork = true;
@@ -323,7 +327,7 @@ function buildZoneEditor() {
       const sy = slider('Verticaal', 'y', -0.5, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`);
       const ss = slider('Grootte', 'scale', 0.2, 3, 0.01, (v) => `${Math.round(v * 100)}%`);
       const sr = slider('Rotatie', 'rotation', -180, 180, 1, (v) => `${Math.round(v)}°`);
-      const clear = el('button', 'btn btn-quiet btn-full', 'Afbeelding verwijderen');
+      const clear = el('button', 'btn btn-quiet btn-full', 'Logo verwijderen');
       clear.type = 'button';
       clear.addEventListener('click', () => {
         state.hasArtwork = false;
