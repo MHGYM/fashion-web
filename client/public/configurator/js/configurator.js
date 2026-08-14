@@ -304,7 +304,9 @@ function buildZoneEditor() {
 
   if (zone.artwork === 'full') {
     box.appendChild(el('div', 'divider'));
-    box.appendChild(el('h2', 'card-title', 'Eigen afbeelding'));
+    const hFull = el('h2', 'card-title', 'Eigen afbeelding');
+    hFull.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.customLogo)}`));
+    box.appendChild(hFull);
     const dz = dropzone('Sleep je afbeelding hierheen', 'of klik om te kiezen · PNG, JPG of SVG · max 5MB',
       (img) => {
         state.artworkTransform = defaultArtworkTransform();
@@ -335,7 +337,12 @@ function buildZoneEditor() {
 
   if (zone.artwork === 'badge') {
     box.appendChild(el('div', 'divider'));
-    box.appendChild(el('h2', 'card-title', 'Logo op de manchet'));
+    const hBadge = el('h2', 'card-title', 'Logo op de manchet');
+    // Zelfde toeslag als de Front Panel-afbeelding (zie renderPrice): één
+    // vaste prijs voor "eigen logo/afbeelding", niet gestapeld als de klant
+    // toevallig beide gebruikt.
+    hBadge.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.customLogo)}`));
+    box.appendChild(hBadge);
     const dz = dropzone('Sleep je logo hierheen', 'of klik om te kiezen · PNG met transparantie werkt het best',
       (img) => {
         state.hasLogo = true;
@@ -421,9 +428,11 @@ function buildSizePanel() {
 
 function renderPrice() {
   const rows = [['Handschoen', PRICING.base]];
-  if (state.hasArtwork) rows.push(['Eigen afbeelding', PRICING.customImage]);
-  if (state.name.trim()) rows.push(['Naam op manchet', PRICING.wristName]);
-  if (state.hasLogo) rows.push(['Logo op manchet', PRICING.wristLogo]);
+  // Eén vaste toeslag voor "een eigen logo/afbeelding gebruiken", ongeacht
+  // of dat via de Front Panel-afbeelding, het manchet-logo, of allebei is —
+  // geen dubbele toeslag voor wat de klant als één keuze ervaart.
+  if (state.hasArtwork || state.hasLogo) rows.push(['Eigen logo', PRICING.customLogo]);
+  if (state.name.trim()) rows.push(['Naam borduren', PRICING.wristName]);
 
   const wrap = $('price-rows');
   wrap.innerHTML = '';

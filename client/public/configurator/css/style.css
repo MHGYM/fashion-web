@@ -107,6 +107,12 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   font-weight: 500; letter-spacing: .04em; text-transform: none;
   color: var(--muted); font-size: .68rem;
 }
+.price-tag {
+  display: inline-block; margin-left: 8px; vertical-align: middle;
+  font-size: .62rem; font-weight: 800; letter-spacing: .04em; text-transform: none;
+  color: var(--gold); background: var(--gold-dim); border: 1px solid var(--gold-line);
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
 
 /* ── Model kiezen (compacte rij, geen eigen kaart) ───────────────────────── */
 .model-row { display: flex; align-items: center; gap: 12px; }

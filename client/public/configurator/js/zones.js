@@ -116,12 +116,16 @@ export const SIZES = ['8oz', '10oz', '12oz', '14oz', '16oz'];
 /**
  * Prijsopbouw. De server rekent bij het toevoegen aan de winkelwagen de
  * definitieve prijs opnieuw uit — dit is voor de weergave in de UI.
+ *
+ * customLogo geldt EENMALIG voor "een eigen logo/afbeelding gebruiken",
+ * ongeacht of dat de doorlopende Front Panel-afbeelding is, het losse
+ * logo op de manchet, of allebei tegelijk — de klant betaalt niet twee
+ * keer voor wat voor hen één en dezelfde keuze is ("ik upload iets").
  */
 export const PRICING = {
-  base: 69.95,
-  customImage: 20.00,   // eigen afbeelding op het front panel
-  wristName: 10.00,     // naam op de manchet
-  wristLogo: 15.00,     // eigen logo op de manchet
+  base: 129.95,
+  customLogo: 12.95,    // eigen logo/afbeelding (Front Panel en/of manchet)
+  wristName: 12.95,     // naam borduren op de manchet
 };
 
 /** Lettertypes voor de naam op de manchet. */

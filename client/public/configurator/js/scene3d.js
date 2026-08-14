@@ -37,6 +37,18 @@ import { ZONE_IDS, ZONE_BY_ID } from './zones.js';
 const COLOR_LERP_SPEED = 8;
 const TEX_SIZE = 1024;   // canvas per zone; groot genoeg voor scherpe uploads
 
+/** Verduistert (amt<0) of verlicht (amt>0) een hex-kleur met amt ∈ [-1,1].
+ *  Gebruikt om een donkerdere tint van dezelfde kleur te krijgen voor het
+ *  borduur-effect, zonder een aparte kleur te hoeven kiezen. */
+function shadeColor(hex, amt) {
+  const c = (hex || '#FFFFFF').replace('#', '');
+  const full = c.length === 3 ? c.split('').map((x) => x + x).join('') : c;
+  const num = parseInt(full, 16) || 0xffffff;
+  const r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v + (amt < 0 ? -v : 255 - v) * Math.abs(amt))));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+
 // Welke zone de 'volledige afbeelding'-upload draagt — bepaald uit de data
 // (zones.js), niet hardcoded op een zone-id, zodat dit generiek blijft.
 const FULL_ZONE_ID = ZONE_IDS.find((id) => ZONE_BY_ID[id].artwork === 'full') || null;
@@ -218,11 +230,27 @@ export function createGloveViewer(canvas, opts = {}) {
       cursor += logoW + gap;
     }
     if (b.text) {
-      ctx.fillStyle = b.textColor || '#FFFFFF';
+      // Borduureffect i.p.v. platte print: een donker, licht verschoven
+      // schaduwlaagje geeft de tekst diepte (het reliëf van draad op stof),
+      // en een dunne omtreklijn in een donkerdere tint van dezelfde kleur
+      // simuleert de dichte steekrand van satijnsteek-borduurwerk.
+      const label = b.text.toUpperCase();
+      const base = b.textColor || '#FFFFFF';
       ctx.font = fontCss;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(b.text.toUpperCase(), cursor, BASE_Y, W * 0.5);
+      const maxW = W * 0.5;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillText(label, cursor + fontSize * 0.035, BASE_Y + fontSize * 0.05, maxW);
+
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(1, fontSize * 0.05);
+      ctx.strokeStyle = shadeColor(base, -0.45);
+      ctx.strokeText(label, cursor, BASE_Y, maxW);
+
+      ctx.fillStyle = base;
+      ctx.fillText(label, cursor, BASE_Y, maxW);
     }
     z.badgeTexture.needsUpdate = true;
   }
