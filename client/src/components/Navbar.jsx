@@ -17,7 +17,11 @@ export default function Navbar() {
 
         <div className="navbar-links">
           <Link to="/shop">Shop</Link>
-          <Link to="/customize">Customise ✨</Link>
+          {/* Gewone <a>, geen React-Router <Link>: /configurator/ is een losse
+              statische pagina buiten de SPA. Een <Link> zou hier proberen
+              client-side te routeren en op de SPA's 404 uitkomen i.p.v. een
+              echte paginalaad te doen. */}
+          <a href="/configurator/">Customise ✨</a>
           <Link to="/scholen">Scholen</Link>
           <Link to="/shop?gender=men">Heren</Link>
           <Link to="/shop?gender=women">Dames</Link>
@@ -48,7 +52,12 @@ export default function Navbar() {
 
       {menuOpen && (
         <div className="navbar-mobile-menu">
-          {[['/', 'Home'], ['/shop', 'Shop'], ['/customize', 'Customise ✨'], ['/scholen', 'Scholen'], ['/shop?gender=men', 'Heren'], ['/shop?gender=women', 'Dames'], ['/shop?sale=1', 'Sale']].map(([to, label]) => (
+          <Link to="/" onClick={() => setMenuOpen(false)}>Home</Link>
+          <Link to="/shop" onClick={() => setMenuOpen(false)}>Shop</Link>
+          {/* Zelfde reden als hierboven: echte paginalaad naar de losse
+              statische configurator-pagina, geen SPA-route. */}
+          <a href="/configurator/" onClick={() => setMenuOpen(false)}>Customise ✨</a>
+          {[['/scholen', 'Scholen'], ['/shop?gender=men', 'Heren'], ['/shop?gender=women', 'Dames'], ['/shop?sale=1', 'Sale']].map(([to, label]) => (
             <Link key={to} to={to} onClick={() => setMenuOpen(false)}>{label}</Link>
           ))}
           {user ? (
