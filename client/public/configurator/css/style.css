@@ -156,6 +156,37 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   color: var(--muted);
 }
 
+/* ── Inklapbare kleursectie ────────────────────────────────────────────── */
+.color-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 0 0 12px; margin: 0; background: none; border: 0;
+  font-size: .72rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--text-2); text-align: left; cursor: pointer;
+}
+.color-toggle:hover { color: var(--text); }
+.color-toggle-label { flex: 0 0 auto; }
+.color-toggle-dot {
+  width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,.24);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.25), 0 1px 3px rgba(0,0,0,.4);
+}
+.color-toggle-chev {
+  width: 14px; height: 14px; margin-left: auto; flex-shrink: 0;
+  color: var(--muted); stroke-width: 2.3px; transition: transform .2s ease, color .18s;
+}
+.color-toggle:hover .color-toggle-chev { color: var(--text-2); }
+.color-toggle[aria-expanded="true"] .color-toggle-chev { transform: rotate(180deg); }
+
+/* max-height-transitie i.p.v. grid-template-rows (fr-eenheden animeren niet
+   overal betrouwbaar) — universeel ondersteund, ondubbelzinnig gedrag.
+   600px is ruim genoeg voor 16 zwatches in een 8-koloms grid; het palet
+   zelf bepaalt de zichtbare hoogte, deze waarde is alleen het plafond. */
+.color-panel {
+  max-height: 0; overflow: hidden;
+  transition: max-height .25s ease;
+}
+.color-panel.is-open { max-height: 600px; }
+
 /* ── Swatches ──────────────────────────────────────────────────────────── */
 .swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 9px; }
 .swatch {

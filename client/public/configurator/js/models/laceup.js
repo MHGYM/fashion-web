@@ -38,9 +38,16 @@ export default {
     top:   { theta: 0.55,           phi: 0.42 },
   },
 
+  // Matte afwerking: geen clearcoat (dat gaf een scherpe glans-highlight die
+  // over geüploade logo's/artwork heen liep), hogere roughness voor zachte
+  // in plaats van harde lichtreflecties, lagere envMapIntensity zodat de
+  // studio-omgeving niet als zichtbare witte glans terugkaatst. roughness
+  // blijft < 1 en envMapIntensity blijft > 0 zodat de vorm van de handschoen
+  // nog steeds met zachte shading leesbaar blijft — geen plat/cartoonachtig
+  // materiaal.
   materialDefaults: {
-    roughness: 0.42, metalness: 0.02,
-    clearcoat: 0.26, clearcoatRoughness: 0.28, envMapIntensity: 1.0,
+    roughness: 0.78, metalness: 0.0,
+    clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
   },
 
   bindings: {

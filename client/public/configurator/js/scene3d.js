@@ -286,9 +286,11 @@ export function createGloveViewer(canvas, opts = {}) {
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
 
+    // Zelfde matte richting als de andere materialen, zodat de manchet niet
+    // opvallend glanziger oogt dan de rest van de handschoen.
     const decal = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
       map: tex, transparent: true, depthTest: true, depthWrite: false,
-      polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.5, metalness: 0.05,
+      polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.75, metalness: 0,
     }));
     decal.renderOrder = 10;
     scene.add(decal);
@@ -359,11 +361,16 @@ export function createGloveViewer(canvas, opts = {}) {
     tex.colorSpace = THREE.SRGBColorSpace;
 
     const d = materialDefaults || {};
+    // Zelfde matte instellingen als de zone-materialen (zie hierboven) — dit
+    // is letterlijk het materiaal dat een geüpload logo draagt, dus juist
+    // hier is een scherpe glans-highlight het meest schadelijk voor de
+    // leesbaarheid.
     const material = new THREE.MeshPhysicalMaterial({
       map: tex, transparent: false, depthTest: true, depthWrite: true,
       polygonOffset: true, polygonOffsetFactor: -2,
-      roughness: d.roughness ?? 0.45, metalness: d.metalness ?? 0.02,
-      clearcoat: d.clearcoat ?? 0.22, clearcoatRoughness: d.clearcoatRoughness ?? 0.3,
+      roughness: d.roughness ?? 0.78, metalness: d.metalness ?? 0.0,
+      clearcoat: d.clearcoat ?? 0, clearcoatRoughness: d.clearcoatRoughness ?? 1,
+      envMapIntensity: d.envMapIntensity ?? 0.4,
     });
 
     const decalMeshes = meshes.map((mesh) => {
@@ -460,11 +467,13 @@ export function createGloveViewer(canvas, opts = {}) {
         const material = new THREE.MeshPhysicalMaterial({
           map: texture,
           color: 0xffffff,               // wit: de textuur bepaalt de kleur
-          roughness: d.roughness ?? 0.45,
-          metalness: d.metalness ?? 0.02,
-          clearcoat: d.clearcoat ?? 0.22,
-          clearcoatRoughness: d.clearcoatRoughness ?? 0.3,
-          envMapIntensity: d.envMapIntensity ?? 1.0,
+          // Matte fallback (zie models/*.js voor de toelichting) — geldt
+          // alleen als een toekomstig model-profiel geen materialDefaults zet.
+          roughness: d.roughness ?? 0.78,
+          metalness: d.metalness ?? 0.0,
+          clearcoat: d.clearcoat ?? 0,
+          clearcoatRoughness: d.clearcoatRoughness ?? 1,
+          envMapIntensity: d.envMapIntensity ?? 0.4,
         });
         mesh.material = material;
 

@@ -38,6 +38,11 @@ const state = {
 
 const euro = (n) => '€' + n.toFixed(2).replace('.', ',');
 
+// Puur UI-voorkeur (in-/uitgeklapt), geen onderdeel van de configuratie:
+// niet in `state`, dus niet opgeslagen/gedeeld. Blijft wel gelden zolang de
+// klant tussen zones wisselt, tot de pagina herlaadt.
+let colorPanelOpen = true;
+
 /* ── Opslag + deelbare link ───────────────────────────────────────────── */
 // Alleen instellingen, geen afbeeldingen: die zijn te groot voor een URL en
 // blijven bij de klant tot ze bij het bestellen geüpload worden.
@@ -294,13 +299,37 @@ function buildZoneEditor() {
   $('stage-title').textContent = zone.label;
   $('stage-hint').textContent = zone.hint;
 
-  box.appendChild(el('h2', 'card-title', 'Kleur'));
-  box.appendChild(swatchGrid(state.colors[zone.id], (c) => {
+  // Inklapbare kleursectie: dicht toont alleen "KLEUR" + de gekozen kleur
+  // (de stip in de header, altijd zichtbaar, ook ingeklapt); open toont het
+  // volledige palet. Toggle herbouwt bewust NIET de hele editor — dat zou
+  // bij het kiezen van een kleur het paneel weer laten "springen".
+  const colorHead = el('button', 'color-toggle');
+  colorHead.type = 'button';
+  colorHead.setAttribute('aria-expanded', String(colorPanelOpen));
+  const colorDot = el('span', 'color-toggle-dot');
+  colorDot.style.background = hexOf(state.colors[zone.id]);
+  const chev = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  chev.setAttribute('viewBox', '0 0 24 24');
+  chev.setAttribute('class', 'color-toggle-chev');
+  chev.setAttribute('aria-hidden', 'true');
+  chev.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
+  colorHead.append(el('span', 'color-toggle-label', 'Kleur'), colorDot, chev);
+  colorHead.addEventListener('click', () => {
+    colorPanelOpen = !colorPanelOpen;
+    colorHead.setAttribute('aria-expanded', String(colorPanelOpen));
+    colorPanel.classList.toggle('is-open', colorPanelOpen);
+  });
+  box.appendChild(colorHead);
+
+  const colorPanel = el('div', 'color-panel' + (colorPanelOpen ? ' is-open' : ''));
+  colorPanel.appendChild(swatchGrid(state.colors[zone.id], (c) => {
     state.colors[zone.id] = c.name;
     viewer.setZoneColor(zone.id, c.hex);
+    colorDot.style.background = c.hex;
     buildZoneTabs();
     save();
   }));
+  box.appendChild(colorPanel);
 
   if (zone.artwork === 'full') {
     box.appendChild(el('div', 'divider'));
