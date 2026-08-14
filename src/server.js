@@ -28,8 +28,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      // Productfoto's en video's mogen van externe hosts komen (Unsplash, CDN's)
-      'img-src':   ["'self'", 'data:', 'https:'],
+      // Productfoto's en video's mogen van externe hosts komen (Unsplash, CDN's).
+      // blob: is nodig voor de 3D-configurator: een geüploade afbeelding wordt
+      // via URL.createObjectURL() in een <img> geladen vóór hij op canvas
+      // getekend wordt (img-src, niet media-src — dit is geen <video>/<audio>).
+      'img-src':   ["'self'", 'data:', 'https:', 'blob:'],
       'media-src': ["'self'", 'data:', 'https:', 'blob:'],
       // 'wasm-unsafe-eval': staat WebAssembly.instantiate() toe (nodig voor de
       // meshopt-decoder van de 3D-configurator). Dit is NIET hetzelfde als
