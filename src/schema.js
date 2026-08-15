@@ -116,6 +116,12 @@ const PATCHES = [
 const HOMEPAGE_DEFAULTS = [
   ['hero_image',    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80'],
   ['hero_video',    ''],
+  // Achtergrondvideo van de Customizer-promosectie op de homepage (tussen hero
+  // en "Shop per categorie"). Startwaarde is de door de klant aangeleverde
+  // video, eenmalig gekopieerd naar UPLOADS_DIR — verder identiek behandeld
+  // als hero_video: door de admin te vervangen via Homepage-beheer, geen
+  // codewijziging nodig.
+  ['customizer_video', '/uploads/1786786705468-ubcb2dom87n.mp4'],
   ['hero_overline', 'Hét fight gear platform van Nederland'],
   ['hero_heading',  'JOUW CLUB.|JOUW GEAR.'],
   ['hero_cta',      'Ontdek de shop'],

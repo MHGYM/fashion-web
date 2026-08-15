@@ -247,6 +247,7 @@ const getHomepageSettings = wrap(async (req, res) => {
 const updateHomepageSettings = wrap(async (req, res) => {
   const allowed = [
     'hero_image', 'hero_video', 'hero_overline', 'hero_heading', 'hero_cta', 'hero_cta_link',
+    'customizer_video',
     'promo_visible', 'promo_image', 'promo_overline', 'promo_heading', 'promo_cta', 'promo_cta_link',
     'featured_title', 'sale_title',
     'usp1_title', 'usp1_sub', 'usp2_title', 'usp2_sub',

@@ -16,14 +16,14 @@ const CAT_FALLBACK = {
 }
 const DEFAULT_CAT_IMG = 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&q=80'
 
-// Achtergrondvideo van de Customizer-promotiesectie (hero <-> Shop per categorie).
-// Eenmalig via Admin -> Homepage geupload (bestaande hero-video-upload-knop),
-// URL hier overgenomen. Leeg = nette donkere gradient-achtergrond i.p.v. video.
-const CUSTOMIZER_PROMO_VIDEO = ''
-
 const HERO_DEFAULTS = {
   hero_image:    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80',
   hero_video:    '',
+  // Achtergrondvideo van de Customizer-promosectie (hero <-> Shop per
+  // categorie) — admin-beheerd homepage_setting (zie AdminPage.jsx
+  // HomepageSection), zelfde patroon als hero_video. Leeg = nette donkere
+  // gradient-achtergrond i.p.v. video (geen kapotte <video>-tag).
+  customizer_video: '',
   hero_overline: 'Hét fight gear platform van Nederland',
   hero_heading:  'JOUW CLUB.|JOUW GEAR.',
   hero_cta:      'Ontdek de shop',
@@ -130,10 +130,10 @@ export default function HomePage() {
           className="customizer-promo"
           aria-label="Start de configurator — ontwerp je eigen fight gear"
         >
-          {CUSTOMIZER_PROMO_VIDEO ? (
+          {hero.customizer_video ? (
             <video
               className="customizer-promo-bg"
-              src={CUSTOMIZER_PROMO_VIDEO}
+              src={hero.customizer_video}
               autoPlay loop muted playsInline
               ref={el => { if (el) el.muted = true }}
             />

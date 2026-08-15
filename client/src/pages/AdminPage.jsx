@@ -920,6 +920,7 @@ function HomepageSection() {
   const heroFileRef  = useRef()
   const heroVideoRef = useRef()
   const promoFileRef = useRef()
+  const customizerVideoRef = useRef()
   const [settings,     setSettings]     = useState(null)
   const [saving,       setSaving]       = useState(false)
   const [uploadingKey, setUploadingKey] = useState(null)
@@ -1006,6 +1007,30 @@ function HomepageSection() {
           )}
           <p style={{ fontSize:'0.7rem', color:'#aaa', marginTop:4 }}>Tip: kort MP4-fragment, geluidloos (speelt automatisch + herhaalt). Max 50MB — de foto blijft de fallback/poster.</p>
         </div>
+      </div>
+
+      {/* ── Customizer promo-video ── */}
+      <div style={{ marginBottom:'2rem' }}>
+        <div style={{ fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase', color:'#aaa', marginBottom:'0.875rem', paddingBottom:'0.5rem', borderBottom:'1px solid #f0f0f0' }}>Customizer promo-video</div>
+        <p style={{ fontSize:'0.78rem', color:'#888', marginBottom:'0.75rem' }}>Achtergrondvideo van het "Customize your gear"-blok op de homepage, tussen de hero en Shop per categorie.</p>
+        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          <button onClick={() => customizerVideoRef.current?.click()} disabled={uploadingKey === 'customizer_video'} className="btn btn-outline"
+            style={{ fontSize:'0.8rem', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
+            {uploadingKey === 'customizer_video' ? <><RefreshCw size={13} style={{ animation:'spin 1s linear infinite' }}/> Uploaden…</> : <><Upload size={13}/> Video uploaden</>}
+          </button>
+          <input className="input" value={settings.customizer_video || ''} onChange={e => set('customizer_video', e.target.value)}
+            placeholder="leeg = donkere gradient i.p.v. video" style={{ fontSize:'0.82rem', flex:1, minWidth:160 }}/>
+          {settings.customizer_video && (
+            <button onClick={() => set('customizer_video', '')} className="btn btn-outline" style={{ fontSize:'0.8rem', color:'#ef4444', whiteSpace:'nowrap' }}>Video weghalen</button>
+          )}
+        </div>
+        <input ref={customizerVideoRef} type="file" accept="video/*" style={{ display:'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage('customizer_video', f); e.target.value = '' }}/>
+        {settings.customizer_video && (
+          <video src={settings.customizer_video} muted loop autoPlay playsInline
+            style={{ marginTop:'0.6rem', width:'100%', maxHeight:180, objectFit:'cover', borderRadius:8, background:'#000' }}/>
+        )}
+        <p style={{ fontSize:'0.7rem', color:'#aaa', marginTop:4 }}>Tip: kort MP4-fragment, geluidloos. Max 50MB. Een nieuwe upload vervangt de huidige video meteen op de homepage.</p>
       </div>
 
       {/* ── Hero teksten ── */}
