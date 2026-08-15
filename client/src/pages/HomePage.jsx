@@ -218,22 +218,6 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Lege staat */}
-      {featured.length === 0 && sale.length === 0 && (
-        <section className="home-section">
-          <div className="home-section-inner" style={{ textAlign: 'center', padding: '6rem 0' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.15 }}>◻</div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-              Collectie komt eraan
-            </h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '0.9rem' }}>
-              Voeg je eerste producten toe via het admin panel.
-            </p>
-            <Link to="/shop" className="btn btn-black">Naar de shop</Link>
-          </div>
-        </section>
-      )}
-
       {/* ── USP balk (bewerkbaar via Homepage-editor) ─── */}
       <div className="usp-bar">
         {[
