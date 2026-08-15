@@ -12,9 +12,20 @@
 const fs = require('fs')
 const path = require('path')
 const PDFDocument = require('pdfkit')
-// archiver@8 is ESM-only met een class-API (geen archiver('zip',opts) meer).
-const { ZipArchive } = require('archiver')
 const { UPLOADS_DIR } = require('../config')
+
+// archiver@8 is ESM-only met een class-API (geen archiver('zip',opts) meer).
+// require() van een ESM-package werkt wel op sommige Node-versies (lokaal
+// getest op Node 24) maar NIET op Node 20 (o.a. Railway se productieomgeving
+// — ERR_REQUIRE_ESM, crashet de hele server bij het laden van deze module).
+// Dynamic import() is de enige manier die op alle Node-versies werkt vanuit
+// CommonJS; lazy + eenmalig gecachet zodat elke aanroep hem niet opnieuw
+// hoeft te laden.
+let zipArchiveModulePromise = null
+function loadZipArchive() {
+  if (!zipArchiveModulePromise) zipArchiveModulePromise = import('archiver').then((m) => m.ZipArchive)
+  return zipArchiveModulePromise
+}
 
 /** Parseert order_items.custom_config veilig. null bij afwezig/onleesbaar. */
 function parseCustomConfig(item) {
@@ -151,6 +162,7 @@ async function streamProductionZip(res, order, item, config) {
   res.setHeader('Content-Type', 'application/zip')
   res.setHeader('Content-Disposition', `attachment; filename="${folder}.zip"`)
 
+  const ZipArchive = await loadZipArchive()
   const archive = new ZipArchive({ zlib: { level: 9 } })
   archive.on('error', (err) => {
     console.error('[ZIP]', err.message)
