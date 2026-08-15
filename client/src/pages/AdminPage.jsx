@@ -737,6 +737,25 @@ function ProductionFiles({ orderId, item }) {
           style={{ width:130, height:130, objectFit:'contain', borderRadius:6, border:'1px solid #eee', background:'#fff', marginBottom:10, display:'block' }} />
       )}
 
+      {(config.modelLabel || config.modelProfile || config.style || config.colors || config.name?.text) && (
+        <div style={{ marginBottom:10, fontSize:'0.78rem', color:'#333', lineHeight:1.7 }}>
+          {(config.modelLabel || config.modelProfile || config.style) && (
+            <div><strong>Model:</strong> {config.modelLabel || config.modelProfile || config.style}</div>
+          )}
+          {config.colors && Object.keys(config.colors).length > 0 && (
+            <div>
+              <strong>Kleuren:</strong>{' '}
+              {Object.entries(config.colors).map(([zone, color], i) => (
+                <span key={zone}>{i > 0 ? ', ' : ''}{zone}: {color}</span>
+              ))}
+            </div>
+          )}
+          {config.name?.text && (
+            <div><strong>Naam:</strong> “{config.name.text}” · {config.name.color}{config.name.font ? ` · ${config.name.font}` : ''}</div>
+          )}
+        </div>
+      )}
+
       {frontImage && (
         <div style={{ marginBottom:6 }}>
           <div style={{ fontSize:'0.76rem', fontWeight:600, marginBottom:4, color:'#555' }}>Front Panel-afbeelding</div>
