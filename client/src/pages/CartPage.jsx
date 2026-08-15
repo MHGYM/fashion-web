@@ -10,7 +10,22 @@ const hexOf = name => PALETTE.find(p => p.name === name)?.hex || '#ccc'
 // Leesbare samenvatting van een custom ontwerp in de winkelwagen.
 function CustomSummary({ config }) {
   if (!config) return null
-  const { style, colors, name, logo, notes } = config
+  const { style, colors, name, logo, notes, customImage, wristLogo } = config
+
+  // Logo-thumbnails: de 3D-configurator zet customImage (Front Panel) en/of
+  // wristLogo (Manchet), de oudere SVG-customizer zet logo. Toont steeds het
+  // ORIGINELE geüploade bestand (nooit de upload zelf aanpassen — puur een
+  // <img>-verwijzing ter weergave), met het gepositioneerde artwork als
+  // terugval mocht er onverhoopt geen apart origineel zijn opgeslagen. Geen
+  // van beide aanwezig → simpelweg geen Logo-rij (nette fallback).
+  const logos = [
+    customImage && (customImage.originalUrl || customImage.artworkUrl)
+      ? { label: 'Front Panel', url: customImage.originalUrl || customImage.artworkUrl } : null,
+    wristLogo && (wristLogo.originalUrl || wristLogo.artworkUrl)
+      ? { label: 'Manchet', url: wristLogo.originalUrl || wristLogo.artworkUrl } : null,
+    (!customImage && !wristLogo && logo?.url) ? { label: logo.style || 'Logo', url: logo.url } : null,
+  ].filter(Boolean)
+
   return (
     <div className="cart-custom-summary">
       {style && <div className="ccs-row"><span className="ccs-key">Stijl</span><span>{style}</span></div>}
@@ -23,13 +38,17 @@ function CustomSummary({ config }) {
           </span>
         </div>
       ))}
-      {name && <div className="ccs-row"><span className="ccs-key">Naam</span><span>“{name.text}” · {name.color} · {name.style}</span></div>}
-      {logo && (
+      {name && <div className="ccs-row"><span className="ccs-key">Naam</span><span>“{name.text}” · {name.color}{name.style ? ` · ${name.style}` : ''}</span></div>}
+      {logos.length > 0 && (
         <div className="ccs-row">
           <span className="ccs-key">Logo</span>
-          <span className="ccs-color">
-            {logo.url && <img src={logo.url} alt="" className="ccs-logo" />}
-            {logo.style}
+          <span className="ccs-color ccs-logos">
+            {logos.map((l) => (
+              <span key={l.label} className="ccs-logo-item">
+                <img src={l.url} alt={`${l.label}-logo`} className="ccs-logo" />
+                <span className="ccs-logo-label">{l.label}</span>
+              </span>
+            ))}
           </span>
         </div>
       )}
