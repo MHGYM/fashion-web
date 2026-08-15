@@ -16,6 +16,11 @@ const CAT_FALLBACK = {
 }
 const DEFAULT_CAT_IMG = 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&q=80'
 
+// Achtergrondvideo van de Customizer-promotiesectie (hero <-> Shop per categorie).
+// Eenmalig via Admin -> Homepage geupload (bestaande hero-video-upload-knop),
+// URL hier overgenomen. Leeg = nette donkere gradient-achtergrond i.p.v. video.
+const CUSTOMIZER_PROMO_VIDEO = ''
+
 const HERO_DEFAULTS = {
   hero_image:    'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1920&q=80',
   hero_video:    '',
@@ -110,6 +115,40 @@ export default function HomePage() {
           <span>SCROLL</span>
           <div className="hero-scroll-line" />
         </div>
+      </section>
+
+      {/* ── Customizer-promo ─────────────────────────
+           Losstaand promotieblok, bewust NIET vol-breed zoals hero/categorieën:
+           een zwarte band + een los, afgerond kaart erin — dat maakt meteen
+           visueel duidelijk dat dit een ander soort blok is dan de categorie-
+           tegels eronder. Verwijst naar de bestaande statische configurator
+           (/configurator/), dus een gewone <a>, geen <Link>: React Router kent
+           dat pad niet, dat is een losse app buiten de SPA. */}
+      <section className="customizer-promo-section">
+        <a
+          href="/configurator/"
+          className="customizer-promo"
+          aria-label="Start de configurator — ontwerp je eigen fight gear"
+        >
+          {CUSTOMIZER_PROMO_VIDEO ? (
+            <video
+              className="customizer-promo-bg"
+              src={CUSTOMIZER_PROMO_VIDEO}
+              autoPlay loop muted playsInline
+              ref={el => { if (el) el.muted = true }}
+            />
+          ) : (
+            <div className="customizer-promo-bg customizer-promo-fallback-bg" />
+          )}
+          <div className="customizer-promo-overlay" />
+          <div className="customizer-promo-border" />
+          <div className="customizer-promo-content">
+            <h2 className="customizer-promo-heading">CUSTOMIZE<br />YOUR GEAR</h2>
+            <p className="customizer-promo-sub">Create your own gloves &amp; fight gear</p>
+            <span className="customizer-promo-cta">Start Customize <span aria-hidden="true">→</span></span>
+          </div>
+          <span className="customizer-promo-tagline">Design it. Make it yours.</span>
+        </a>
       </section>
 
       {/* ── Categorieën ──────────────────────────── */}
