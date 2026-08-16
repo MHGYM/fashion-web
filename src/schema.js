@@ -248,6 +248,10 @@ async function ensureSchema() {
     // afweek van wat de configurator liet zien.
     await seedCustom('custom-gloves',     'Custom Gloves',      129.95, ['8oz', '10oz', '12oz', '14oz', '16oz'])
     await seedCustom('custom-shinguards', 'Custom Shin Guards', 49.95, ['S', 'M', 'L', 'XL'])
+    // Prijs nog 0 (placeholder) — zie JERSEY_PRICING.base in
+    // client/src/configurator3d/jersey/zones.ts EN CUSTOM_JERSEY_PRICING.base
+    // in customizerController.js; alle drie moeten gelijk blijven.
+    await seedCustom('custom-jersey', 'Custom Fight Jersey', 0, ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'])
   } catch (e) { console.error('[DB] custom-producten seed:', e.message) }
 
   for (const [key, value] of HOMEPAGE_DEFAULTS) {

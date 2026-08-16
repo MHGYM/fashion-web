@@ -6,7 +6,7 @@ const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch
 // Moet gelijk blijven aan PRICING.nameEmbroiderySurcharge in client/src/customizer/config.js
 // (de oude, los toegankelijke SVG-customizer voor o.a. Custom Shin Guards).
 const NAME_EMBROIDERY = 10
-const CUSTOM_SLUGS = ['custom-gloves', 'custom-shinguards']
+const CUSTOM_SLUGS = ['custom-gloves', 'custom-shinguards', 'custom-jersey']
 
 // Vaste prijsopbouw voor de bokshandschoen-configurator (3D). Moet exact
 // gelijk blijven aan PRICING in client/public/configurator/js/zones.js.
@@ -16,6 +16,11 @@ const CUSTOM_SLUGS = ['custom-gloves', 'custom-shinguards']
 // worden — deze constante is de daadwerkelijke bron van waarheid voor wat
 // een klant betaalt.
 const CUSTOM_GLOVE_PRICING = { base: 129.95, customLogo: 12.95, wristName: 12.95 }
+
+// Moet exact gelijk blijven aan JERSEY_PRICING in
+// client/src/configurator3d/jersey/zones.ts — bewust nog op 0, de klant
+// vult dit later zelf in. Berekening (som) staat al klaar.
+const CUSTOM_JERSEY_PRICING = { base: 0, perLogo: 0, perTextLayer: 0 }
 
 /** GET /api/customizer/products — de twee custom producten + maten→variant_id + basisprijs */
 const products = wrap(async (req, res) => {
@@ -67,6 +72,17 @@ const addToCart = wrap(async (req, res) => {
     price = CUSTOM_GLOVE_PRICING.base
       + (hasLogo ? CUSTOM_GLOVE_PRICING.customLogo : 0)
       + (embroidered ? CUSTOM_GLOVE_PRICING.wristName : 0)
+  } else if (productKey === 'custom-jersey') {
+    const zones = (config && typeof config.zones === 'object') ? config.zones : {}
+    let logoCount = 0
+    let textCount = 0
+    for (const zone of Object.values(zones)) {
+      if (Array.isArray(zone?.logos)) logoCount += zone.logos.length
+      if (Array.isArray(zone?.texts)) textCount += zone.texts.length
+    }
+    price = CUSTOM_JERSEY_PRICING.base
+      + logoCount * CUSTOM_JERSEY_PRICING.perLogo
+      + textCount * CUSTOM_JERSEY_PRICING.perTextLayer
   } else {
     price = product.price + (embroidered ? NAME_EMBROIDERY : 0)
   }

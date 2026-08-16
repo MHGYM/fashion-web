@@ -11,6 +11,7 @@ const ShopPage            = lazy(() => import('./pages/ShopPage'))
 const ProductPage         = lazy(() => import('./pages/ProductPage'))
 const CartPage            = lazy(() => import('./pages/CartPage'))
 const CustomizePage       = lazy(() => import('./pages/CustomizePage'))
+const JerseyConfiguratorPage = lazy(() => import('./pages/JerseyConfiguratorPage'))
 const CheckoutPage        = lazy(() => import('./pages/CheckoutPage'))
 const AccountPage         = lazy(() => import('./pages/AccountPage'))
 const AdminPage           = lazy(() => import('./pages/AdminPage'))
@@ -41,6 +42,7 @@ function App() {
                 <Route path="/shop/:slug"  element={<ProductPage />} />
                 <Route path="/cart"        element={<CartPage />} />
                 <Route path="/customize"   element={<CustomizePage />} />
+                <Route path="/configurator/shirt" element={<JerseyConfiguratorPage />} />
                 <Route path="/checkout"    element={<CheckoutPage />} />
                 <Route path="/account"     element={<AccountPage />} />
                 <Route path="/admin"       element={<AdminPage />} />

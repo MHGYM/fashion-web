@@ -1,0 +1,40 @@
+.layer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--jc-card-2, #17171c);
+  border: 1px solid var(--jc-line, #232329);
+  border-radius: 10px;
+}
+
+.layer-controls__row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  color: var(--jc-text-2, #a0a0ac);
+}
+
+.layer-controls__row input[type="range"] {
+  width: 100%;
+  accent-color: var(--jc-gold, #e5b93c);
+}
+
+.layer-controls__remove {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--jc-err, #e8836f);
+  border: 1px solid rgba(232, 131, 111, 0.35);
+  background: rgba(232, 131, 111, 0.08);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
+.layer-controls__remove:hover {
+  background: rgba(232, 131, 111, 0.18);
+}

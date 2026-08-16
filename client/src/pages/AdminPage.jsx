@@ -697,6 +697,41 @@ function parseCustomConfig(raw) {
   try { const c = JSON.parse(raw); return c && typeof c === 'object' ? c : null } catch { return null }
 }
 
+const JERSEY_ZONE_LABELS = { front: 'Voorkant', back: 'Achterkant', sleeveLeft: 'Mouw links', sleeveRight: 'Mouw rechts' }
+
+/** Jersey-specifiek: elke zone heeft een eigen kleur + eigen logo's/teksten
+ *  (i.t.t. de handschoen hierboven, die maar één front-panel + wrist-logo
+ *  kent) — aparte weergave i.p.v. hergebruik van frontImage/wristLogo. */
+function JerseyZones({ zones, size, linkBtn }) {
+  return (
+    <div style={{ marginBottom:6 }}>
+      {size && <div style={{ fontSize:'0.78rem', color:'#333', marginBottom:8 }}><strong>Maat:</strong> {size}</div>}
+      {Object.entries(zones).map(([zoneId, zone]) => (
+        <div key={zoneId} style={{ marginBottom:10 }}>
+          <div style={{ fontSize:'0.76rem', fontWeight:600, marginBottom:4, color:'#555', display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ width:12, height:12, borderRadius:3, background:zone.colorHex||'#ccc', border:'1px solid #ddd', display:'inline-block' }} />
+            {JERSEY_ZONE_LABELS[zoneId] || zoneId} · {zone.colorHex}
+          </div>
+          {(zone.logos || []).map((logo) => (
+            <div key={logo.id} style={{ marginBottom:4 }}>
+              {logo.originalUrl ? (
+                <a href={logo.originalUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}><Download size={12}/> {logo.fileName || 'Logo'} downloaden</a>
+              ) : (
+                <span style={{ fontSize:'0.74rem', color:'#999' }}>{logo.fileName || 'Logo'} (origineel nog niet ontvangen)</span>
+              )}
+            </div>
+          ))}
+          {(zone.texts || []).map((t) => (
+            <div key={t.id} style={{ fontSize:'0.76rem', color:'#333', marginBottom:2 }}>
+              <strong>Tekst:</strong> "{t.text}" · {t.color} · {t.fontFamily}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** PRODUCTIEBESTANDEN — alleen zichtbaar onder order-items die uit de
  *  configurator komen (custom_config aanwezig). Render null voor gewone
  *  producten, dus geen enkel visueel verschil voor de rest van de lijst. */
@@ -770,6 +805,10 @@ function ProductionFiles({ orderId, item }) {
           {wristLogo.originalUrl && <a href={wristLogo.originalUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}><Download size={12}/> Origineel bestand downloaden</a>}
           {wristLogo.artworkUrl && wristLogo.artworkUrl !== wristLogo.originalUrl && <a href={wristLogo.artworkUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}><Download size={12}/> Productie-artwork downloaden</a>}
         </div>
+      )}
+
+      {config.zones && typeof config.zones === 'object' && (
+        <JerseyZones zones={config.zones} size={config.size} linkBtn={linkBtn} />
       )}
 
       <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid #eee' }}>

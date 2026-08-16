@@ -97,6 +97,53 @@ function buildProductionSpecPdf(order, item, config) {
     row('Model:', c.modelLabel || c.modelProfile || c.style || '—')
     row('Maat:', c.size || item.size || '—')
 
+    // Jersey-config heeft een heel andere vorm dan de handschoen (meerdere
+    // zones, elk met een eigen kleur + meerdere logo's/teksten) — eigen
+    // secties i.p.v. de handschoen-secties hieronder, die verder ongewijzigd
+    // blijven voor bestaande/nieuwe handschoen-bestellingen.
+    const jerseyZones = c.zones && typeof c.zones === 'object' ? c.zones : null
+    if (jerseyZones) {
+      const ZONE_LABELS = { front: 'Voorkant', back: 'Achterkant', sleeveLeft: 'Mouw links', sleeveRight: 'Mouw rechts' }
+      section('Kleuren per zone')
+      Object.entries(jerseyZones).forEach(([zone, z]) => row((ZONE_LABELS[zone] || zone) + ':', z?.colorHex || '—'))
+
+      section("Logo's")
+      let anyLogo = false
+      Object.entries(jerseyZones).forEach(([zone, z]) => {
+        (z?.logos || []).forEach((logo) => {
+          anyLogo = true
+          row(`${ZONE_LABELS[zone] || zone}:`, logo.fileName || logo.id)
+          if (logo.transform) {
+            const t = logo.transform
+            row('  Positie / schaal / rotatie:',
+              `x=${t.x ?? 0}, y=${t.y ?? 0}, schaal=${Math.round((t.scale ?? 1) * 100)}%, rotatie=${t.rotation ?? 0}°`)
+          }
+        })
+      })
+      if (!anyLogo) doc.text('Geen logo\'s gebruikt.')
+
+      section('Tekst')
+      let anyText = false
+      Object.entries(jerseyZones).forEach(([zone, z]) => {
+        (z?.texts || []).forEach((t) => {
+          anyText = true
+          row(`${ZONE_LABELS[zone] || zone}:`, t.text)
+          row('  Kleur / lettertype:', `${t.color || '—'} / ${t.fontFamily || '—'}`)
+        })
+      })
+      if (!anyText) doc.text('Geen tekst toegevoegd.')
+
+      section('Prijs')
+      row('In rekening gebracht:', euro(item.price))
+
+      doc.moveDown(1.2)
+      doc.fontSize(8).fillColor('#999').text(
+        'Dit document maakt deel uit van het productiepakket (ZIP) met de originele geüploade bestanden per zone en de volledige design-data.json.'
+      )
+      doc.end()
+      return
+    }
+
     section('Kleuren')
     const colorEntries = c.colors && typeof c.colors === 'object' ? Object.entries(c.colors) : []
     if (colorEntries.length) colorEntries.forEach(([zone, colorName]) => row(zone + ':', colorName))
@@ -187,6 +234,22 @@ async function streamProductionZip(res, order, item, config) {
   const addIfExists = (url, zipPath) => {
     const abs = resolveUploadPath(url)
     if (abs) archive.file(abs, { name: zipPath })
+  }
+
+  // Jersey: elke zone kan meerdere logo's hebben — allemaal apart onder
+  // original-uploads/<zone>/, elk met hun eigen bestandsnaam (fileName +
+  // layer-id blijft uniek, zie meshSplit/JerseyConfiguratorUI). Handschoen-
+  // pad hieronder blijft ongewijzigd voor niet-jersey-config.
+  if (c.zones && typeof c.zones === 'object') {
+    Object.entries(c.zones).forEach(([zone, z]) => {
+      (z?.logos || []).forEach((logo) => {
+        if (!logo.originalUrl) return
+        const ext = path.extname(logo.originalUrl) || path.extname(logo.fileName || '') || '.bin'
+        addIfExists(logo.originalUrl, `${folder}/original-uploads/${zone}/${logo.id}${ext}`)
+      })
+    })
+    await archive.finalize()
+    return
   }
 
   addIfExists(c.glovePreviewUrl, `${folder}/glove-preview${c.glovePreviewUrl ? (path.extname(c.glovePreviewUrl) || '.png') : '.png'}`)

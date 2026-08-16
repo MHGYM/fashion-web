@@ -16,7 +16,15 @@ const { UPLOADS_DIR } = require('../config')
  */
 
 const KIND_NAMES = { original: 'original', artwork: 'artwork', preview: 'preview' }
-const ZONE_NAMES = { 'front-panel': 'front-panel', wrist: 'wrist', general: 'general' }
+const ZONE_NAMES = {
+  'front-panel': 'front-panel', wrist: 'wrist', general: 'general',
+  // Jersey-zones — toegevoegd voor de fight-jersey-configurator, handschoen-
+  // zones hierboven blijven ongewijzigd.
+  front: 'front', back: 'back', sleeveLeft: 'sleeveLeft', sleeveRight: 'sleeveRight',
+}
+// Alleen a-z/A-Z/0-9/-/_, max 40 tekens — voorkomt path-traversal via een
+// aangepast form-veld (layerId komt ongefilterd van de client).
+const LAYER_ID_RE = /^[a-zA-Z0-9_-]{1,40}$/
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
@@ -27,10 +35,15 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const kind = KIND_NAMES[req.body.kind] || 'file'
     const zone = ZONE_NAMES[req.body.zone] || 'general'
+    // Jersey staat meerdere logo's/teksten per zone toe (anders dan de
+    // handschoen, die één vaste zone-naam per bestand had) — layerId maakt
+    // de bestandsnaam dan uniek zodat een volgende laag de vorige niet
+    // overschrijft. Zonder layerId (handschoen-flow) verandert er niets.
+    const layerId = LAYER_ID_RE.test(req.body.layerId || '') ? `-${req.body.layerId}` : ''
     // Origineel behoudt zijn eigen extensie/formaat (nooit hercoderen); bij
     // een ontbrekende/onherkende extensie een neutrale fallback.
     const ext = path.extname(file.originalname).toLowerCase().replace(/[^a-z0-9.]/g, '') || '.bin'
-    cb(null, `${kind}-${zone}${ext}`)
+    cb(null, `${kind}-${zone}${layerId}${ext}`)
   },
 })
 
