@@ -305,16 +305,24 @@ export function createShirtViewer(canvas, opts = {}) {
   // zijn daar al exact bekend — geen Box3-afhankelijkheid nodig.
   function fitCameraToObject(size) {
     const extent = Math.max(size.width, size.height, size.depth);
-    camRadius = extent * 2.0;
-    camTargetY = size.height * 0.52;
+    // 2.4× i.p.v. de 1.85× van de handschoen: die is bijna kubisch, het shirt
+    // is smal en hoog, dus is `extent` hier altijd de hoogte. Bij 1.85–2.0×
+    // liep de zoom door het perspectief (de voorkant staat dichter bij de
+    // camera dan het middelpunt) onderaan uit het kader. 2.4× houdt het hele
+    // shirt met marge in beeld; de zoomgrenzen hieronder staan in dezelfde
+    // verhouding tot de startafstand als bij de handschoen.
+    camRadius = extent * 2.4;
+    camTargetY = size.height * 0.5;
     controls.target.set(0, camTargetY, 0);
-    controls.minDistance = extent * 0.7;
-    controls.maxDistance = extent * 3.2;
+    controls.minDistance = extent * 0.9;
+    controls.maxDistance = extent * 3.9;
     camera.near = extent * 0.01;
     camera.far = extent * 40;
     camera.updateProjectionMatrix();
     goToPreset('front', 0);
-    shadowMesh.scale.setScalar(Math.max(size.width, size.depth) * 1.6);
+    // PlaneGeometry(2,2) → schaal s geeft breedte 2s; iets breder dan het
+    // shirt zelf, anders wordt het een donkere vlek over het hele kader.
+    shadowMesh.scale.setScalar(Math.max(size.width, size.depth) * 0.6);
     shadowMesh.position.y = 0.001;
   }
 

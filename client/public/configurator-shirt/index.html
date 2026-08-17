@@ -9,6 +9,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../configurator/css/style.css">
+<style>
+  /* De gedeelde stylesheet maakt alleen #glove-canvas passend aan zijn ouder.
+     Zonder een eigen regel valt dit canvas terug op zijn attribuut-formaat,
+     groeit de ouder mee en blaast de ResizeObserver het beeld op tot miljoenen
+     pixels hoog. Zelfde regels als #glove-canvas, apart gehouden zodat de
+     bokshandschoen-stylesheet ongewijzigd blijft. */
+  #shirt-canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #shirt-canvas:active { cursor: grabbing; }
+</style>
 </head>
 <body>
 

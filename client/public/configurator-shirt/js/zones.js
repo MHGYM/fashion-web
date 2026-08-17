@@ -17,7 +17,7 @@
 export { COLORS, hexOf, NAME_FONTS, NAME_SIZES } from '../../configurator/js/zones.js';
 
 /** Maten waarin het shirt te bestellen is (moet matchen met de backend). */
-export const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+export const SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
 /**
  * Prijsopbouw — zelfde model als de bokshandschoen-configurator (zie

@@ -251,7 +251,9 @@ async function ensureSchema() {
     // 25.95 moet gelijk blijven aan PRICING.base in
     // client/public/configurator-shirt/js/zones.js EN aan
     // CUSTOM_JERSEY_PRICING.base in customizerController.js.
-    await seedCustom('custom-jersey', 'Custom Fight Jersey', 25.95, ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'])
+    // Maten moeten gelijk blijven aan SIZES in
+    // client/public/configurator-shirt/js/zones.js.
+    await seedCustom('custom-jersey', 'Custom Fight Jersey', 25.95, ['S', 'M', 'L', 'XL', 'XXL'])
   } catch (e) { console.error('[DB] custom-producten seed:', e.message) }
 
   for (const [key, value] of HOMEPAGE_DEFAULTS) {
