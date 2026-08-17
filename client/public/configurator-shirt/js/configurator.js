@@ -7,47 +7,56 @@
 
    Vereenvoudigd t.o.v. de handschoen omdat het shirt maar één kleurbare
    "zone" heeft (het hele shirt, zie zones.js) i.p.v. 9 losse onderdelen:
-   geen model-lijst, geen zone-tabs. Eigen logo/ontwerp + naam zitten allebei
-   op de voorkant (front-decal), net als bij de handschoen front-panel.
+   geen model-lijst, geen zone-tabs. Eigen logo/ontwerp en naam zijn elk
+   onafhankelijk naar de voor- of achterkant te plaatsen en met de muis/touch
+   te verslepen op het canvas (zie scene3d.js, sectie "SLEPEN").
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { createShirtViewer } from './scene3d.js';
 import {
-  COLORS, SIZES, PRICING, NAME_FONTS, NAME_SIZES, hexOf, defaultArtworkTransform,
+  COLORS, SIZES, PRICING, NAME_FONTS, NAME_SIZES, hexOf, defaultArtworkTransform, defaultNameTransform,
 } from './zones.js';
 
 const STORE_KEY = 'fm-shirt-config-v1';
 const API = '/api/customizer';
 const PRODUCT_KEY = 'custom-jersey';
+const PLACEMENT_LABEL = { front: 'Voorkant', back: 'Achterkant' };
 
 const state = {
   color: 'Black',
   artworkTransform: defaultArtworkTransform(),
+  artworkPlacement: 'front',
   hasArtwork: false,
   artworkFile: null,
   name: '',
   nameFont: NAME_FONTS[0].id,
   nameSize: 'm',
   nameColor: 'White',
+  nameTransform: defaultNameTransform(),
+  namePlacement: 'front',
   size: '',
 };
 
 const euro = (n) => '€' + n.toFixed(2).replace('.', ',');
 
 const shareable = () => ({
-  color: state.color, artworkTransform: state.artworkTransform,
+  color: state.color, artworkTransform: state.artworkTransform, artworkPlacement: state.artworkPlacement,
   name: state.name, nameFont: state.nameFont, nameSize: state.nameSize,
-  nameColor: state.nameColor, size: state.size,
+  nameColor: state.nameColor, nameTransform: state.nameTransform, namePlacement: state.namePlacement,
+  size: state.size,
 });
 
 function applySaved(saved) {
   if (!saved) return;
   if (COLORS.some((c) => c.name === saved.color)) state.color = saved.color;
   if (saved.artworkTransform) Object.assign(state.artworkTransform, saved.artworkTransform);
+  if (saved.artworkPlacement === 'front' || saved.artworkPlacement === 'back') state.artworkPlacement = saved.artworkPlacement;
   if (typeof saved.name === 'string') state.name = saved.name.slice(0, 20);
   if (NAME_FONTS.some((f) => f.id === saved.nameFont)) state.nameFont = saved.nameFont;
   if (NAME_SIZES.some((s) => s.id === saved.nameSize)) state.nameSize = saved.nameSize;
   if (COLORS.some((c) => c.name === saved.nameColor)) state.nameColor = saved.nameColor;
+  if (saved.nameTransform) Object.assign(state.nameTransform, saved.nameTransform);
+  if (saved.namePlacement === 'front' || saved.namePlacement === 'back') state.namePlacement = saved.namePlacement;
   if (SIZES.includes(saved.size)) state.size = saved.size;
 }
 function load() {
@@ -61,7 +70,19 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('shirt-canvas');
 
 load();
-const viewer = createShirtViewer(canvas);
+// onArtworkDrag/onNameDrag: houdt de state (en dus de sliders/opslag) in sync
+// terwijl de klant het logo of de naam met de muis/touch over het shirt sleept.
+const viewer = createShirtViewer(canvas, {
+  onArtworkDrag: (t) => {
+    state.artworkTransform = t;
+    syncArtworkPositionUI();
+    save();
+  },
+  onNameDrag: (t) => {
+    state.nameTransform = t;
+    save();
+  },
+});
 
 window.FMShirtConfigurator = { viewer, getConfiguration: () => buildConfig(), renderNow: () => viewer.renderNow() };
 
@@ -76,8 +97,26 @@ function pushName() {
   const font = NAME_FONTS.find((f) => f.id === state.nameFont) || NAME_FONTS[0];
   const size = NAME_SIZES.find((s) => s.id === state.nameSize) || NAME_SIZES[2];
   viewer.setName(state.name.trim() ? {
-    text: state.name.trim(), color: hexOf(state.nameColor), fontCss: font.css, fontScale: size.scale, y: 0.82,
-  } : null);
+    text: state.name.trim(), color: hexOf(state.nameColor), fontCss: font.css, fontScale: size.scale,
+  } : null, state.namePlacement, state.nameTransform);
+}
+
+/** Bouwt een "Voorkant/Achterkant"-keuze zoals de bestaande maat-chips
+ *  (#size-row), zodat logo en naam elk apart naar de voor- of achterkant
+ *  van het shirt verplaatst kunnen worden. */
+function placementToggle(selected, onPick) {
+  const row = el('div', 'chip-row');
+  ['front', 'back'].forEach((p) => {
+    const b = el('button', p === selected ? 'is-active' : '', PLACEMENT_LABEL[p]);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      row.querySelectorAll('button').forEach((x) => x.classList.remove('is-active'));
+      b.classList.add('is-active');
+      onPick(p);
+    });
+    row.appendChild(b);
+  });
+  return row;
 }
 
 function swatchGrid(selectedName, onPick, cls) {
@@ -152,31 +191,81 @@ function dropzone(titleText, subText, onFile) {
 }
 
 /* ── Kleurpaneel: ÉÉN kleur voor het HELE shirt (front+back+mouwen) ─────── */
+// Zelfde in-/uitklappatroon (.color-toggle/.color-panel) als de bestaande
+// bokshandschoen-configurator (client/public/configurator/js/configurator.js)
+// — puur UI-state, niet opgeslagen en niet van invloed op state.color/
+// artwork/name: in-/uitklappen verandert dus nooit de gekozen kleur, het
+// logo, de naam of hun positie.
+let colorPanelOpen = true;
+
 function buildColorPanel() {
-  const box = $('color-panel');
+  const box = $('color-card');
   box.innerHTML = '';
-  box.appendChild(swatchGrid(state.color, (c) => {
+
+  const colorHead = el('button', 'color-toggle');
+  colorHead.type = 'button';
+  colorHead.setAttribute('aria-expanded', String(colorPanelOpen));
+  colorHead.setAttribute('aria-controls', 'color-panel');
+  const colorDot = el('span', 'color-toggle-dot');
+  colorDot.style.background = hexOf(state.color);
+  const chev = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  chev.setAttribute('viewBox', '0 0 24 24');
+  chev.setAttribute('class', 'color-toggle-chev');
+  chev.setAttribute('aria-hidden', 'true');
+  chev.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
+  colorHead.append(el('span', 'color-toggle-label', 'Shirtkleur'), colorDot, chev);
+  colorHead.addEventListener('click', () => {
+    colorPanelOpen = !colorPanelOpen;
+    colorHead.setAttribute('aria-expanded', String(colorPanelOpen));
+    colorPanel.classList.toggle('is-open', colorPanelOpen);
+  });
+  box.appendChild(colorHead);
+
+  const colorPanel = el('div', 'color-panel' + (colorPanelOpen ? ' is-open' : ''));
+  colorPanel.id = 'color-panel';
+  colorPanel.appendChild(swatchGrid(state.color, (c) => {
     state.color = c.name;
     viewer.setShirtColor(c.hex);
+    colorDot.style.background = c.hex;
     save();
   }));
+  box.appendChild(colorPanel);
 }
 
-/* ── Eigen logo/ontwerp op de voorkant ───────────────────────────────────── */
+/* ── Eigen logo/ontwerp op de voor- of achterkant ────────────────────────── */
+let artworkPositionSliders = null; // {x,y}-sliderrefs, live bijgewerkt tijdens slepen op het canvas
+
+function syncArtworkPositionUI() {
+  if (!artworkPositionSliders) return;
+  const t = state.artworkTransform;
+  artworkPositionSliders.x.input.value = t.x;
+  artworkPositionSliders.x.val.textContent = `${Math.round(t.x * 200)}%`;
+  artworkPositionSliders.y.input.value = t.y;
+  artworkPositionSliders.y.val.textContent = `${Math.round(t.y * 200)}%`;
+}
+
 function buildArtworkPanel() {
   const box = $('artwork-panel');
   box.innerHTML = '';
+  artworkPositionSliders = null;
 
   const h = el('h2', 'card-title', 'Eigen logo / ontwerp');
   h.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.customLogo)}`));
   box.appendChild(h);
-  box.appendChild(el('p', 'hint', 'Upload je eigen logo of ontwerp — het komt op de voorkant van het shirt.'));
+  box.appendChild(el('p', 'hint', 'Upload je eigen logo of ontwerp en sleep het naar de gewenste plek op het shirt.'));
+
+  box.appendChild(el('span', 'field-label', 'Plaatsing'));
+  box.appendChild(placementToggle(state.artworkPlacement, (p) => {
+    state.artworkPlacement = p;
+    if (state.hasArtwork) viewer.setArtworkPlacement(p);
+    save();
+  }));
 
   const dz = dropzone('Sleep je logo hierheen', 'of klik om te kiezen · PNG, JPG of SVG · max 5MB', (img, file) => {
     state.artworkTransform = defaultArtworkTransform();
     state.hasArtwork = true;
     state.artworkFile = file || null;
-    viewer.setArtwork(img, state.artworkTransform);
+    viewer.setArtwork(img, state.artworkTransform, state.artworkPlacement);
     buildArtworkPanel(); renderPrice(); save();
   });
   box.appendChild(dz.zone);
@@ -188,6 +277,7 @@ function buildArtworkPanel() {
     const sy = slider('Verticaal', 'y', -0.5, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`);
     const ss = slider('Grootte', 'scale', 0.2, 3, 0.01, (v) => `${Math.round(v * 100)}%`);
     const sr = slider('Rotatie', 'rotation', -180, 180, 1, (v) => `${Math.round(v)}°`);
+    artworkPositionSliders = { x: sx, y: sy };
     const clear = el('button', 'btn btn-quiet btn-full', 'Logo verwijderen');
     clear.type = 'button';
     clear.addEventListener('click', () => {
@@ -201,8 +291,16 @@ function buildArtworkPanel() {
   }
 }
 
-/* ── Naam op de voorkant ──────────────────────────────────────────────── */
+/* ── Naam op de voor- of achterkant ──────────────────────────────────────── */
 function buildNamePanel() {
+  const placementBox = $('name-placement');
+  placementBox.innerHTML = '';
+  placementBox.appendChild(placementToggle(state.namePlacement, (p) => {
+    state.namePlacement = p;
+    if (state.name.trim()) viewer.setNamePlacement(p);
+    save();
+  }));
+
   const input = $('name-input');
   input.value = state.name;
   input.addEventListener('input', () => {
@@ -277,10 +375,13 @@ function buildConfig() {
     product: 'Custom Fight Jersey',
     size: state.size,
     color: state.color,
-    customImage: state.hasArtwork ? { placement: 'Voorkant', transform: { ...state.artworkTransform } } : null,
+    customImage: state.hasArtwork
+      ? { placement: PLACEMENT_LABEL[state.artworkPlacement], transform: { ...state.artworkTransform } }
+      : null,
     name: state.name.trim() ? {
       text: state.name.trim(), color: state.nameColor,
       font: (NAME_FONTS.find((f) => f.id === state.nameFont) || {}).label, size: state.nameSize,
+      placement: PLACEMENT_LABEL[state.namePlacement], transform: { ...state.nameTransform },
     } : null,
   };
 }
@@ -325,22 +426,24 @@ function dataUrlToBlob(dataUrl) {
 async function buildProductionConfig(designId) {
   let customImage = null;
   if (state.hasArtwork) {
-    customImage = { placement: 'Voorkant', transform: { ...state.artworkTransform } };
+    const zone = state.artworkPlacement;
+    customImage = { placement: PLACEMENT_LABEL[zone], transform: { ...state.artworkTransform } };
     if (state.artworkFile) {
       customImage.originalFilename = state.artworkFile.name;
       customImage.originalMimeType = state.artworkFile.type || null;
-      customImage.originalUrl = await uploadDesignAsset(designId, 'original', 'front', state.artworkFile, state.artworkFile.name);
+      customImage.originalUrl = await uploadDesignAsset(designId, 'original', zone, state.artworkFile, state.artworkFile.name);
     }
-    const artCanvas = viewer.getArtworkCanvas(2048);
+    const artCanvas = viewer.getArtworkCanvas(zone, 2048);
     if (artCanvas) {
       const blob = await canvasToPngBlob(artCanvas);
-      if (blob) customImage.artworkUrl = await uploadDesignAsset(designId, 'artwork', 'front', blob, 'front-artwork.png');
+      if (blob) customImage.artworkUrl = await uploadDesignAsset(designId, 'artwork', zone, blob, `${zone}-artwork.png`);
     }
   }
 
   const nameObj = state.name.trim() ? {
     text: state.name.trim(), color: state.nameColor,
     font: (NAME_FONTS.find((f) => f.id === state.nameFont) || {}).label, size: state.nameSize,
+    placement: PLACEMENT_LABEL[state.namePlacement], transform: { ...state.nameTransform },
   } : null;
 
   let shirtPreviewUrl = null;
@@ -442,9 +545,11 @@ function wireActions() {
   $('reset').addEventListener('click', () => {
     state.color = 'Black';
     state.artworkTransform = defaultArtworkTransform();
+    state.artworkPlacement = 'front';
     state.hasArtwork = false; state.artworkFile = null;
     state.name = ''; state.size = '';
     state.nameFont = NAME_FONTS[0].id; state.nameSize = 'm'; state.nameColor = 'White';
+    state.nameTransform = defaultNameTransform(); state.namePlacement = 'front';
     viewer.setArtwork(null);
     viewer.setName(null);
     localStorage.removeItem(STORE_KEY);

@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════════
    Zelfde architectuur als client/public/configurator/js/scene3d.js (bokshand-
    schoen): canvas-textuur voor kleur, DecalGeometry voor een geüpload
-   logo/ontwerp op de voorkant, dezelfde matte materiaal-receptuur, dezelfde
+   logo/ontwerp en voor de naam, dezelfde matte materiaal-receptuur, dezelfde
    camera-fit/preset/zoom-opzet, dezelfde requestAnimationFrame-loop met
    achtergrondtab-vangnet (force-render als rAF niet op tijd tikt).
 
@@ -19,6 +19,9 @@
    precies wat garandeert dat een gekozen kleur overal naadloos doorloopt en
    een mouw nooit kan achterblijven op de oude kleur: er is maar één canvas/
    materiaal-object, alle 4 de zone-meshes wijzen ernaar.
+
+   Logo en naam kunnen elk onafhankelijk op de voor- of achterkant geplaatst
+   worden en zijn met de muis/touch versleepbaar (zie "SLEPEN" hieronder).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../configurator/js/vendor/three/three.module.js';
@@ -37,6 +40,14 @@ const SLEEVE_X_FRACTION = 0.62;
 const HEM_Y_FRACTION = 0.15;
 const TARGET_HEIGHT = 1.09; // zelfde schaal-normalisatie als eerder gebruikt
 
+// Hoever (in dezelfde -0.5..0.5-fractie als de transform.x/y) een klik van het
+// midden van een laag mag afwijken om die laag nog "te pakken" te krijgen bij
+// het slepen. Dezelfde 0.5-grens als hieronder voor clampPosition wordt ook
+// gebruikt als uiterste rand — een laag kan dus nooit verder dan de rand van
+// de al bestaande front/back-artworkzone (dezelfde zone die de Horizontaal/
+// Verticaal-sliders al gebruikten) versleept worden.
+const HIT_RADIUS = 0.28;
+
 const MATERIAL_DEFAULTS = {
   roughness: 0.78, metalness: 0.0,
   clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
@@ -50,6 +61,8 @@ function shadeColor(hex, amt) {
   const f = (v) => Math.max(0, Math.min(255, Math.round(v + (amt < 0 ? -v : 255 - v) * Math.abs(amt))));
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
+
+function clampUnit(v) { return Math.max(-0.5, Math.min(0.5, v)); }
 
 /** Verzamelt alle meshes van het model en classificeert elke driehoek naar
  *  front/back/sleeveLeft/sleeveRight, puur op wereldpositie (zie module-
@@ -151,6 +164,8 @@ function splitAndClassify(root) {
 }
 
 export function createShirtViewer(canvas, opts = {}) {
+  const { onArtworkDrag, onNameDrag } = opts;
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -204,7 +219,21 @@ export function createShirtViewer(canvas, opts = {}) {
   let modelRoot = null;
   let bodyCanvas, bodyCtx, bodyTexture, bodyMaterial;
   let frontMesh = null;
-  let frontArtwork = null; // { state:{img,transform,name}, canvas, ctx, texture, mesh }
+  let backMesh = null;
+  // Eén "frame" (midden/oriëntatie/afmeting in wereldruimte) per kant — nodig
+  // om zowel de DecalGeometry te bouwen als om een sleepbeweging (muispositie
+  // op het canvas) om te rekenen naar dezelfde -0.5..0.5-canvasfractie die de
+  // Horizontaal/Verticaal-sliders al gebruikten.
+  const decalFrames = { front: null, back: null };
+  // Logo en naam zijn elk twee losse, altijd-aanwezige decals (front + back).
+  // Alleen de kant die daadwerkelijk actief is, is zichtbaar/beschilderd —
+  // dit voorkomt dat een decal-mesh op- en afgebroken moet worden zodra de
+  // klant van kant wisselt (die blijft gewoon "op zijn kant" hangen, ook als
+  // de camera net naar de andere kant kijkt).
+  const logoLayers = { front: null, back: null };
+  const nameLayers = { front: null, back: null };
+  let logoState = null; // { img, transform:{x,y,scale,rotation}, placement }
+  let nameState = null; // { text, color, fontCss, fontScale, transform:{x,y}, placement }
   let camRadius = 3, camTargetY = 0.5, camAnim = null;
   let shirtHeight = TARGET_HEIGHT;
 
@@ -228,7 +257,7 @@ export function createShirtViewer(canvas, opts = {}) {
     ctx.restore();
   }
 
-  function drawName(ctx, W, H, opts) {
+  function drawName(ctx, W, H, opts, t) {
     if (!opts || !opts.text) return;
     const label = opts.text.toUpperCase();
     const base = opts.color || '#FFFFFF';
@@ -236,36 +265,50 @@ export function createShirtViewer(canvas, opts = {}) {
     ctx.font = (opts.fontCss || '800 {size}px Inter, system-ui, sans-serif').replace('{size}', fontSize);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const y = H * (opts.y ?? 0.82);
+    const x = W / 2 + ((t?.x) ?? 0) * W;
+    const y = H / 2 + ((t?.y) ?? 0.32) * H;
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillText(label, W / 2 + fontSize * 0.035, y + fontSize * 0.05);
+    ctx.fillText(label, x + fontSize * 0.035, y + fontSize * 0.05);
     ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1, fontSize * 0.05);
     ctx.strokeStyle = shadeColor(base, -0.45);
-    ctx.strokeText(label, W / 2, y);
+    ctx.strokeText(label, x, y);
     ctx.fillStyle = base;
-    ctx.fillText(label, W / 2, y);
+    ctx.fillText(label, x, y);
   }
 
-  function repaintFrontArtwork() {
-    if (!frontArtwork) return;
-    const { ctx, canvas: c, state } = frontArtwork;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, c.width, c.height);
-    if (state?.img) drawCoverImage(ctx, c.width, c.height, state.img, state.transform);
-    if (state?.name) drawName(ctx, c.width, c.height, state.name);
-    frontArtwork.texture.needsUpdate = true;
-    frontArtwork.mesh.visible = !!(state?.img || state?.name?.text);
+  function repaintLogo() {
+    ['front', 'back'].forEach((side) => {
+      const L = logoLayers[side];
+      if (!L) return;
+      L.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      L.ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
+      const active = !!(logoState && logoState.placement === side);
+      if (active) drawCoverImage(L.ctx, TEX_SIZE, TEX_SIZE, logoState.img, logoState.transform);
+      L.texture.needsUpdate = true;
+      L.mesh.visible = active;
+    });
   }
 
-  /** Decal geprojecteerd op ALLEEN de front-zone-mesh (dus nooit op de rug of
-   *  mouwen, ongeacht boxgrootte) — zelfde DecalGeometry-techniek als de
-   *  handschoen se front-panel-artwork, maar hier één enkel doelvlak i.p.v.
-   *  een groep meshes. */
-  function buildFrontDecal(mesh) {
-    // Lokale geometry-bounds i.p.v. Box3.setFromObject(mesh) — zie de
-    // toelichting bij fitCameraToObject hierboven; mesh.position is hier
-    // altijd identity, dus lokaal == wereldruimte voor dit doel.
+  function repaintName() {
+    ['front', 'back'].forEach((side) => {
+      const N = nameLayers[side];
+      if (!N) return;
+      N.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      N.ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
+      const active = !!(nameState && nameState.placement === side && nameState.text);
+      if (active) drawName(N.ctx, TEX_SIZE, TEX_SIZE, nameState, nameState.transform);
+      N.texture.needsUpdate = true;
+      N.mesh.visible = active;
+    });
+  }
+
+  /** Wereldruimte-"frame" (midden/oriëntatie/afmeting) van het projectievlak
+   *  voor één kant — zelfde box-op-basis-van-de-lokale-bounding-box-techniek
+   *  als voorheen (bewust géén Box3.setFromObject, zie de toelichting bij
+   *  fitCameraToObject hieronder). `dir` is de kant waarheen het decalvak
+   *  geprojecteerd wordt: +1 voor front (richting +Z), -1 voor back. */
+  function computeFrame(mesh, dir) {
     const box = mesh.geometry.boundingBox;
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
@@ -273,8 +316,18 @@ export function createShirtViewer(canvas, opts = {}) {
     const decalCenter = new THREE.Vector3(center.x, center.y + size.y * 0.08, center.z);
     const orient = new THREE.Object3D();
     orient.position.copy(decalCenter);
-    orient.lookAt(decalCenter.clone().add(new THREE.Vector3(0, 0, 1)));
+    orient.lookAt(decalCenter.clone().add(new THREE.Vector3(0, 0, dir)));
+    const normal = new THREE.Vector3(0, 0, dir);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, decalCenter);
+    return { center: decalCenter, orient, size: decalSize, plane, quatInv: orient.quaternion.clone().invert() };
+  }
 
+  /** Bouwt één (aanvankelijk lege/onzichtbare) decal-mesh geprojecteerd op
+   *  ALLEEN de opgegeven kant-mesh (dus nooit lekkend naar de rug/mouwen),
+   *  zelfde DecalGeometry-techniek als de handschoen se front-panel-artwork.
+   *  `polyOffset` houdt logo- en naam-decals op dezelfde kant uit elkaars
+   *  z-fighting (naam iets dichter bij de camera getekend dan het logo). */
+  function buildDecalMesh(mesh, frame, polyOffset) {
     const c = document.createElement('canvas');
     c.width = c.height = TEX_SIZE;
     const ctx = c.getContext('2d');
@@ -283,17 +336,17 @@ export function createShirtViewer(canvas, opts = {}) {
 
     const material = new THREE.MeshPhysicalMaterial({
       map: tex, transparent: true, depthTest: true, depthWrite: false,
-      polygonOffset: true, polygonOffsetFactor: -4,
+      polygonOffset: true, polygonOffsetFactor: polyOffset,
       roughness: MATERIAL_DEFAULTS.roughness, metalness: MATERIAL_DEFAULTS.metalness,
       clearcoat: MATERIAL_DEFAULTS.clearcoat, clearcoatRoughness: MATERIAL_DEFAULTS.clearcoatRoughness,
       envMapIntensity: MATERIAL_DEFAULTS.envMapIntensity,
     });
-    const geo = new DecalGeometry(mesh, decalCenter, orient.rotation, decalSize);
+    const geo = new DecalGeometry(mesh, frame.center, frame.orient.rotation, frame.size);
     const dm = new THREE.Mesh(geo, material);
-    dm.renderOrder = 6;
+    dm.renderOrder = polyOffset < -4 ? 7 : 6;
     dm.visible = false;
     scene.add(dm);
-    return { state: null, canvas: c, ctx, texture: tex, mesh: dm };
+    return { canvas: c, ctx, texture: tex, mesh: dm };
   }
 
   // Neemt de al analytisch bekende afmetingen uit splitAndClassify aan i.p.v.
@@ -341,8 +394,18 @@ export function createShirtViewer(canvas, opts = {}) {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
 
+  function disposeDecalLayer(L) {
+    if (!L) return;
+    scene.remove(L.mesh);
+    L.mesh.geometry.dispose();
+    L.mesh.material.dispose();
+    L.texture.dispose();
+  }
+
   function disposeModel() {
-    if (frontArtwork) { scene.remove(frontArtwork.mesh); frontArtwork.mesh.geometry.dispose(); frontArtwork.material?.dispose(); frontArtwork.texture.dispose(); frontArtwork = null; }
+    disposeDecalLayer(logoLayers.front); disposeDecalLayer(logoLayers.back);
+    disposeDecalLayer(nameLayers.front); disposeDecalLayer(nameLayers.back);
+    logoLayers.front = logoLayers.back = nameLayers.front = nameLayers.back = null;
     if (modelRoot) {
       scene.remove(modelRoot);
       modelRoot.traverse((o) => { if (o.isMesh) o.geometry?.dispose(); });
@@ -382,11 +445,17 @@ export function createShirtViewer(canvas, opts = {}) {
         mesh.castShadow = true; mesh.receiveShadow = true;
         modelRoot.add(mesh);
         if (zone === 'front') frontMesh = mesh;
+        if (zone === 'back') backMesh = mesh;
       });
       scene.add(modelRoot);
       fitCameraToObject({ width, height, depth });
 
-      frontArtwork = buildFrontDecal(frontMesh);
+      decalFrames.front = computeFrame(frontMesh, 1);
+      decalFrames.back = computeFrame(backMesh, -1);
+      logoLayers.front = buildDecalMesh(frontMesh, decalFrames.front, -4);
+      logoLayers.back = buildDecalMesh(backMesh, decalFrames.back, -4);
+      nameLayers.front = buildDecalMesh(frontMesh, decalFrames.front, -5);
+      nameLayers.back = buildDecalMesh(backMesh, decalFrames.back, -5);
 
       resolve();
     }, undefined, reject);
@@ -394,32 +463,60 @@ export function createShirtViewer(canvas, opts = {}) {
 
   const setShirtColor = (hex) => { repaintBody(hex); renderNow(); };
 
-  const setArtwork = (img, transform) => {
-    if (!frontArtwork) return;
-    frontArtwork.state = { ...(frontArtwork.state || {}), img, transform: transform || { x: 0, y: 0, scale: 1, rotation: 0 } };
-    repaintFrontArtwork();
+  const setArtwork = (img, transform, placement) => {
+    logoState = img ? {
+      img,
+      transform: transform || defaultTransform(),
+      placement: placement || logoState?.placement || 'front',
+    } : null;
+    repaintLogo();
     renderNow();
   };
   const setArtworkTransform = (transform) => {
-    if (!frontArtwork?.state) return;
-    frontArtwork.state.transform = transform;
-    repaintFrontArtwork();
+    if (!logoState) return;
+    logoState.transform = transform;
+    repaintLogo();
     renderNow();
   };
-  const setName = (opts) => {
-    if (!frontArtwork) return;
-    frontArtwork.state = { ...(frontArtwork.state || {}), name: opts };
-    repaintFrontArtwork();
+  const setArtworkPlacement = (placement) => {
+    if (!logoState) return;
+    logoState.placement = placement;
+    repaintLogo();
+    renderNow();
+  };
+  function defaultTransform() { return { x: 0, y: 0, scale: 1, rotation: 0 }; }
+
+  const setName = (opts, placement, transform) => {
+    nameState = (opts && opts.text) ? {
+      ...opts,
+      transform: transform || nameState?.transform || { x: 0, y: 0.32 },
+      placement: placement || nameState?.placement || 'front',
+    } : null;
+    repaintName();
+    renderNow();
+  };
+  const setNameTransform = (transform) => {
+    if (!nameState) return;
+    nameState.transform = transform;
+    repaintName();
+    renderNow();
+  };
+  const setNamePlacement = (placement) => {
+    if (!nameState) return;
+    nameState.placement = placement;
+    repaintName();
     renderNow();
   };
 
-  function getArtworkCanvas(size = 2048) {
-    if (!frontArtwork?.state || (!frontArtwork.state.img && !frontArtwork.state.name?.text)) return null;
+  function getArtworkCanvas(zone, size = 2048) {
+    const hasLogo = !!(logoState && logoState.placement === zone);
+    const hasName = !!(nameState && nameState.placement === zone && nameState.text);
+    if (!hasLogo && !hasName) return null;
     const c = document.createElement('canvas');
     c.width = c.height = size;
     const ctx = c.getContext('2d');
-    if (frontArtwork.state.img) drawCoverImage(ctx, size, size, frontArtwork.state.img, frontArtwork.state.transform);
-    if (frontArtwork.state.name) drawName(ctx, size, size, frontArtwork.state.name);
+    if (hasLogo) drawCoverImage(ctx, size, size, logoState.img, logoState.transform);
+    if (hasName) drawName(ctx, size, size, nameState, nameState.transform);
     return c;
   }
 
@@ -463,6 +560,94 @@ export function createShirtViewer(canvas, opts = {}) {
     renderer.render(scene, camera);
   }
 
+  /* ═══ SLEPEN: logo en naam onafhankelijk verslepen op het canvas ═════════
+     Raycast tegen de echte front/back-mesh (die respecteert automatisch
+     FrontSide-culling, dus je pakt altijd de kant op die je op dat moment
+     ziet). Het rakingspunt wordt omgerekend naar dezelfde -0.5..0.5-
+     canvasfractie die transform.x/y ook al gebruiken (zelfde wiskunde als
+     DecalGeometry zelf gebruikt om de UV's te genereren, zie computeFrame/
+     buildDecalMesh) — zo blijft de gesleepte laag exact onder de cursor en
+     kan hij nooit buiten de al bestaande artwork-projectiezone (dezelfde
+     zone die de Horizontaal/Verticaal-sliders gebruiken) terechtkomen. */
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const dragPoint = new THREE.Vector3();
+  let drag = null; // { kind:'logo'|'name', side:'front'|'back', frame }
+
+  function pointerToNDC(e) {
+    const rect = canvas.getBoundingClientRect();
+    ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function localFraction(frame, worldPoint) {
+    const local = worldPoint.clone().sub(frame.center).applyQuaternion(frame.quatInv);
+    return { x: local.x / frame.size.x, y: -local.y / frame.size.y };
+  }
+
+  function pickLayerAt(tx, ty, side) {
+    if (nameState && nameState.placement === side) {
+      const t = nameState.transform;
+      if (Math.max(Math.abs(tx - t.x), Math.abs(ty - t.y)) <= HIT_RADIUS) return 'name';
+    }
+    if (logoState && logoState.placement === side) {
+      const t = logoState.transform;
+      if (Math.max(Math.abs(tx - t.x), Math.abs(ty - t.y)) <= HIT_RADIUS) return 'logo';
+    }
+    return null;
+  }
+
+  function onPointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    pointerToNDC(e);
+    raycaster.setFromCamera(ndc, camera);
+    const targets = [frontMesh, backMesh].filter(Boolean);
+    if (!targets.length) return;
+    const hits = raycaster.intersectObjects(targets, false);
+    if (!hits.length) return;
+    const side = hits[0].object === frontMesh ? 'front' : 'back';
+    const frame = decalFrames[side];
+    const { x: tx, y: ty } = localFraction(frame, hits[0].point);
+    const kind = pickLayerAt(tx, ty, side);
+    if (!kind) return; // niets geraakt: laat OrbitControls gewoon draaien
+    drag = { kind, side, frame };
+    controls.enabled = false;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* niet kritiek */ }
+    e.preventDefault();
+  }
+
+  function onPointerMove(e) {
+    if (!drag) return;
+    pointerToNDC(e);
+    raycaster.setFromCamera(ndc, camera);
+    if (!raycaster.ray.intersectPlane(drag.frame.plane, dragPoint)) return;
+    const frac = localFraction(drag.frame, dragPoint);
+    const t = { x: clampUnit(frac.x), y: clampUnit(frac.y) };
+    if (drag.kind === 'logo' && logoState) {
+      logoState.transform = { ...logoState.transform, x: t.x, y: t.y };
+      repaintLogo();
+      onArtworkDrag?.({ ...logoState.transform });
+    } else if (drag.kind === 'name' && nameState) {
+      nameState.transform = t;
+      repaintName();
+      onNameDrag?.({ ...nameState.transform });
+    }
+    renderNow();
+    e.preventDefault();
+  }
+
+  function endDrag(e) {
+    if (!drag) return;
+    if (e?.pointerId !== undefined) { try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* niet kritiek */ } }
+    drag = null;
+    controls.enabled = true;
+  }
+
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
   const clock = new THREE.Clock();
   function animate() {
     requestAnimationFrame(animate);
@@ -489,7 +674,10 @@ export function createShirtViewer(canvas, opts = {}) {
     setShirtColor,
     setArtwork,
     setArtworkTransform,
+    setArtworkPlacement,
     setName,
+    setNameTransform,
+    setNamePlacement,
     getArtworkCanvas,
     captureHighResPNG,
     goToPreset,

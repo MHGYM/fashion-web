@@ -37,3 +37,7 @@ export const PRICING = {
 export function defaultArtworkTransform() {
   return { x: 0, y: 0, scale: 1, rotation: 0 };
 }
+
+export function defaultNameTransform() {
+  return { x: 0, y: 0.32 };
+}
