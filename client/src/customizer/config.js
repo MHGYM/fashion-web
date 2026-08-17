@@ -62,7 +62,7 @@ export const PRICING = {
 
 // Verplichte disclaimer bij "Confirm Design".
 export const CONFIRM_DISCLAIMER =
-  'Ik begrijp dat mijn custom gear ongeveer 4-6 weken duurt om te maken en te ' +
+  'Ik begrijp dat mijn custom gear ongeveer 3-6 weken duurt om te maken en te ' +
   'verzenden. Zodra mijn ontwerp is ingediend kan het niet meer worden gewijzigd, ' +
   'terugbetaald of geretourneerd, tenzij er een fout is gemaakt van onze kant. ' +
   'Een track & trace wordt verstuurd zodra je bestelling klaar is.'
