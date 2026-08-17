@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FightMarketing — Stel je T-shirt samen</title>
+<meta name="description" content="Ontwerp je eigen FightMarketing fight jersey in 3D.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../configurator/css/style.css">
+<style>
+  /* De gedeelde stylesheet maakt alleen #glove-canvas passend aan zijn ouder.
+     Zonder een eigen regel valt dit canvas terug op zijn attribuut-formaat,
+     groeit de ouder mee en blaast de ResizeObserver het beeld op tot miljoenen
+     pixels hoog. Zelfde regels als #glove-canvas, apart gehouden zodat de
+     bokshandschoen-stylesheet ongewijzigd blijft. */
+  #shirt-canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #shirt-canvas:active { cursor: grabbing; }
+
+  /* Kleurkaart iets compacter dan de standaard .card/.color-toggle-maten uit
+     de gedeelde stylesheet (id-gescopeerd, dus de bokshandschoen-configurator
+     blijft ongemoeid) — zo blijven shirt + bediening eronder samen beter
+     zichtbaar, zowel dicht als open. */
+  #color-card { padding: 12px 16px; }
+  #color-card .color-toggle { padding-bottom: 8px; }
+  #color-card .swatches { gap: 6px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/">
+    <svg class="brand-mark" viewBox="0 0 108 62" aria-hidden="true">
+      <path d="M0,0 h41 v13 h-27 v11 h22 v13 h-22 v25 h-14 z"/>
+      <path d="M53,0 h15 l13,26 l13,-26 h15 v62 h-14 v-35 l-11,22 h-6 l-11,-22 v35 h-14 z"/>
+    </svg>
+    <span class="brand-text">FIGHT<em>MARKETING</em></span>
+  </a>
+  <nav class="topnav">
+    <a href="/">Home</a>
+    <a href="/shop">Shop</a>
+    <a class="is-active" href="/configurator-shirt/" aria-current="page">T-shirt</a>
+    <a href="/configurator/">Handschoenen</a>
+    <a href="/scholen">Scholen</a>
+  </nav>
+  <span class="chip">Made to order</span>
+</header>
+
+<main class="layout">
+
+  <div class="editor-col">
+
+    <section class="stage">
+      <div class="stage-head">
+        <h1 id="stage-title">Custom Fight Jersey</h1>
+        <p id="stage-hint">Kies een kleur voor het hele shirt en voeg optioneel je eigen logo en naam toe.</p>
+      </div>
+
+      <div class="stage-inner">
+        <canvas id="shirt-canvas" role="img" aria-label="Draaibare 3D-weergave van je T-shirt"></canvas>
+        <div id="stage-loading" class="stage-loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>3D-model laden…</span>
+        </div>
+        <p id="stage-error" class="stage-error" hidden></p>
+      </div>
+
+      <div class="view-bar" role="group" aria-label="Weergave">
+        <button type="button" data-cam="front" class="is-active" aria-pressed="true">Voor</button>
+        <button type="button" data-cam="back" aria-pressed="false">Achter</button>
+        <span class="view-sep" aria-hidden="true"></span>
+        <button type="button" id="zoom-out" title="Uitzoomen" aria-label="Uitzoomen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button type="button" id="zoom-in" title="Inzoomen" aria-label="Inzoomen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button type="button" id="cam-reset" title="Beeld herstellen" aria-label="Beeld herstellen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
+        </button>
+      </div>
+      <p class="stage-foot">Sleep om te draaien · scroll om te zoomen</p>
+    </section>
+
+    <!-- Eén kleurpaneel voor het HELE shirt (voorkant, achterkant, beide
+         mouwen, schouders) — geen aparte zones zoals bij de handschoen, want
+         de kleur moet overal naadloos hetzelfde zijn. Inklap-toggle + paneel
+         worden door JS opgebouwd (zelfde .color-toggle/.color-panel-patroon
+         als de bestaande bokshandschoen-configurator), zodat het palet dicht
+         kan en het shirt + de bediening eronder tegelijk beter zichtbaar
+         blijven. -->
+    <section class="card zone-editor-card" id="color-card"></section>
+
+    <section class="card zone-editor-card" id="artwork-panel"></section>
+
+    <div class="editor-sub" id="name-card">
+      <h2 class="card-title">Naam toevoegen
+        <span class="opt">optioneel</span><span class="price-tag">+ €10,00</span>
+      </h2>
+      <span class="field-label">Plaatsing</span>
+      <div id="name-placement" class="chip-row"></div>
+      <input id="name-input" class="input" type="text" maxlength="20"
+             placeholder="JOUW NAAM" autocomplete="off" spellcheck="false">
+      <label class="field-label" for="name-font">Lettertype</label>
+      <select id="name-font" class="input select"></select>
+      <span class="field-label">Grootte</span>
+      <div id="name-size" class="size-row" role="group" aria-label="Tekstgrootte"></div>
+      <div class="inline-field">
+        <span class="field-label no-margin">Tekstkleur</span>
+        <div id="name-color" class="mini-swatches"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <aside class="col-right">
+    <section class="card">
+      <h2 class="card-title">Maat</h2>
+      <div id="size-row" class="chip-row" role="group" aria-label="Maat"></div>
+      <p class="hint" id="size-hint">Kies een maat om te kunnen bestellen.</p>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">Prijsopbouw</h2>
+      <dl id="price-rows" class="price-rows"></dl>
+      <div class="price-total">
+        <span>Totaal</span>
+        <strong id="price-total">€25,95</strong>
+      </div>
+      <button id="add-to-cart" class="btn btn-gold btn-full" type="button">In winkelwagen</button>
+      <p id="cart-msg" class="cart-msg" hidden></p>
+      <button id="save-design" class="btn btn-ghost btn-full" type="button">Ontwerp downloaden</button>
+      <button id="reset" class="btn btn-quiet btn-full" type="button">Opnieuw beginnen</button>
+    </section>
+  </aside>
+
+</main>
+
+<footer class="trust-bar">
+  <div><strong>Gratis verzending</strong><span>Op alle custom orders</span></div>
+  <div><strong>Made to order</strong><span>3–6 weken levertijd</span></div>
+  <div><strong>Premium kwaliteit</strong><span>Duurzame materialen</span></div>
+  <div><strong>Veilig betalen</strong><span>iDEAL &amp; meer</span></div>
+</footer>
+
+<p class="attribution">3D-model &ldquo;Tshirt&rdquo; van <a href="https://sketchfab.com/Tabbuso" target="_blank" rel="noopener">Tabbuso</a>, gebruikt onder <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a>.</p>
+
+<script type="module" src="js/configurator.js"></script>
+</body>
+</html>

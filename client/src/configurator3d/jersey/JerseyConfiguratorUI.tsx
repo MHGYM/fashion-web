@@ -318,6 +318,11 @@ export default function JerseyConfiguratorUI() {
             {adding ? 'Bezig…' : 'IN WINKELWAGEN'}
           </button>
           {!user && <p className="jc-hint">Je moet ingelogd zijn om te bestellen.</p>}
+          <p className="jc-attribution">
+            3D-model &ldquo;Tshirt&rdquo; van{' '}
+            <a href="https://sketchfab.com/Tabbuso" target="_blank" rel="noopener">Tabbuso</a>, gebruikt onder{' '}
+            <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a>.
+          </p>
         </div>
       </div>
     </>

@@ -236,6 +236,17 @@
   text-align: center;
 }
 
+.jc-attribution {
+  font-size: 0.68rem;
+  color: var(--jc-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+.jc-attribution a {
+  color: var(--jc-muted);
+  text-decoration: underline;
+}
+
 .jc-btn {
   padding: 14px 18px;
   border-radius: 10px;

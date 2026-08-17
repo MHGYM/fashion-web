@@ -29,7 +29,10 @@ export const COLOR_PRESETS = [
   { name: 'Roze', hex: '#db2777' },
 ]
 
-export const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'] as const
+// Moet gelijk blijven aan SIZES in client/public/configurator-shirt/js/zones.js
+// en aan de seed in src/schema.js: XS en 3XL bestaan niet meer als variant, dus
+// een bestelling in die maten zou hier op "Ongeldige maat" stuklopen.
+export const SIZES = ['S', 'M', 'L', 'XL', 'XXL'] as const
 export type JerseySize = (typeof SIZES)[number]
 
 // Prijsstructuur — bedragen bewust nog op 0: de klant vult dit later zelf in.
