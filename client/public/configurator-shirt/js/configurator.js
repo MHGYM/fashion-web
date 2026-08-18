@@ -8,8 +8,9 @@
    Vereenvoudigd t.o.v. de handschoen omdat het shirt maar één kleurbare
    "zone" heeft (het hele shirt, zie zones.js) i.p.v. 9 losse onderdelen:
    geen model-lijst, geen zone-tabs. Eigen logo/ontwerp en naam zijn elk
-   onafhankelijk naar de voor- of achterkant te plaatsen en met de muis/touch
-   te verslepen op het canvas (zie scene3d.js, sectie "SLEPEN").
+   TWEE onafhankelijke instanties — één voor de voorkant, één voor de
+   achterkant — die tegelijk actief kunnen zijn en elk apart met de muis/
+   touch te verslepen zijn op het canvas (zie scene3d.js, sectie "SLEPEN").
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { createShirtViewer } from './scene3d.js';
@@ -17,46 +18,54 @@ import {
   COLORS, SIZES, PRICING, NAME_FONTS, NAME_SIZES, hexOf, defaultArtworkTransform, defaultNameTransform,
 } from './zones.js';
 
-const STORE_KEY = 'fm-shirt-config-v1';
+const STORE_KEY = 'fm-shirt-config-v2';
 const API = '/api/customizer';
 const PRODUCT_KEY = 'custom-jersey';
-const PLACEMENT_LABEL = { front: 'Voorkant', back: 'Achterkant' };
+const SIDES = ['front', 'back'];
+const SIDE_LABEL = { front: 'Voorkant', back: 'Achterkant' };
+
+function freshLogoSide() {
+  return { hasArtwork: false, artworkFile: null, transform: defaultArtworkTransform() };
+}
+function freshNameSide() {
+  return { text: '', font: NAME_FONTS[0].id, size: 'm', color: 'White', transform: defaultNameTransform() };
+}
 
 const state = {
   color: 'Black',
-  artworkTransform: defaultArtworkTransform(),
-  artworkPlacement: 'front',
-  hasArtwork: false,
-  artworkFile: null,
-  name: '',
-  nameFont: NAME_FONTS[0].id,
-  nameSize: 'm',
-  nameColor: 'White',
-  nameTransform: defaultNameTransform(),
-  namePlacement: 'front',
+  logo: { front: freshLogoSide(), back: freshLogoSide() },
+  name: { front: freshNameSide(), back: freshNameSide() },
   size: '',
 };
 
 const euro = (n) => '€' + n.toFixed(2).replace('.', ',');
 
 const shareable = () => ({
-  color: state.color, artworkTransform: state.artworkTransform, artworkPlacement: state.artworkPlacement,
-  name: state.name, nameFont: state.nameFont, nameSize: state.nameSize,
-  nameColor: state.nameColor, nameTransform: state.nameTransform, namePlacement: state.namePlacement,
+  color: state.color,
+  logo: { front: { transform: state.logo.front.transform }, back: { transform: state.logo.back.transform } },
+  name: state.name,
   size: state.size,
 });
 
 function applySaved(saved) {
   if (!saved) return;
   if (COLORS.some((c) => c.name === saved.color)) state.color = saved.color;
-  if (saved.artworkTransform) Object.assign(state.artworkTransform, saved.artworkTransform);
-  if (saved.artworkPlacement === 'front' || saved.artworkPlacement === 'back') state.artworkPlacement = saved.artworkPlacement;
-  if (typeof saved.name === 'string') state.name = saved.name.slice(0, 20);
-  if (NAME_FONTS.some((f) => f.id === saved.nameFont)) state.nameFont = saved.nameFont;
-  if (NAME_SIZES.some((s) => s.id === saved.nameSize)) state.nameSize = saved.nameSize;
-  if (COLORS.some((c) => c.name === saved.nameColor)) state.nameColor = saved.nameColor;
-  if (saved.nameTransform) Object.assign(state.nameTransform, saved.nameTransform);
-  if (saved.namePlacement === 'front' || saved.namePlacement === 'back') state.namePlacement = saved.namePlacement;
+  SIDES.forEach((side) => {
+    // Het geüploade bestand zelf (File/Image) overleeft een paginaherlaad
+    // sowieso niet en wordt dus bewust nooit hersteld — alleen de gekozen
+    // positie/schaal/rotatie, zodat een nieuwe upload daar meteen op staat.
+    const l = saved.logo?.[side];
+    if (l?.transform) Object.assign(state.logo[side].transform, l.transform);
+
+    const n = saved.name?.[side];
+    if (n) {
+      if (typeof n.text === 'string') state.name[side].text = n.text.slice(0, 20);
+      if (NAME_FONTS.some((f) => f.id === n.font)) state.name[side].font = n.font;
+      if (NAME_SIZES.some((s) => s.id === n.size)) state.name[side].size = n.size;
+      if (COLORS.some((c) => c.name === n.color)) state.name[side].color = n.color;
+      if (n.transform) Object.assign(state.name[side].transform, n.transform);
+    }
+  });
   if (SIZES.includes(saved.size)) state.size = saved.size;
 }
 function load() {
@@ -71,15 +80,17 @@ const canvas = $('shirt-canvas');
 
 load();
 // onArtworkDrag/onNameDrag: houdt de state (en dus de sliders/opslag) in sync
-// terwijl de klant het logo of de naam met de muis/touch over het shirt sleept.
+// terwijl de klant het logo of de naam met de muis/touch over het shirt
+// sleept — `side` geeft aan welke van de twee (voor/achter) instanties het
+// betreft, zodat de andere kant onaangeroerd blijft.
 const viewer = createShirtViewer(canvas, {
-  onArtworkDrag: (t) => {
-    state.artworkTransform = t;
-    syncArtworkPositionUI();
+  onArtworkDrag: (side, t) => {
+    state.logo[side].transform = t;
+    syncArtworkPositionUI(side, t);
     save();
   },
-  onNameDrag: (t) => {
-    state.nameTransform = t;
+  onNameDrag: (side, t) => {
+    state.name[side].transform = t;
     save();
   },
 });
@@ -93,30 +104,13 @@ function el(tag, cls, text) {
   return n;
 }
 
-function pushName() {
-  const font = NAME_FONTS.find((f) => f.id === state.nameFont) || NAME_FONTS[0];
-  const size = NAME_SIZES.find((s) => s.id === state.nameSize) || NAME_SIZES[2];
-  viewer.setName(state.name.trim() ? {
-    text: state.name.trim(), color: hexOf(state.nameColor), fontCss: font.css, fontScale: size.scale,
-  } : null, state.namePlacement, state.nameTransform);
-}
-
-/** Bouwt een "Voorkant/Achterkant"-keuze zoals de bestaande maat-chips
- *  (#size-row), zodat logo en naam elk apart naar de voor- of achterkant
- *  van het shirt verplaatst kunnen worden. */
-function placementToggle(selected, onPick) {
-  const row = el('div', 'chip-row');
-  ['front', 'back'].forEach((p) => {
-    const b = el('button', p === selected ? 'is-active' : '', PLACEMENT_LABEL[p]);
-    b.type = 'button';
-    b.addEventListener('click', () => {
-      row.querySelectorAll('button').forEach((x) => x.classList.remove('is-active'));
-      b.classList.add('is-active');
-      onPick(p);
-    });
-    row.appendChild(b);
-  });
-  return row;
+function pushName(side) {
+  const s = state.name[side];
+  const font = NAME_FONTS.find((f) => f.id === s.font) || NAME_FONTS[0];
+  const size = NAME_SIZES.find((sz) => sz.id === s.size) || NAME_SIZES[2];
+  viewer.setName(s.text.trim() ? {
+    text: s.text.trim(), color: hexOf(s.color), fontCss: font.css, fontScale: size.scale,
+  } : null, side, s.transform);
 }
 
 function swatchGrid(selectedName, onPick, cls) {
@@ -137,19 +131,21 @@ function swatchGrid(selectedName, onPick, cls) {
   return grid;
 }
 
-function slider(label, key, min, max, step, fmt) {
+/** Generieke schuifregelaar op een willekeurig transform-object (i.p.v. een
+ *  vast state-veld), zodat dezelfde functie voor de front- én back-instantie
+ *  van het logo hergebruikt kan worden. */
+function slider(transformObj, label, key, min, max, step, fmt, onChange) {
   const row = el('div', 'ctrl-row');
   const head = el('div', 'ctrl-head');
-  const val = el('span', 'ctrl-value', fmt(state.artworkTransform[key]));
+  const val = el('span', 'ctrl-value', fmt(transformObj[key]));
   head.append(el('span', 'ctrl-label', label), val);
   const input = document.createElement('input');
   input.type = 'range'; input.min = min; input.max = max; input.step = step;
-  input.value = state.artworkTransform[key];
+  input.value = transformObj[key];
   input.addEventListener('input', () => {
-    state.artworkTransform[key] = parseFloat(input.value);
-    val.textContent = fmt(state.artworkTransform[key]);
-    viewer.setArtworkTransform(state.artworkTransform);
-    save();
+    transformObj[key] = parseFloat(input.value);
+    val.textContent = fmt(transformObj[key]);
+    onChange();
   });
   row.append(head, input);
   return { row, input, val };
@@ -194,8 +190,8 @@ function dropzone(titleText, subText, onFile) {
 // Zelfde in-/uitklappatroon (.color-toggle/.color-panel) als de bestaande
 // bokshandschoen-configurator (client/public/configurator/js/configurator.js)
 // — puur UI-state, niet opgeslagen en niet van invloed op state.color/
-// artwork/name: in-/uitklappen verandert dus nooit de gekozen kleur, het
-// logo, de naam of hun positie.
+// logo/naam: in-/uitklappen verandert dus nooit de gekozen kleur, logo's,
+// namen of hun posities.
 let colorPanelOpen = true;
 
 function buildColorPanel() {
@@ -232,108 +228,145 @@ function buildColorPanel() {
   box.appendChild(colorPanel);
 }
 
-/* ── Eigen logo/ontwerp op de voor- of achterkant ────────────────────────── */
-let artworkPositionSliders = null; // {x,y}-sliderrefs, live bijgewerkt tijdens slepen op het canvas
+/* ── Eigen logo/ontwerp — los op voorkant én achterkant ──────────────────── */
+// {x,y}-sliderrefs per kant, live bijgewerkt tijdens slepen op het canvas.
+const artworkPositionSliders = { front: null, back: null };
 
-function syncArtworkPositionUI() {
-  if (!artworkPositionSliders) return;
-  const t = state.artworkTransform;
-  artworkPositionSliders.x.input.value = t.x;
-  artworkPositionSliders.x.val.textContent = `${Math.round(t.x * 200)}%`;
-  artworkPositionSliders.y.input.value = t.y;
-  artworkPositionSliders.y.val.textContent = `${Math.round(t.y * 200)}%`;
+function syncArtworkPositionUI(side, t) {
+  const refs = artworkPositionSliders[side];
+  if (!refs) return;
+  refs.x.input.value = t.x;
+  refs.x.val.textContent = `${Math.round(t.x * 200)}%`;
+  refs.y.input.value = t.y;
+  refs.y.val.textContent = `${Math.round(t.y * 200)}%`;
+}
+
+function buildLogoSide(box, side) {
+  const s = state.logo[side];
+  artworkPositionSliders[side] = null;
+
+  const wrap = el('div', 'stack');
+  wrap.style.marginTop = '14px';
+  wrap.appendChild(el('span', 'field-label', SIDE_LABEL[side]));
+
+  const dz = dropzone(
+    `Sleep je logo hierheen (${SIDE_LABEL[side].toLowerCase()})`,
+    'of klik om te kiezen · PNG, JPG of SVG · max 5MB',
+    (img, file) => {
+      s.transform = defaultArtworkTransform();
+      s.hasArtwork = true;
+      s.artworkFile = file || null;
+      viewer.setArtwork(img, s.transform, side);
+      buildArtworkPanel(); renderPrice(); save();
+    },
+  );
+  wrap.appendChild(dz.zone);
+
+  if (s.hasArtwork) {
+    const tools = el('div', 'stack');
+    tools.style.marginTop = '10px';
+    const onChange = () => { viewer.setArtworkTransform(s.transform, side); save(); };
+    const sx = slider(s.transform, 'Horizontaal', 'x', -0.5, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`, onChange);
+    const sy = slider(s.transform, 'Verticaal', 'y', -0.5, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`, onChange);
+    const ss = slider(s.transform, 'Grootte', 'scale', 0.2, 3, 0.01, (v) => `${Math.round(v * 100)}%`, onChange);
+    const sr = slider(s.transform, 'Rotatie', 'rotation', -180, 180, 1, (v) => `${Math.round(v)}°`, onChange);
+    artworkPositionSliders[side] = { x: sx, y: sy };
+    const clear = el('button', 'btn btn-quiet btn-full', `Logo ${SIDE_LABEL[side].toLowerCase()} verwijderen`);
+    clear.type = 'button';
+    clear.addEventListener('click', () => {
+      s.hasArtwork = false;
+      s.artworkFile = null;
+      viewer.setArtwork(null, null, side);
+      buildArtworkPanel(); renderPrice(); save();
+    });
+    tools.append(sx.row, sy.row, ss.row, sr.row, clear);
+    wrap.appendChild(tools);
+  }
+  box.appendChild(wrap);
 }
 
 function buildArtworkPanel() {
   const box = $('artwork-panel');
   box.innerHTML = '';
-  artworkPositionSliders = null;
 
   const h = el('h2', 'card-title', 'Eigen logo / ontwerp');
   h.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.customLogo)}`));
   box.appendChild(h);
-  box.appendChild(el('p', 'hint', 'Upload je eigen logo of ontwerp en sleep het naar de gewenste plek op het shirt.'));
+  box.appendChild(el('p', 'hint', 'Upload je eigen logo of ontwerp — apart voor voor- en achterkant — en sleep het naar de gewenste plek op het shirt.'));
 
-  box.appendChild(el('span', 'field-label', 'Plaatsing'));
-  box.appendChild(placementToggle(state.artworkPlacement, (p) => {
-    state.artworkPlacement = p;
-    if (state.hasArtwork) viewer.setArtworkPlacement(p);
-    save();
-  }));
-
-  const dz = dropzone('Sleep je logo hierheen', 'of klik om te kiezen · PNG, JPG of SVG · max 5MB', (img, file) => {
-    state.artworkTransform = defaultArtworkTransform();
-    state.hasArtwork = true;
-    state.artworkFile = file || null;
-    viewer.setArtwork(img, state.artworkTransform, state.artworkPlacement);
-    buildArtworkPanel(); renderPrice(); save();
-  });
-  box.appendChild(dz.zone);
-
-  if (state.hasArtwork) {
-    const tools = el('div', 'stack');
-    tools.style.marginTop = '14px';
-    const sx = slider('Horizontaal', 'x', -0.5, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`);
-    const sy = slider('Verticaal', 'y', -0.5, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`);
-    const ss = slider('Grootte', 'scale', 0.2, 3, 0.01, (v) => `${Math.round(v * 100)}%`);
-    const sr = slider('Rotatie', 'rotation', -180, 180, 1, (v) => `${Math.round(v)}°`);
-    artworkPositionSliders = { x: sx, y: sy };
-    const clear = el('button', 'btn btn-quiet btn-full', 'Logo verwijderen');
-    clear.type = 'button';
-    clear.addEventListener('click', () => {
-      state.hasArtwork = false;
-      state.artworkFile = null;
-      viewer.setArtwork(null);
-      buildArtworkPanel(); renderPrice(); save();
-    });
-    tools.append(sx.row, sy.row, ss.row, sr.row, clear);
-    box.appendChild(tools);
-  }
+  SIDES.forEach((side) => buildLogoSide(box, side));
 }
 
-/* ── Naam op de voor- of achterkant ──────────────────────────────────────── */
-function buildNamePanel() {
-  const placementBox = $('name-placement');
-  placementBox.innerHTML = '';
-  placementBox.appendChild(placementToggle(state.namePlacement, (p) => {
-    state.namePlacement = p;
-    if (state.name.trim()) viewer.setNamePlacement(p);
-    save();
-  }));
+/* ── Naam — los op voorkant én achterkant ────────────────────────────────── */
+function buildNameSide(box, side) {
+  const s = state.name[side];
 
-  const input = $('name-input');
-  input.value = state.name;
+  const wrap = el('div', 'stack');
+  wrap.style.marginTop = '14px';
+  wrap.appendChild(el('span', 'field-label', SIDE_LABEL[side]));
+
+  const input = document.createElement('input');
+  input.className = 'input';
+  input.type = 'text';
+  input.maxLength = 20;
+  input.placeholder = 'JOUW NAAM';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.value = s.text;
   input.addEventListener('input', () => {
-    state.name = input.value.slice(0, 20);
-    pushName(); renderPrice(); save();
+    s.text = input.value.slice(0, 20);
+    pushName(side); renderPrice(); save();
   });
+  wrap.appendChild(input);
 
-  const fontSel = $('name-font');
+  const fontLabel = el('label', 'field-label', 'Lettertype');
+  wrap.appendChild(fontLabel);
+  const fontSel = document.createElement('select');
+  fontSel.className = 'input select';
   NAME_FONTS.forEach((f) => {
     const o = document.createElement('option');
     o.value = f.id; o.textContent = f.label;
     fontSel.appendChild(o);
   });
-  fontSel.value = state.nameFont;
-  fontSel.addEventListener('change', () => { state.nameFont = fontSel.value; pushName(); save(); });
+  fontSel.value = s.font;
+  fontSel.addEventListener('change', () => { s.font = fontSel.value; pushName(side); save(); });
+  wrap.appendChild(fontSel);
 
-  const sizeWrap = $('name-size');
-  NAME_SIZES.forEach((s) => {
-    const b = el('button', s.id === state.nameSize ? 'is-active' : '', s.label);
+  wrap.appendChild(el('span', 'field-label', 'Grootte'));
+  const sizeWrap = el('div', 'size-row');
+  NAME_SIZES.forEach((sz) => {
+    const b = el('button', sz.id === s.size ? 'is-active' : '', sz.label);
     b.type = 'button';
-    b.setAttribute('aria-label', `Tekstgrootte ${s.id}`);
+    b.setAttribute('aria-label', `Tekstgrootte ${sz.id}`);
     b.addEventListener('click', () => {
-      state.nameSize = s.id;
+      s.size = sz.id;
       sizeWrap.querySelectorAll('button').forEach((x) => x.classList.remove('is-active'));
       b.classList.add('is-active');
-      pushName(); save();
+      pushName(side); save();
     });
     sizeWrap.appendChild(b);
   });
+  wrap.appendChild(sizeWrap);
 
-  $('name-color').appendChild(
-    swatchGrid(state.nameColor, (c) => { state.nameColor = c.name; pushName(); save(); }, 'mini-swatches'),
-  );
+  const inlineField = el('div', 'inline-field');
+  inlineField.appendChild(el('span', 'field-label no-margin', 'Tekstkleur'));
+  inlineField.appendChild(swatchGrid(s.color, (c) => { s.color = c.name; pushName(side); save(); }, 'mini-swatches'));
+  wrap.appendChild(inlineField);
+
+  box.appendChild(wrap);
+}
+
+function buildNamePanel() {
+  const box = $('name-card');
+  box.innerHTML = '';
+
+  const h = el('h2', 'card-title', 'Naam toevoegen');
+  h.appendChild(el('span', 'opt', 'optioneel'));
+  h.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.name)}`));
+  box.appendChild(h);
+  box.appendChild(el('p', 'hint', 'Voeg een naam toe op de voorkant en/of de achterkant — beide onafhankelijk te verslepen op het shirt.'));
+
+  SIDES.forEach((side) => buildNameSide(box, side));
 }
 
 function buildSizePanel() {
@@ -355,10 +388,13 @@ function buildSizePanel() {
   if (state.size) $('size-hint').textContent = `Maat ${state.size} geselecteerd.`;
 }
 
+function hasAnyLogo() { return state.logo.front.hasArtwork || state.logo.back.hasArtwork; }
+function hasAnyName() { return !!(state.name.front.text.trim() || state.name.back.text.trim()); }
+
 function renderPrice() {
   const rows = [['Shirt', PRICING.base]];
-  if (state.hasArtwork) rows.push(['Eigen logo/ontwerp', PRICING.customLogo]);
-  if (state.name.trim()) rows.push(['Naam', PRICING.name]);
+  if (hasAnyLogo()) rows.push(['Eigen logo/ontwerp', PRICING.customLogo]);
+  if (hasAnyName()) rows.push(['Naam', PRICING.name]);
   const wrap = $('price-rows');
   wrap.innerHTML = '';
   rows.forEach(([label, amount]) => {
@@ -370,19 +406,31 @@ function renderPrice() {
 }
 
 /* ── Configuratie voor de winkelwagen ─────────────────────────────────── */
+function sideImageConfig(side) {
+  const s = state.logo[side];
+  return s.hasArtwork ? { placement: SIDE_LABEL[side], transform: { ...s.transform } } : null;
+}
+function sideNameConfig(side) {
+  const s = state.name[side];
+  if (!s.text.trim()) return null;
+  return {
+    text: s.text.trim(), color: s.color,
+    font: (NAME_FONTS.find((f) => f.id === s.font) || {}).label, size: s.size,
+    placement: SIDE_LABEL[side], transform: { ...s.transform },
+  };
+}
+
 function buildConfig() {
+  const logoFront = sideImageConfig('front');
+  const logoBack = sideImageConfig('back');
+  const nameFront = sideNameConfig('front');
+  const nameBack = sideNameConfig('back');
   return {
     product: 'Custom Fight Jersey',
     size: state.size,
     color: state.color,
-    customImage: state.hasArtwork
-      ? { placement: PLACEMENT_LABEL[state.artworkPlacement], transform: { ...state.artworkTransform } }
-      : null,
-    name: state.name.trim() ? {
-      text: state.name.trim(), color: state.nameColor,
-      font: (NAME_FONTS.find((f) => f.id === state.nameFont) || {}).label, size: state.nameSize,
-      placement: PLACEMENT_LABEL[state.namePlacement], transform: { ...state.nameTransform },
-    } : null,
+    customImage: (logoFront || logoBack) ? { front: logoFront, back: logoBack } : null,
+    name: (nameFront || nameBack) ? { front: nameFront, back: nameBack } : null,
   };
 }
 
@@ -423,28 +471,28 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: mime });
 }
 
-async function buildProductionConfig(designId) {
-  let customImage = null;
-  if (state.hasArtwork) {
-    const zone = state.artworkPlacement;
-    customImage = { placement: PLACEMENT_LABEL[zone], transform: { ...state.artworkTransform } };
-    if (state.artworkFile) {
-      customImage.originalFilename = state.artworkFile.name;
-      customImage.originalMimeType = state.artworkFile.type || null;
-      customImage.originalUrl = await uploadDesignAsset(designId, 'original', zone, state.artworkFile, state.artworkFile.name);
-    }
-    const artCanvas = viewer.getArtworkCanvas(zone, 2048);
-    if (artCanvas) {
-      const blob = await canvasToPngBlob(artCanvas);
-      if (blob) customImage.artworkUrl = await uploadDesignAsset(designId, 'artwork', zone, blob, `${zone}-artwork.png`);
-    }
+async function sideImageProduction(designId, side) {
+  const s = state.logo[side];
+  if (!s.hasArtwork) return null;
+  const obj = { placement: SIDE_LABEL[side], transform: { ...s.transform } };
+  if (s.artworkFile) {
+    obj.originalFilename = s.artworkFile.name;
+    obj.originalMimeType = s.artworkFile.type || null;
+    obj.originalUrl = await uploadDesignAsset(designId, 'original', side, s.artworkFile, s.artworkFile.name);
   }
+  const artCanvas = viewer.getArtworkCanvas(side, 2048);
+  if (artCanvas) {
+    const blob = await canvasToPngBlob(artCanvas);
+    if (blob) obj.artworkUrl = await uploadDesignAsset(designId, 'artwork', side, blob, `${side}-artwork.png`);
+  }
+  return obj;
+}
 
-  const nameObj = state.name.trim() ? {
-    text: state.name.trim(), color: state.nameColor,
-    font: (NAME_FONTS.find((f) => f.id === state.nameFont) || {}).label, size: state.nameSize,
-    placement: PLACEMENT_LABEL[state.namePlacement], transform: { ...state.nameTransform },
-  } : null;
+async function buildProductionConfig(designId) {
+  const logoFront = await sideImageProduction(designId, 'front');
+  const logoBack = await sideImageProduction(designId, 'back');
+  const nameFront = sideNameConfig('front');
+  const nameBack = sideNameConfig('back');
 
   let shirtPreviewUrl = null;
   {
@@ -454,8 +502,10 @@ async function buildProductionConfig(designId) {
     shirtPreviewUrl = await uploadDesignAsset(designId, 'preview', 'general', previewBlob, 'shirt-preview.png');
   }
 
-  const logoSurcharge = state.hasArtwork ? PRICING.customLogo : 0;
-  const nameSurcharge = nameObj ? PRICING.name : 0;
+  const hasLogo = !!(logoFront || logoBack);
+  const hasName = !!(nameFront || nameBack);
+  const logoSurcharge = hasLogo ? PRICING.customLogo : 0;
+  const nameSurcharge = hasName ? PRICING.name : 0;
   const displayedTotal = Math.round((PRICING.base + logoSurcharge + nameSurcharge) * 100) / 100;
 
   return {
@@ -463,8 +513,8 @@ async function buildProductionConfig(designId) {
     product: 'Custom Fight Jersey',
     size: state.size,
     color: state.color,
-    customImage,
-    name: nameObj,
+    customImage: hasLogo ? { front: logoFront, back: logoBack } : null,
+    name: hasName ? { front: nameFront, back: nameBack } : null,
     shirtPreviewUrl,
     pricing: { base: PRICING.base, logoSurcharge, nameSurcharge, displayedTotal },
   };
@@ -544,14 +594,10 @@ function wireActions() {
 
   $('reset').addEventListener('click', () => {
     state.color = 'Black';
-    state.artworkTransform = defaultArtworkTransform();
-    state.artworkPlacement = 'front';
-    state.hasArtwork = false; state.artworkFile = null;
-    state.name = ''; state.size = '';
-    state.nameFont = NAME_FONTS[0].id; state.nameSize = 'm'; state.nameColor = 'White';
-    state.nameTransform = defaultNameTransform(); state.namePlacement = 'front';
-    viewer.setArtwork(null);
-    viewer.setName(null);
+    state.logo = { front: freshLogoSide(), back: freshLogoSide() };
+    state.name = { front: freshNameSide(), back: freshNameSide() };
+    state.size = '';
+    SIDES.forEach((side) => { viewer.setArtwork(null, null, side); viewer.setName(null, side); });
     localStorage.removeItem(STORE_KEY);
     location.reload();
   });
@@ -567,8 +613,7 @@ viewer.ready.then(async () => {
   renderPrice();
   wireActions();
   viewer.setShirtColor(hexOf(state.color));
-  pushName();
-  if (state.hasArtwork) buildArtworkPanel();
+  SIDES.forEach((side) => pushName(side));
 }).catch((err) => {
   console.error('[3D] laden mislukt:', err);
   $('stage-loading').classList.add('is-hidden');

@@ -92,25 +92,13 @@
          blijven. -->
     <section class="card zone-editor-card" id="color-card"></section>
 
+    <!-- Logo en naam zijn elk apart op voor- én achterkant tegelijk te
+         plaatsen (twee onafhankelijke instanties per onderdeel) — daarom
+         volledig door JS opgebouwd i.p.v. één vaste set velden, zie
+         buildArtworkPanel()/buildNamePanel() in configurator.js. -->
     <section class="card zone-editor-card" id="artwork-panel"></section>
 
-    <div class="editor-sub" id="name-card">
-      <h2 class="card-title">Naam toevoegen
-        <span class="opt">optioneel</span><span class="price-tag">+ €10,00</span>
-      </h2>
-      <span class="field-label">Plaatsing</span>
-      <div id="name-placement" class="chip-row"></div>
-      <input id="name-input" class="input" type="text" maxlength="20"
-             placeholder="JOUW NAAM" autocomplete="off" spellcheck="false">
-      <label class="field-label" for="name-font">Lettertype</label>
-      <select id="name-font" class="input select"></select>
-      <span class="field-label">Grootte</span>
-      <div id="name-size" class="size-row" role="group" aria-label="Tekstgrootte"></div>
-      <div class="inline-field">
-        <span class="field-label no-margin">Tekstkleur</span>
-        <div id="name-color" class="mini-swatches"></div>
-      </div>
-    </div>
+    <div class="editor-sub" id="name-card"></div>
 
   </div>
 
