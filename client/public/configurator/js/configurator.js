@@ -156,6 +156,16 @@ function buildModelList() {
     btn.addEventListener('click', () => { if (m.id !== state.model) switchModel(m.id); });
     wrap.appendChild(btn);
   });
+
+  // T-shirt is geen bokshandschoen-model (ander mesh/zone-systeem, eigen
+  // pagina) en kan dus niet via switchModel() ingeladen worden — dit is
+  // een gewone link naar /configurator-shirt/, alleen visueel als tegel
+  // meegenomen in dezelfde rij zodat de klant ook dit product hier vindt.
+  const shirtLink = el('a', 'model-item');
+  shirtLink.href = '/configurator-shirt/';
+  shirtLink.style.textDecoration = 'none';
+  shirtLink.append(el('span', 'model-name', 'T-shirt'), el('span', 'model-sub', 'Fight Jersey'));
+  wrap.appendChild(shirtLink);
 }
 
 /** Wisselt van 3D-model en zet alle instellingen opnieuw toe. */
