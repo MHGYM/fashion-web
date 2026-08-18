@@ -20,8 +20,9 @@
    een mouw nooit kan achterblijven op de oude kleur: er is maar één canvas/
    materiaal-object, alle 4 de zone-meshes wijzen ernaar.
 
-   Logo en naam kunnen elk onafhankelijk op de voor- of achterkant geplaatst
-   worden en zijn met de muis/touch versleepbaar (zie "SLEPEN" hieronder).
+   Logo en naam kunnen elk tegelijk op ZOWEL de voorkant als de achterkant
+   staan (onafhankelijke front/back-sleuven, zie logoState/nameState) en zijn
+   op elke kant apart met de muis/touch versleepbaar (zie "SLEPEN" hieronder).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import * as THREE from '../../configurator/js/vendor/three/three.module.js';
@@ -232,8 +233,10 @@ export function createShirtViewer(canvas, opts = {}) {
   // de camera net naar de andere kant kijkt).
   const logoLayers = { front: null, back: null };
   const nameLayers = { front: null, back: null };
-  let logoState = null; // { img, transform:{x,y,scale,rotation}, placement }
-  let nameState = null; // { text, color, fontCss, fontScale, transform:{x,y}, placement }
+  // Onafhankelijke sleuven per kant — een logo/naam op de voorkant en op de
+  // achterkant kunnen tegelijk actief zijn, elk met hun eigen inhoud/positie.
+  const logoState = { front: null, back: null }; // { img, transform:{x,y,scale,rotation} } | null
+  const nameState = { front: null, back: null }; // { text, color, fontCss, fontScale, transform:{x,y} } | null
   let camRadius = 3, camTargetY = 0.5, camAnim = null;
   let shirtHeight = TARGET_HEIGHT;
 
@@ -277,29 +280,31 @@ export function createShirtViewer(canvas, opts = {}) {
     ctx.fillText(label, x, y);
   }
 
-  function repaintLogo() {
-    ['front', 'back'].forEach((side) => {
-      const L = logoLayers[side];
+  function repaintLogo(side) {
+    const sides = side ? [side] : ['front', 'back'];
+    sides.forEach((s) => {
+      const L = logoLayers[s];
       if (!L) return;
       L.ctx.setTransform(1, 0, 0, 1, 0, 0);
       L.ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-      const active = !!(logoState && logoState.placement === side);
-      if (active) drawCoverImage(L.ctx, TEX_SIZE, TEX_SIZE, logoState.img, logoState.transform);
+      const item = logoState[s];
+      if (item) drawCoverImage(L.ctx, TEX_SIZE, TEX_SIZE, item.img, item.transform);
       L.texture.needsUpdate = true;
-      L.mesh.visible = active;
+      L.mesh.visible = !!item;
     });
   }
 
-  function repaintName() {
-    ['front', 'back'].forEach((side) => {
-      const N = nameLayers[side];
+  function repaintName(side) {
+    const sides = side ? [side] : ['front', 'back'];
+    sides.forEach((s) => {
+      const N = nameLayers[s];
       if (!N) return;
       N.ctx.setTransform(1, 0, 0, 1, 0, 0);
       N.ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-      const active = !!(nameState && nameState.placement === side && nameState.text);
-      if (active) drawName(N.ctx, TEX_SIZE, TEX_SIZE, nameState, nameState.transform);
+      const item = nameState[s];
+      if (item) drawName(N.ctx, TEX_SIZE, TEX_SIZE, item, item.transform);
       N.texture.needsUpdate = true;
-      N.mesh.visible = active;
+      N.mesh.visible = !!item;
     });
   }
 
@@ -463,60 +468,47 @@ export function createShirtViewer(canvas, opts = {}) {
 
   const setShirtColor = (hex) => { repaintBody(hex); renderNow(); };
 
-  const setArtwork = (img, transform, placement) => {
-    logoState = img ? {
-      img,
-      transform: transform || defaultTransform(),
-      placement: placement || logoState?.placement || 'front',
-    } : null;
-    repaintLogo();
-    renderNow();
-  };
-  const setArtworkTransform = (transform) => {
-    if (!logoState) return;
-    logoState.transform = transform;
-    repaintLogo();
-    renderNow();
-  };
-  const setArtworkPlacement = (placement) => {
-    if (!logoState) return;
-    logoState.placement = placement;
-    repaintLogo();
-    renderNow();
-  };
   function defaultTransform() { return { x: 0, y: 0, scale: 1, rotation: 0 }; }
 
-  const setName = (opts, placement, transform) => {
-    nameState = (opts && opts.text) ? {
+  /** Zet (of wist, als img=null) het logo op ÉÉN kant — de andere kant blijft
+   *  onaangeroerd, dus front en back kunnen tegelijk een eigen logo hebben. */
+  const setArtwork = (img, transform, side) => {
+    logoState[side] = img ? { img, transform: transform || defaultTransform() } : null;
+    repaintLogo(side);
+    renderNow();
+  };
+  const setArtworkTransform = (transform, side) => {
+    if (!logoState[side]) return;
+    logoState[side].transform = transform;
+    repaintLogo(side);
+    renderNow();
+  };
+
+  /** Zet (of wist) de naam op ÉÉN kant — zelfde onafhankelijkheid als het logo. */
+  const setName = (opts, side, transform) => {
+    nameState[side] = (opts && opts.text) ? {
       ...opts,
-      transform: transform || nameState?.transform || { x: 0, y: 0.32 },
-      placement: placement || nameState?.placement || 'front',
+      transform: transform || nameState[side]?.transform || { x: 0, y: 0.32 },
     } : null;
-    repaintName();
+    repaintName(side);
     renderNow();
   };
-  const setNameTransform = (transform) => {
-    if (!nameState) return;
-    nameState.transform = transform;
-    repaintName();
-    renderNow();
-  };
-  const setNamePlacement = (placement) => {
-    if (!nameState) return;
-    nameState.placement = placement;
-    repaintName();
+  const setNameTransform = (transform, side) => {
+    if (!nameState[side]) return;
+    nameState[side].transform = transform;
+    repaintName(side);
     renderNow();
   };
 
   function getArtworkCanvas(zone, size = 2048) {
-    const hasLogo = !!(logoState && logoState.placement === zone);
-    const hasName = !!(nameState && nameState.placement === zone && nameState.text);
-    if (!hasLogo && !hasName) return null;
+    const logo = logoState[zone];
+    const name = nameState[zone];
+    if (!logo && !name) return null;
     const c = document.createElement('canvas');
     c.width = c.height = size;
     const ctx = c.getContext('2d');
-    if (hasLogo) drawCoverImage(ctx, size, size, logoState.img, logoState.transform);
-    if (hasName) drawName(ctx, size, size, nameState, nameState.transform);
+    if (logo) drawCoverImage(ctx, size, size, logo.img, logo.transform);
+    if (name) drawName(ctx, size, size, name, name.transform);
     return c;
   }
 
@@ -586,12 +578,14 @@ export function createShirtViewer(canvas, opts = {}) {
   }
 
   function pickLayerAt(tx, ty, side) {
-    if (nameState && nameState.placement === side) {
-      const t = nameState.transform;
+    const name = nameState[side];
+    if (name) {
+      const t = name.transform;
       if (Math.max(Math.abs(tx - t.x), Math.abs(ty - t.y)) <= HIT_RADIUS) return 'name';
     }
-    if (logoState && logoState.placement === side) {
-      const t = logoState.transform;
+    const logo = logoState[side];
+    if (logo) {
+      const t = logo.transform;
       if (Math.max(Math.abs(tx - t.x), Math.abs(ty - t.y)) <= HIT_RADIUS) return 'logo';
     }
     return null;
@@ -623,14 +617,15 @@ export function createShirtViewer(canvas, opts = {}) {
     if (!raycaster.ray.intersectPlane(drag.frame.plane, dragPoint)) return;
     const frac = localFraction(drag.frame, dragPoint);
     const t = { x: clampUnit(frac.x), y: clampUnit(frac.y) };
-    if (drag.kind === 'logo' && logoState) {
-      logoState.transform = { ...logoState.transform, x: t.x, y: t.y };
-      repaintLogo();
-      onArtworkDrag?.({ ...logoState.transform });
-    } else if (drag.kind === 'name' && nameState) {
-      nameState.transform = t;
-      repaintName();
-      onNameDrag?.({ ...nameState.transform });
+    const side = drag.side;
+    if (drag.kind === 'logo' && logoState[side]) {
+      logoState[side].transform = { ...logoState[side].transform, x: t.x, y: t.y };
+      repaintLogo(side);
+      onArtworkDrag?.(side, { ...logoState[side].transform });
+    } else if (drag.kind === 'name' && nameState[side]) {
+      nameState[side].transform = t;
+      repaintName(side);
+      onNameDrag?.(side, { ...nameState[side].transform });
     }
     renderNow();
     e.preventDefault();
@@ -674,10 +669,8 @@ export function createShirtViewer(canvas, opts = {}) {
     setShirtColor,
     setArtwork,
     setArtworkTransform,
-    setArtworkPlacement,
     setName,
     setNameTransform,
-    setNamePlacement,
     getArtworkCanvas,
     captureHighResPNG,
     goToPreset,
