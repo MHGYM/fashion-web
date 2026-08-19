@@ -1,33 +1,29 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   MODEL-PROFIEL — Velcro
+   MODEL-PROFIEL — Velcro (2e generatie)
    ═══════════════════════════════════════════════════════════════════════════
-   ⚠ PLAATSHOUDER-MODEL — wordt later vervangen door een nieuw Velcro-ontwerp.
-   Dit 3D-model is bewust niet verder gepolijst; de klant heeft expliciet
-   gevraagd om er nu geen tijd in te steken. Wél moet de Velcro-KEUZE zelf
-   in de configurator blijven werken, zodat klanten kunnen wisselen tussen
-   Velcro en Lace-Up.
+   Vervangt het eerdere placeholder-model. Bron: eigen Meshy AI-generatie van
+   de klant ("part-segmentation"-export — het bestand heette per ongeluk
+   "...Steel Juggernaut Helmet..."; de geometrie zelf is onmiskenbaar een
+   bokshandschoen, bevestigd met losstaande, geïsoleerde renders per mesh
+   vóórdat dit profiel gebouwd is). Omgezet met tools/build-velcro.py: dat
+   bronbestand komt al vooraf gesegmenteerd in 8 delen uit Meshy, dus alleen
+   hernoemen/samenvoegen naar de configurator-zone-namen + Decimate/meshopt-
+   compressie voor web — geen vormwijziging.
 
-   Vervangen zodra het nieuwe model er is — geen enkele wijziging nodig aan
-   de UI, scene3d.js of model-profile.js:
-     1. Zet het nieuwe .glb in assets/ (bv. assets/fm-glove-velcro.glb
-        overschrijven, of een nieuwe bestandsnaam + modelUrl hieronder).
-     2. Werk `bindings` hieronder bij naar de meshnamen van het nieuwe model
-        (per zone-id uit zones.js: front-panel, palm, outer-thumb,
-        inner-thumb, thumb-strip, wrist, laces, piping, stitching).
-     3. `cameraPresets` / `materialDefaults` / `attribution` naar wens
-        aanpassen aan het nieuwe model/de nieuwe bronlicentie.
-   Dat is alles — dit bestand is het ENIGE aanspreekpunt voor een Velcro-
-   modelwissel.
+   Zeven van de negen gedeelde zones zijn hier beschikbaar: front-panel,
+   back-panel (nieuw t.o.v. het vorige model), thumb (nieuw, ongesplitst —
+   dit model heeft geen apart outer/inner-duim), wrist, piping, stitching en
+   palm. outer-thumb/inner-thumb/thumb-strip/laces zijn hier niet van
+   toepassing (zie 'unsupported' hieronder) — dat verandert niets aan wat
+   Lace-Up zelf kan, dat model bindt gewoon zijn eigen zones onafhankelijk.
 
-   Huidig (tijdelijk) model:
-   Gemodelleerde velcro-wedstrijdhandschoen.
-   Bron: Sketchfab "Boxing gloves" van A1905, CC-BY-4.0 → naamsvermelding
-   verplicht bij publicatie (zie `attribution`).
-
-   Omgezet met tools/build-velcro.py: gesplitst op UV-eiland, dus langs de
-   naden die de 3D-artist zelf heeft gelegd. Twee scheidingen zijn
-   geometrisch en niet door de artist gelegd — expliciet vermeld:
-     • outer/inner-thumb  gesplitst op oriëntatie (voorzijde vs palmzijde)
+   Kanttekening bij 'palm': dit is verreweg de grootste mesh in het
+   bronbestand (een volledige, gesloten basisschil van de hele handschoen).
+   Front-panel/back-panel/thumb/wrist liggen er als losse panelen bovenop.
+   Er is geen apart palm-only mesh, dus deze zone kleurt de palm plus wat
+   verder nergens door een ander paneel gedekt wordt (voornamelijk kleine
+   randen/naden) — in de praktijk overwegend de palm zelf, zie het
+   analyse-rapport voor de volledige onderbouwing.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default {
@@ -39,18 +35,14 @@ export default {
   capabilities: { hasUVs: true, closure: 'velcro' },
 
   cameraPresets: {
-    front: { theta: 0.55,           phi: 1.18 },
-    back:  { theta: Math.PI + 0.55, phi: 1.18 },
-    top:   { theta: 0.55,           phi: 0.42 },
+    front: { theta: 0,               phi: 1.18 },
+    back:  { theta: Math.PI,         phi: 1.18 },
+    top:   { theta: 0,               phi: 0.42 },
   },
 
-  // Matte afwerking: geen clearcoat (dat gaf een scherpe glans-highlight die
-  // over geüploade logo's/artwork heen liep), hogere roughness voor zachte
-  // in plaats van harde lichtreflecties, lagere envMapIntensity zodat de
-  // studio-omgeving niet als zichtbare witte glans terugkaatst. roughness
-  // blijft < 1 en envMapIntensity blijft > 0 zodat de vorm van de handschoen
-  // nog steeds met zachte shading leesbaar blijft — geen plat/cartoonachtig
-  // materiaal.
+  // Zelfde matte afwerking als Lace-Up (zie models/laceup.js voor de
+  // toelichting) — bewust ongewijzigd overgenomen zodat beide modellen
+  // identiek ogen naast elkaar.
   materialDefaults: {
     roughness: 0.78, metalness: 0.0,
     clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
@@ -58,25 +50,24 @@ export default {
 
   bindings: {
     'front-panel': { type: 'mesh', node: 'front-panel' },
-    'palm':        { type: 'mesh', node: 'palm' },
-    'outer-thumb': { type: 'mesh', node: 'outer-thumb' },
-    'inner-thumb': { type: 'mesh', node: 'inner-thumb' },
+    'back-panel':  { type: 'mesh', node: 'back-panel' },
+    'thumb':       { type: 'mesh', node: 'thumb' },
     'wrist':       { type: 'mesh', node: 'wrist' },
     'piping':      { type: 'mesh', node: 'piping' },
     'stitching':   { type: 'mesh', node: 'stitching' },
+    'palm':        { type: 'mesh', node: 'palm' },
     'laces':       { type: 'unsupported', reason: 'Dit model heeft een klittenbandsluiting, geen veters.' },
-    // Dit bronmodel heeft geen los mesh voor de naad tussen duim en palm —
-    // die zit hier vast aan de duim. Niet kunstmatig gesplitst: de klant
-    // heeft expliciet gevraagd dit placeholder-model niet te bewerken.
-    'thumb-strip': { type: 'unsupported', reason: 'Dit onderdeel is op dit model niet als losse geometrie beschikbaar.' },
+    'outer-thumb': { type: 'unsupported', reason: 'Dit model heeft de duim niet in buiten-/binnenzijde gesplitst — zie de aparte "Thumb"-zone.' },
+    'inner-thumb': { type: 'unsupported', reason: 'Dit model heeft de duim niet in buiten-/binnenzijde gesplitst — zie de aparte "Thumb"-zone.' },
+    'thumb-strip': { type: 'unsupported', reason: 'Dit model heeft geen losse naad-geometrie tussen duim en palm.' },
   },
 
-  staticNodes: ['lining'],
+  staticNodes: [],
 
-  attribution: {
-    title: 'Boxing gloves', author: 'A1905',
-    authorUrl: 'https://sketchfab.com/al1905',
-    source: 'https://sketchfab.com/3d-models/boxing-gloves-3c85b09870a04253ba40472f5db55500',
-    license: 'CC-BY-4.0', licenseUrl: 'http://creativecommons.org/licenses/by/4.0/',
-  },
+  // Geen attribution-object: dit is een eigen (Meshy AI-)generatie van de
+  // klant, geen extern CC-gelicentieerd model — showAttribution() in
+  // configurator.js verwacht anders a.authorUrl/a.license e.d. en zou die
+  // als "undefined" tonen. `null` laat de attributieregel gewoon leeg,
+  // exact zoals de bestaande ternary in showAttribution() al ondersteunt.
+  attribution: null,
 };

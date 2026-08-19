@@ -55,13 +55,26 @@ export const ZONES = [
   {
     id: 'front-panel', label: 'Front Panel', group: 'Panelen',
     default: 'Black', artwork: 'full',
-    artworkGroup: ['front-panel', 'outer-thumb', 'inner-thumb', 'thumb-strip'],
+    artworkGroup: ['front-panel', 'outer-thumb', 'inner-thumb', 'thumb-strip', 'thumb'],
     hint: 'Het slagvlak inclusief de volledige duim. Een upload wordt als één doorlopend ontwerp over paneel én duim geplaatst.',
   },
   {
+    // Bij Lace-Up de complete palmzijde. Bij Velcro (2e-generatie model) is
+    // dit tegelijk de enige, grootste basismesh van de hele handschoen —
+    // front/back/duim/manchet liggen er als losse panelen bovenop. Zie
+    // models/velcro.js voor de volledige toelichting.
     id: 'palm', label: 'Palm', group: 'Panelen',
     default: 'Black', artwork: null,
     hint: 'De complete palmzijde.',
+  },
+  {
+    // Nieuw t.b.v. het 2e-generatie Velcro-model, dat — anders dan Lace-Up —
+    // een volledig apart, herkleurbaar rugpaneel heeft. Lace-Up bindt deze
+    // zone niet (blijft daar "n.v.t.", exact zoals 'laces' dat nu al is voor
+    // Velcro) — geen wijziging aan wat Lace-Up kan.
+    id: 'back-panel', label: 'Back Panel', group: 'Panelen',
+    default: 'Black', artwork: null,
+    hint: 'Het rugpaneel (bovenkant van de hand).',
   },
   {
     id: 'outer-thumb', label: 'Outer Thumb', group: 'Duim',
@@ -81,6 +94,15 @@ export const ZONES = [
     id: 'thumb-strip', label: 'Thumb Strip', group: 'Duim',
     default: 'Black', artwork: null,
     hint: 'De naad tussen duim en palm. Kleur zichtbaar zolang er geen afbeelding op het Front Panel staat.',
+  },
+  {
+    // Nieuw t.b.v. het 2e-generatie Velcro-model: die heeft de duim niet in
+    // outer/inner gesplitst (één ongesplitst duim-mesh) — vandaar een eigen,
+    // unieke zone i.p.v. hergebruik van outer-thumb/inner-thumb (die zouden
+    // dan hetzelfde mesh dubbel besturen). Lace-Up bindt deze zone niet.
+    id: 'thumb', label: 'Thumb', group: 'Duim',
+    default: 'Black', artwork: null,
+    hint: 'De volledige duim.',
   },
   {
     id: 'wrist', label: 'Wrist', group: 'Sluiting',

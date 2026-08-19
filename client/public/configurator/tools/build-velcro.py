@@ -1,160 +1,150 @@
 """
-Herbouwt het VELCRO-model (boxing_gloves.glb) naar dezelfde 8 zones als het
-lace-up model, zodat beide modellen dezelfde configurator-UI delen.
+BOUWSCRIPT — Velcro-model (2e generatie, Meshy AI part-segmentation)
+═══════════════════════════════════════════════════════════════════════════
+Vervangt de vorige build-velcro.py (die voor het oude UV-eiland-gebaseerde
+placeholder-model was): dit bronbestand komt al vooraf gesegmenteerd uit
+Meshy AI, dus geen UV-island-detectie meer nodig — alleen hernoemen naar de
+configurator-zone-namen (scene3d.js zoekt meshes puur op node-naam op) en
+comprimeren voor web.
 
-Het bronmodel is netjes ge-unwrapt: er wordt gesplitst op UV-eiland (de naden
-die de 3D-artist zelf legde), niet op verzonnen drempels.
+Bron: eigen 3D-scan/generatie van de klant via Meshy AI ("part-segmentation"-
+export). BELANGRIJK: het aangeleverde bestand heette "...Steel Juggernaut
+Helmet..._part-segmentation.glb" — een verkeerd gekoppelde exportnaam vanuit
+Meshy. De geometrie zelf is onmiskenbaar een bokshandschoen, geverifieerd met
+losstaande, geïsoleerde renders per mesh vóór dit script werd gebruikt.
+Origineel (34,8MB) bewaard door de klant zelf buiten dit repo — niet
+gecommit i.v.m. bestandsgrootte.
 
-'laces' ontbreekt bewust: dit is een velcro-handschoen zonder veters. Het
-profiel markeert die zone als niet-beschikbaar.
+Gebruik:
+  blender --background --python build-velcro.py -- <bron.glb> <doel.glb> [--debug]
+
+Mapping (bevestigd met geïsoleerde renders per mesh, zie analyse-artifact):
+  mesh_5           -> front-panel
+  mesh_6           -> back-panel   (nieuw — dit bronmodel heeft ook een
+                                     volledig apart, herkleurbaar rugpaneel)
+  mesh_4           -> thumb        (nieuw, ongesplitst — dit model heeft geen
+                                     apart outer/inner-duim zoals Lace-Up)
+  mesh_7           -> wrist        (manchet + trekluspje al één geheel mesh)
+  mesh_3           -> piping       (bies onderrand manchet — dekt alleen die
+                                     ene rand, geen bies rond front/duim)
+  mesh_1 + mesh_2  -> stitching    (twee losse naadfragmentjes bij de duim,
+                                     samengevoegd tot één zone zoals gevraagd)
+  mesh_0           -> palm         (verreweg de grootste mesh: een volledige,
+                                     gesloten basisschil van de hele
+                                     handschoen. Er is geen apart palm-mesh —
+                                     front/back/thumb/wrist liggen er als
+                                     losse panelen bovenop. Het herkleuren van
+                                     'palm' kleurt dus de palm plus wat verder
+                                     nergens door een ander paneel gedekt
+                                     wordt. Zie het rapport voor de volledige
+                                     toelichting.)
+
+GEEN vormwijziging: alleen hernoemen/samenvoegen (join = puur administratief,
+geen geometrie-bewerking) + Decimate ter compressie (zelfde aanpak als de
+oorspronkelijke build-velcro.py voor de 'lining'). Decimate-ratio's gekozen om
+het zichtbare quilt-/stiksel-reliëf te behouden terwijl de bestandsgrootte
+richting de bestaande ~600KB–1,2MB-modellen gaat (bron is 34,8MB, veel te
+dicht voor web) — plus EXT_meshopt_compression bij export (zelfde decoder die
+scene3d.js al vendored heeft voor Lace-Up/het oude Velcro-model).
 """
-import bpy, bmesh, sys, os, math
-from mathutils import Vector
+import bpy, sys, os
 
 argv = sys.argv[sys.argv.index("--") + 1:]
-GLB_IN, GLB_OUT, OUT_DIR = argv[0], argv[1], argv[2]
+GLB_IN, GLB_OUT = argv[0], argv[1]
 DEBUG = "--debug" in argv
-os.makedirs(OUT_DIR, exist_ok=True)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=GLB_IN)
 src = {o.name: o for o in bpy.context.scene.objects if o.type == 'MESH'}
 
-def uv_islands(obj):
-    bm = bmesh.new(); bm.from_mesh(obj.data); bm.faces.ensure_lookup_table()
-    uv = bm.loops.layers.uv.active
-    fu = {f.index: set((round(l[uv].uv.x,5), round(l[uv].uv.y,5)) for l in f.loops) for f in bm.faces}
-    adj = {f.index: [] for f in bm.faces}
-    for f in bm.faces:
-        for e in f.edges:
-            for lf in e.link_faces:
-                if lf.index != f.index and len(fu[f.index] & fu[lf.index]) >= 2:
-                    adj[f.index].append(lf.index)
-    seen=set(); out=[]
-    for f in bm.faces:
-        if f.index in seen: continue
-        comp=[]; st=[f.index]
-        while st:
-            fi=st.pop()
-            if fi in seen: continue
-            seen.add(fi); comp.append(fi)
-            for nb in adj[fi]:
-                if nb not in seen: st.append(nb)
-        out.append(comp)
-    out.sort(key=len, reverse=True)
-    meta=[]
-    for comp in out:
-        n=Vector((0,0,0))
-        for fi in comp: n += bm.faces[fi].normal
-        meta.append({"faces": comp, "normal": n.normalized()})
-    bm.free()
-    return meta
+def decimate(obj, ratio):
+    bpy.context.view_layer.objects.active = obj
+    before = len(obj.data.polygons)
+    d = obj.modifiers.new("dec", 'DECIMATE')
+    d.ratio = ratio
+    bpy.ops.object.modifier_apply(modifier=d.name)
+    print(f"[DECIMATE] {obj.name}: {before} -> {len(obj.data.polygons)} faces (ratio={ratio})")
 
-zone_faces = {}
-def add(zone, obj_name, faces):
-    zone_faces.setdefault(zone, {}).setdefault(obj_name, set()).update(faces)
+def rename(obj, new_name):
+    obj.name = new_name
+    obj.data.name = new_name
+    return obj
 
-BODY="GUANTE_EDITABLE_2_guante_0"; THUMB="Cube_dedo_0"
-CUFF="Tube_Mat.1_0"; PIPE="Tube_costura velcro_0"; STITCH="LINEA_COSTUA_costura_0"
-
-# Eilanden: 1/2/3/6 = voorkant + bovenzijde, 0 = palmzijde, 4/5/7/8 = randstroken
-for i, isl in enumerate(uv_islands(src[BODY])):
-    if i == 0:                       add("palm", BODY, isl["faces"])
-    elif i in (1, 2, 3, 6):          add("front-panel", BODY, isl["faces"])
-    elif i in (4, 5, 7, 8):          add("piping", BODY, isl["faces"])
-    else:
-        add("front-panel" if isl["normal"].y < 0 else "palm", BODY, isl["faces"])
-
-# Duim splitsen op oriëntatie: voorzijde vs palmzijde
-tb = bmesh.new(); tb.from_mesh(src[THUMB].data); tb.faces.ensure_lookup_table()
-add("outer-thumb", THUMB, {f.index for f in tb.faces if f.normal.y < 0})
-add("inner-thumb", THUMB, {f.index for f in tb.faces if f.normal.y >= 0})
-tb.free()
-
-for name, zone in ((CUFF, "wrist"), (PIPE, "piping"), (STITCH, "stitching")):
-    bm = bmesh.new(); bm.from_mesh(src[name].data)
-    add(zone, name, {f.index for f in bm.faces}); bm.free()
-
-LINING = [n for n in src if "adentro" in n]
-
-ZONE_ORDER = ["front-panel","palm","wrist","piping","stitching","outer-thumb","inner-thumb"]
-DEBUG_COLORS = {
-    "front-panel": (0.90,0.15,0.15,1), "palm": (0.15,0.85,0.30,1),
-    "wrist": (0.95,0.85,0.10,1),       "piping": (0.10,0.55,0.95,1),
-    "stitching": (0.95,0.35,0.95,1),   "outer-thumb": (0.60,0.30,0.95,1),
-    "inner-thumb": (0.95,0.55,0.05,1),
-}
-NEUTRAL = (0.30,0.30,0.32,1)
-
-created = []
-for zone in ZONE_ORDER:
-    parts = zone_faces.get(zone)
-    if not parts: print(f"[WARN] geen geometrie voor {zone}"); continue
-    pieces = []
-    for obj_name, faces in parts.items():
-        s = src[obj_name]
-        bm = bmesh.new(); bm.from_mesh(s.data); bm.faces.ensure_lookup_table()
-        keep = set(faces)
-        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.index not in keep], context='FACES')
-        me = bpy.data.meshes.new(f"{zone}__{obj_name}")
-        bm.to_mesh(me); bm.free()
-        ob = bpy.data.objects.new(f"{zone}__{obj_name}", me)
-        ob.matrix_world = s.matrix_world.copy()
-        bpy.context.collection.objects.link(ob)
-        pieces.append(ob)
+def join_objs(objs, new_name):
     bpy.ops.object.select_all(action='DESELECT')
-    for p in pieces: p.select_set(True)
-    bpy.context.view_layer.objects.active = pieces[0]
-    if len(pieces) > 1: bpy.ops.object.join()
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    if len(objs) > 1:
+        bpy.ops.object.join()
     obj = bpy.context.view_layer.objects.active
-    obj.name = zone
+    rename(obj, new_name)
+    return obj
+
+DEBUG_COLORS = {
+    "front-panel": (0.90, 0.15, 0.15, 1), "back-panel": (0.15, 0.35, 0.90, 1),
+    "thumb": (0.90, 0.85, 0.10, 1), "wrist": (0.90, 0.45, 0.85, 1),
+    "piping": (0.95, 0.55, 0.05, 1), "stitching": (0.20, 0.90, 0.90, 1),
+    "palm": (0.30, 0.85, 0.35, 1),
+}
+NEUTRAL = (0.30, 0.30, 0.32, 1)
+
+def set_debug_material(obj, zone):
     obj.data.materials.clear()
-    mat = bpy.data.materials.new(zone); mat.use_nodes = True
+    mat = bpy.data.materials.new(zone)
+    mat.use_nodes = True
     b = mat.node_tree.nodes.get("Principled BSDF")
     b.inputs["Base Color"].default_value = DEBUG_COLORS[zone] if DEBUG else NEUTRAL
     b.inputs["Roughness"].default_value = 0.45
-    # placeholder-texture houdt TEXCOORD_0 in de export (zie README)
-    if obj.data.uv_layers:
-        img = bpy.data.images.new(f"uvkeep_{zone}", width=1, height=1)
-        img.generated_color = (1,1,1,1)
-        tn = mat.node_tree.nodes.new("ShaderNodeTexImage"); tn.image = img
-        un = mat.node_tree.nodes.new("ShaderNodeUVMap"); un.uv_map = obj.data.uv_layers[0].name
-        mat.node_tree.links.new(un.outputs["UV"], tn.inputs["Vector"])
-        mat.node_tree.links.new(tn.outputs["Color"], b.inputs["Base Color"])
     obj.data.materials.append(mat)
-    for p in obj.data.polygons: p.use_smooth = True
-    created.append(obj)
-    print(f"[ZONE] {zone}: {len(obj.data.polygons)} faces")
+    for p in obj.data.polygons:
+        p.use_smooth = True
 
-if LINING:
-    bpy.ops.object.select_all(action='DESELECT')
-    lo = [src[n] for n in LINING]
-    for o in lo: o.select_set(True)
-    bpy.context.view_layer.objects.active = lo[0]
-    if len(lo) > 1: bpy.ops.object.join()
-    lin = bpy.context.view_layer.objects.active
-    lin.name = "lining"
-    lin.data.materials.clear()
-    lm = bpy.data.materials.new("lining"); lm.use_nodes = True
-    lm.node_tree.nodes.get("Principled BSDF").inputs["Base Color"].default_value = (0.05,0.05,0.06,1)
-    lin.data.materials.append(lm)
-    for p in lin.data.polygons: p.use_smooth = True
-    before = len(lin.data.polygons)
-    d = lin.modifiers.new("dec", 'DECIMATE'); d.ratio = 0.12
-    bpy.context.view_layer.objects.active = lin
-    bpy.ops.object.modifier_apply(modifier=d.name)
-    created.append(lin)
-    print(f"[ZONE] lining: {before} -> {len(lin.data.polygons)} faces")
+# ── 1. Front Panel ──────────────────────────────────────────────────────
+front = rename(src["mesh_5"], "front-panel")
+decimate(front, 0.05)
+set_debug_material(front, "front-panel")
 
-keep = {c.name for c in created}
-for o in [ob for ob in bpy.context.scene.objects if ob.type == 'MESH']:
-    if o.name not in keep: bpy.data.objects.remove(o, do_unlink=True)
+# ── 2. Back Panel (nieuw) ───────────────────────────────────────────────
+back = rename(src["mesh_6"], "back-panel")
+decimate(back, 0.05)
+set_debug_material(back, "back-panel")
 
-print("[INFO] eindobjecten:", sorted(o.name for o in bpy.context.scene.objects if o.type=='MESH'))
+# ── 3. Thumb (nieuw, ongesplitst) ───────────────────────────────────────
+thumb = rename(src["mesh_4"], "thumb")
+decimate(thumb, 0.06)
+set_debug_material(thumb, "thumb")
+
+# ── 4. Wrist / Velcro Strap (manchet + trekluspje, al één mesh) ────────
+wrist = rename(src["mesh_7"], "wrist")
+decimate(wrist, 0.05)
+set_debug_material(wrist, "wrist")
+
+# ── 5. Piping (bies onderrand manchet) ──────────────────────────────────
+piping = rename(src["mesh_3"], "piping")
+decimate(piping, 0.2)
+set_debug_material(piping, "piping")
+
+# ── 6. Stitching — TWEE meshes samengevoegd tot één zone ───────────────
+stitching = join_objs([src["mesh_1"], src["mesh_2"]], "stitching")
+decimate(stitching, 0.3)
+set_debug_material(stitching, "stitching")
+
+# ── 7. Palm (basisschil — zie toelichting in module-docstring) ─────────
+palm = rename(src["mesh_0"], "palm")
+decimate(palm, 0.025)
+set_debug_material(palm, "palm")
+
+created = [front, back, thumb, wrist, piping, stitching, palm]
+print("[INFO] eindobjecten:", [(o.name, len(o.data.polygons)) for o in created])
 
 bpy.ops.object.select_all(action='DESELECT')
-for o in bpy.context.scene.objects:
-    if o.type == 'MESH': o.select_set(True)
-bpy.ops.export_scene.gltf(filepath=GLB_OUT, export_format='GLB', use_selection=True, export_apply=True)
-print("[INFO] geëxporteerd:", GLB_OUT)
+for o in created:
+    o.select_set(True)
+bpy.ops.export_scene.gltf(
+    filepath=GLB_OUT, export_format='GLB', use_selection=True, export_apply=True,
+    export_meshopt_compression_enable=True,
+)
+size_mb = os.path.getsize(GLB_OUT) / 1024 / 1024
+print(f"[INFO] geëxporteerd: {GLB_OUT} ({size_mb:.2f} MB)")
 print("[DONE]")
