@@ -457,9 +457,15 @@ export function createGloveViewer(canvas, opts = {}) {
       // Badges worden pas gebouwd nadat het model is ingepast (fitCameraToObject
       // verplaatst het model; decals hangen aan wereldposities).
       const pendingBadges = [];
+      // Verzamelt zone-id's van het type 'mesh-group' tot na de gewone
+      // 'mesh'-zones zijn opgebouwd — een groep stuurt bestaande zones aan
+      // (zie hieronder) en heeft dus geen eigen canvas/materiaal nodig.
+      const pendingGroups = [];
       ZONE_IDS.forEach((zoneId) => {
         const b = profile.bindings[zoneId];
-        if (!b || b.type !== 'mesh') return;
+        if (!b) return;
+        if (b.type === 'mesh-group') { pendingGroups.push(zoneId); return; }
+        if (b.type !== 'mesh') return;
         const mesh = meshByNode[b.node];
         if (!mesh) { console.warn(`[3D] zone "${zoneId}": mesh "${b.node}" ontbreekt.`); return; }
 
@@ -489,6 +495,18 @@ export function createGloveViewer(canvas, opts = {}) {
         targetColor[zoneId] = new THREE.Color('#14161A');
         repaint(zoneId);
         if (def && def.artwork === 'badge') pendingBadges.push({ zoneId, mesh });
+      });
+
+      // 'mesh-group'-zones: sturen een aantal bestaande zones tegelijk aan
+      // (bv. "Thumb" = Outer Thumb + Inner Thumb in één keer dezelfde kleur
+      // geven) i.p.v. zelf een mesh/canvas te hebben. De aangestuurde zones
+      // blijven daarnaast gewoon zelfstandig instelbaar — dit is puur een
+      // extra, gemakkelijke ingang die ernaast bestaat, geen vervanging.
+      pendingGroups.forEach((zoneId) => {
+        const b = profile.bindings[zoneId];
+        const memberIds = (b.nodes || []).filter((id) => zones[id]);
+        if (!memberIds.length) { console.warn(`[3D] zone "${zoneId}": geen van de gekoppelde zones (${(b.nodes || []).join(', ')}) is beschikbaar.`); return; }
+        zones[zoneId] = { isGroup: true, memberIds, color: '#14161A' };
       });
 
       // Statische onderdelen (voering e.d.) een eigen, dof materiaal geven
@@ -542,6 +560,12 @@ export function createGloveViewer(canvas, opts = {}) {
     const z = zones[zoneId];
     if (!z) return;
     z.color = hex;
+    if (z.isGroup) {
+      // Stuurt de gekoppelde zones aan via hun eigen, bestaande materiaal/
+      // canvas — dat blijft dus ongewijzigd werken, ook los van deze groep.
+      z.memberIds.forEach((id) => setZoneColor(id, hex));
+      return;
+    }
     targetColor[zoneId] = new THREE.Color(hex);
     repaint(zoneId);
   }

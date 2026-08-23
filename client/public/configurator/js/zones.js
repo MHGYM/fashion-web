@@ -96,10 +96,10 @@ export const ZONES = [
     hint: 'De naad tussen duim en palm. Kleur zichtbaar zolang er geen afbeelding op het Front Panel staat.',
   },
   {
-    // Nieuw t.b.v. het 2e-generatie Velcro-model: die heeft de duim niet in
-    // outer/inner gesplitst (één ongesplitst duim-mesh) — vandaar een eigen,
-    // unieke zone i.p.v. hergebruik van outer-thumb/inner-thumb (die zouden
-    // dan hetzelfde mesh dubbel besturen). Lace-Up bindt deze zone niet.
+    // Oorspronkelijk t.b.v. het 2e-generatie Velcro-model (ongesplitst duim-
+    // mesh, geen outer/inner). Lace-Up bindt deze zone ook, maar dan als
+    // 'mesh-group' die Outer Thumb + Inner Thumb tegelijk aanstuurt (geen
+    // eigen duim-mesh in dat bronbestand) — zie models/laceup.js.
     id: 'thumb', label: 'Thumb', group: 'Duim',
     default: 'Black', artwork: null,
     hint: 'De volledige duim.',

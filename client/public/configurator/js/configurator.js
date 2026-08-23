@@ -46,6 +46,17 @@ const state = {
 
 const euro = (n) => '€' + n.toFixed(2).replace('.', ',');
 
+/** Sommige modellen willen een gedeelde zone-id anders noemen — bv. Lace-Up
+ *  toont zone-id 'front-panel' als "Back Panel" (het is daar het vlak
+ *  tegenover de knokkelkap, i.p.v. het slagvlak zoals bij Velcro). zones.js
+ *  blijft model-onafhankelijk; dit overschrijft alleen wat de KLANT leest,
+ *  niet de zone-id zelf (die blijft overal 'front-panel', dus opslag/cart/
+ *  productiebestand/Velcro blijven ongewijzigd). */
+function zoneDisplay(zone) {
+  const o = MODEL_BY_ID[state.model]?.zoneOverrides?.[zone.id];
+  return { label: o?.label ?? zone.label, hint: o?.hint ?? zone.hint, hidden: !!o?.hidden };
+}
+
 // Puur UI-voorkeur (in-/uitgeklapt), geen onderdeel van de configuratie:
 // niet in `state`, dus niet opgeslagen/gedeeld. Blijft wel gelden zolang de
 // klant tussen zones wisselt, tot de pagina herlaadt.
@@ -161,8 +172,13 @@ function buildModelList() {
   // pagina) en kan dus niet via switchModel() ingeladen worden — dit is
   // een gewone link naar /configurator-shirt/, alleen visueel als tegel
   // meegenomen in dezelfde rij zodat de klant ook dit product hier vindt.
+  // Expliciet index.html (i.p.v. alleen de map): de Vite-dev-server doet,
+  // anders dan de Express-productieserver, geen directory-index-fallback
+  // voor statische pagina's — zonder bestandsnaam laadt dit lokaal de
+  // React-SPA i.p.v. de T-shirt-configurator. Werkt met index.html in
+  // beide omgevingen identiek.
   const shirtLink = el('a', 'model-item');
-  shirtLink.href = '/configurator-shirt/';
+  shirtLink.href = '/configurator-shirt/index.html';
   shirtLink.style.textDecoration = 'none';
   shirtLink.append(el('span', 'model-name', 'T-shirt'), el('span', 'model-sub', 'Fight Jersey'));
   wrap.appendChild(shirtLink);
@@ -206,6 +222,12 @@ function buildZoneTabs() {
   const wrap = $('zone-tabs');
   wrap.innerHTML = '';
   ZONES.forEach((zone) => {
+    // Een zone-id die op dit model bewust hergebruikt/hernoemd is naar een
+    // andere, al zichtbare tab (zie zoneOverrides) hoeft niet ook nog als
+    // losse, altijd-onbeschikbare "n.v.t."-tab getoond te worden — dat zou
+    // twee tabs met dezelfde naam geven. Alleen relevant voor het model dat
+    // dit expliciet aanvinkt; andere modellen (bv. Velcro) tonen 'm gewoon.
+    if (zoneDisplay(zone).hidden) return;
     const ok = viewer.isZoneSupported(zone.id);
     const btn = el('button', 'zone-tab'
       + (zone.id === state.activeZone && ok ? ' is-active' : '')
@@ -220,7 +242,7 @@ function buildZoneTabs() {
     if (ok && ((zone.id === FULL_ZONE?.id && state.hasArtwork) ||
                (zone.id === BADGE_ZONE?.id && state.hasLogo))) dot.classList.add('has-art');
 
-    btn.append(dot, document.createTextNode(zone.label));
+    btn.append(dot, document.createTextNode(zoneDisplay(zone).label));
     if (!ok) btn.appendChild(el('span', 'zone-tab-tag', 'n.v.t.'));
     btn.addEventListener('click', () => { state.activeZone = zone.id; buildZoneTabs(); buildZoneEditor(); });
     wrap.appendChild(btn);
@@ -316,8 +338,9 @@ function buildZoneEditor() {
   box.innerHTML = '';
   if (!zone) return;
 
-  $('stage-title').textContent = zone.label;
-  $('stage-hint').textContent = zone.hint;
+  const disp = zoneDisplay(zone);
+  $('stage-title').textContent = disp.label;
+  $('stage-hint').textContent = disp.hint;
 
   // Inklapbare kleursectie: dicht toont alleen "KLEUR" + de gekozen kleur
   // (de stip in de header, altijd zichtbaar, ook ingeklapt); open toont het
@@ -344,6 +367,16 @@ function buildZoneEditor() {
   const colorPanel = el('div', 'color-panel' + (colorPanelOpen ? ' is-open' : ''));
   colorPanel.appendChild(swatchGrid(state.colors[zone.id], (c) => {
     state.colors[zone.id] = c.name;
+    // Een 'mesh-group'-zone (bv. Lace-Up's "Thumb" = Outer Thumb + Inner
+    // Thumb tegelijk) stuurt in de 3D-viewer al de onderliggende zones aan;
+    // hier ook hun eigen state.colors bijwerken zodat de opgeslagen
+    // configuratie, een gedeelde link en het productiebestand exact
+    // overeenkomen met wat er te zien is — anders zou bv. Outer Thumb apart
+    // geopend nog de oude kleur tonen terwijl het 3D-model al de nieuwe toont.
+    const binding = MODEL_BY_ID[state.model]?.bindings?.[zone.id];
+    if (binding?.type === 'mesh-group') {
+      binding.nodes.forEach((id) => { state.colors[id] = c.name; });
+    }
     viewer.setZoneColor(zone.id, c.hex);
     colorDot.style.background = c.hex;
     buildZoneTabs();
@@ -359,7 +392,7 @@ function buildZoneEditor() {
     const hFull = el('h2', 'card-title', 'Eigen logo');
     hFull.appendChild(el('span', 'price-tag', `+ ${euro(PRICING.customLogo)}`));
     box.appendChild(hFull);
-    box.appendChild(el('p', 'hint', 'Upload je eigen logo op de Front Panel — het dekt automatisch het hele paneel én de duim, als één geheel.'));
+    box.appendChild(el('p', 'hint', `Upload je eigen logo op de ${zoneDisplay(zone).label} — het dekt automatisch het hele paneel én de duim, als één geheel.`));
     const dz = dropzone('Sleep je logo hierheen', 'of klik om te kiezen · PNG, JPG of SVG · max 5MB',
       (img, file) => {
         state.artworkTransform = defaultArtworkTransform();

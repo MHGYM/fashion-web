@@ -41,7 +41,10 @@
     <a href="/">Home</a>
     <a href="/shop">Shop</a>
     <a class="is-active" href="/configurator-shirt/" aria-current="page">T-shirt</a>
-    <a href="/configurator/">Handschoenen</a>
+    <!-- Expliciet index.html: de Vite-dev-server doet geen directory-index-
+         fallback voor statische pagina's, dus zonder bestandsnaam laadt dit
+         lokaal de React-SPA i.p.v. de bokshandschoen-configurator. -->
+    <a href="/configurator/index.html">Handschoenen</a>
     <a href="/scholen">Scholen</a>
   </nav>
   <span class="chip">Made to order</span>

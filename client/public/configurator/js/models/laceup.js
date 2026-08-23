@@ -8,9 +8,22 @@
    (tools/build-laceup.py) hoefde alleen te hernoemen en op te schonen.
 
    Let op — de meshnamen in het bronbestand zijn omgedraaid t.o.v. de
-   intuïtie; geverifieerd met geïsoleerde renders per mesh:
-       Back_Palm  = het slagvlak (voorkant)  → front-panel
-       Front_Palm = de palmzijde             → palm
+   intuïtie; geverifieerd met geïsoleerde renders per mesh (rechtstreeks op
+   "Back Cuff Padding Design.glb", niet alleen op de geconverteerde file):
+       Back_Palm  = het slagvlak (voorkant)
+       Front_Palm = de vetersluiting-zijde (rug van de hand)
+   Er zijn maar twee hoofdpanelen in dit bronbestand — geen apart derde stuk
+   geometrie voor een "rug van de hand". Op klantverzoek:
+     - zone 'palm'        kleurt Back_Palm  (GLB-node 'front-panel', slagvlak)
+     - zone 'front-panel' kleurt Front_Palm (GLB-node 'palm', rug van de hand)
+       en wordt in de UI getoond als "Back Panel" i.p.v. "Front Panel" (zie
+       `zoneOverrides` hieronder + `zoneDisplay()` in configurator.js) — er
+       bestaat dus GEEN aparte "Front Panel"-tab meer op dit model, want die
+       zou naar dezelfde mesh als "Back Panel" moeten wijzen (dubbele
+       koppeling, expliciet afgewezen). Alleen de zone→node-koppeling en het
+       label zijn aangepast; de geometrie/node-namen in het GLB-bestand zelf
+       zijn niet aangeraakt. Velcro (ander model-profiel) toont zone-id
+       'front-panel' gewoon als "Front Panel" — dat blijft ongewijzigd.
    Ook zat er een 'Inner_Black.001' in die ver buiten de handschoen lag en
    niets zichtbaars renderde; die is bij de omzetting verwijderd omdat hij
    alleen de bounding box (en daarmee het camerakader) scheeftrok.
@@ -50,16 +63,51 @@ export default {
     clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
   },
 
+  // Toont zone-id 'front-panel' als "Back Panel" op dit model (zelfde zone-
+  // id/opslag/cart/productiebestand als altijd — alleen wat de klant LEEST
+  // verandert). Zie zoneDisplay() in configurator.js.
+  zoneOverrides: {
+    'front-panel': {
+      label: 'Back Panel',
+      hint: 'Het rugpaneel (de vetersluiting-zijde).',
+    },
+    // Zonder deze override zou de al-nooit-gebonden zone-id 'back-panel'
+    // als aparte, altijd-uitgegrijsde "Back Panel · n.v.t."-tab getoond
+    // worden náást de hierboven hernoemde (wél werkende) "Back Panel"-tab
+    // — twee tabs met identieke naam. Alleen op Lace-Up verborgen; Velcro
+    // (waar geen naam-botsing is) toont 'm gewoon zoals altijd.
+    'back-panel': { hidden: true },
+  },
+
   bindings: {
-    'front-panel': { type: 'mesh', node: 'front-panel' },
-    'palm':        { type: 'mesh', node: 'palm' },
+    // Bewust omgewisseld t.o.v. de GLB-nodenamen — zie de toelichting
+    // bovenaan dit bestand: "Palm" kleurt het slagvlak (Back_Palm), "Front
+    // Panel" (getoond als "Back Panel", zie zoneOverrides) kleurt de
+    // vetersluiting-zijde (Front_Palm) — niet de node die toevallig
+    // 'front-panel' heet in het geconverteerde bestand.
+    'front-panel': { type: 'mesh', node: 'palm' },
+    'palm':        { type: 'mesh', node: 'front-panel' },
     'outer-thumb': { type: 'mesh', node: 'outer-thumb' },
     'inner-thumb': { type: 'mesh', node: 'inner-thumb' },
     'thumb-strip': { type: 'mesh', node: 'thumb-strip' },
+    // Geen apart duim-mesh in dit bronbestand (alleen outer/inner) — deze
+    // zone stuurt daarom beide bestaande duim-zones tegelijk aan, als extra
+    // gemakkelijke ingang naast de losse Outer Thumb/Inner Thumb-tabs, die
+    // zelf gewoon onafhankelijk instelbaar blijven. Zie scene3d.js
+    // ("mesh-group"-afhandeling in loadModel/setZoneColor).
+    'thumb':       { type: 'mesh-group', nodes: ['outer-thumb', 'inner-thumb'] },
     'wrist':       { type: 'mesh', node: 'wrist' },
     'laces':       { type: 'mesh', node: 'laces' },
     'piping':      { type: 'mesh', node: 'piping' },
     'stitching':   { type: 'mesh', node: 'stitching' },
+    // Zone-id 'back-panel' zelf blijft ongebonden (n.v.t., automatisch via
+    // model-profile.js) — dat is een ANDERE, ongebruikte zone-id dan de
+    // hierboven hernoemde 'front-panel'. Er is geen derde stuk geometrie
+    // om die apart aan te binden zonder 'front-panel' (nu "Back Panel") of
+    // 'palm' te dupliceren, wat dezelfde canvas-textuur zou delen als een
+    // al bestaande zone en die dus stuk zou maken (laatste kleurkeuze wint).
+    // Onderzocht met geïsoleerde renders per mesh (op zowel het geconverteerde
+    // bestand als rechtstreeks op "Back Cuff Padding Design.glb").
   },
 
   staticNodes: ['lining'],
