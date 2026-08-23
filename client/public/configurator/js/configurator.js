@@ -22,9 +22,22 @@ const STORE_KEY = 'fm-glove-config-v4';
 const API = '/api/customizer';
 const PRODUCT_KEY = 'custom-gloves';
 
+// Elk model heeft zijn eigen kleurenset, ook al delen Velcro en Lace-Up
+// dezelfde zone-id's (bv. 'front-panel') — die zone-id kan per model een
+// ANDER onderdeel voorstellen (op Lace-Up is 'front-panel' het "Back
+// Panel"-vlak, op Velcro het echte front panel). Zonder deze scheiding zou
+// een kleur die je op het ene model kiest ongevraagd overwaaien naar het
+// andere zodra je wisselt — en, erger, je eigen instelling van het andere
+// model overschrijven zodra je daar iets kiest en weer teruggaat.
+function ensureModelColors(modelId) {
+  if (!state.colorsByModel[modelId]) state.colorsByModel[modelId] = defaultColors();
+  return state.colorsByModel[modelId];
+}
+
 const state = {
   model: DEFAULT_MODEL_ID,
-  colors: defaultColors(),
+  colorsByModel: {},
+  colors: null, // wijst altijd naar colorsByModel[model]; hieronder gezet
   artworkTransform: defaultArtworkTransform(),
   hasArtwork: false,
   hasLogo: false,
@@ -43,6 +56,7 @@ const state = {
   size: '',
   activeZone: ZONES[0].id,
 };
+state.colors = ensureModelColors(state.model);
 
 const euro = (n) => '€' + n.toFixed(2).replace('.', ',');
 
@@ -67,7 +81,7 @@ let colorPanelOpen = true;
 // blijven bij de klant tot ze bij het bestellen geüpload worden.
 const shareable = () => ({
   model: state.model,
-  colors: state.colors, artworkTransform: state.artworkTransform,
+  colorsByModel: state.colorsByModel, artworkTransform: state.artworkTransform,
   name: state.name, nameFont: state.nameFont, nameSize: state.nameSize,
   nameColor: state.nameColor, size: state.size,
 });
@@ -75,10 +89,30 @@ const shareable = () => ({
 function applySaved(saved) {
   if (!saved) return;
   if (MODEL_BY_ID[saved.model]) state.model = saved.model;
-  ZONES.forEach((z) => {
-    const c = saved.colors?.[z.id];
-    if (typeof c === 'string' && COLORS.some((x) => x.name === c)) state.colors[z.id] = c;
-  });
+  if (saved.colorsByModel && typeof saved.colorsByModel === 'object') {
+    // Nieuwe opslagvorm: per model zijn eigen kleuren.
+    Object.keys(saved.colorsByModel).forEach((modelId) => {
+      if (!MODEL_BY_ID[modelId]) return;
+      const src = saved.colorsByModel[modelId];
+      const dst = ensureModelColors(modelId);
+      ZONES.forEach((z) => {
+        const c = src?.[z.id];
+        if (typeof c === 'string' && COLORS.some((x) => x.name === c)) dst[z.id] = c;
+      });
+    });
+  } else if (saved.colors && typeof saved.colors === 'object') {
+    // Oudere opslag (vóór per-model kleuren): één platte kleurenset die voor
+    // alle modellen gold. Migreert naar het model waar hij bij hoorde; op
+    // andere modellen beginnen de zone-id's die daar iets anders voorstellen
+    // (bv. 'front-panel' = Back Panel op Lace-Up) dan gewoon weer op hun
+    // eigen standaardkleur, i.p.v. de oude, nu misleidende waarde over te nemen.
+    const dst = ensureModelColors(saved.model && MODEL_BY_ID[saved.model] ? saved.model : DEFAULT_MODEL_ID);
+    ZONES.forEach((z) => {
+      const c = saved.colors[z.id];
+      if (typeof c === 'string' && COLORS.some((x) => x.name === c)) dst[z.id] = c;
+    });
+  }
+  state.colors = ensureModelColors(state.model);
   if (saved.artworkTransform) Object.assign(state.artworkTransform, saved.artworkTransform);
   if (typeof saved.name === 'string') state.name = saved.name.slice(0, 14);
   if (NAME_FONTS.some((f) => f.id === saved.nameFont)) state.nameFont = saved.nameFont;
@@ -187,6 +221,10 @@ function buildModelList() {
 /** Wisselt van 3D-model en zet alle instellingen opnieuw toe. */
 async function switchModel(modelId) {
   state.model = modelId;
+  // Elk model heeft zijn eigen kleuren-emmer (zie ensureModelColors) — hier
+  // wisselen zodat pushColors() zo meteen de kleuren van DIT model terugzet,
+  // niet die van het model waar je net vandaan kwam.
+  state.colors = ensureModelColors(modelId);
   buildModelList();
   $('stage-loading').classList.remove('is-hidden');
   try {
@@ -763,7 +801,8 @@ function wireActions() {
   });
 
   $('reset').addEventListener('click', () => {
-    state.colors = defaultColors();
+    state.colorsByModel = {};
+    state.colors = ensureModelColors(state.model);
     state.artworkTransform = defaultArtworkTransform();
     state.hasArtwork = false; state.hasLogo = false;
     state.artworkFile = null; state.logoFile = null;
