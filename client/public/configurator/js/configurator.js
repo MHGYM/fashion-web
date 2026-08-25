@@ -324,7 +324,7 @@ function slider(label, key, min, max, step, fmt) {
 }
 
 /** Uploadvak met klik én slepen-en-neerzetten. */
-function dropzone(titleText, subText, onFile) {
+function dropzone(titleText, subText, onFile, initialFileName) {
   const zone = el('label', 'dropzone');
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   icon.setAttribute('viewBox', '0 0 24 24');
@@ -334,6 +334,16 @@ function dropzone(titleText, subText, onFile) {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.hidden = true;
   zone.append(icon, title, sub, input);
+
+  // buildZoneEditor() herbouwt dit hele paneel (dus ook een verse dropzone)
+  // na elke upload — zonder dit zou de zone meteen terugspringen naar "Sleep
+  // je logo hierheen", ook al staat het logo allang op de handschoen. Dat
+  // ziet eruit als een mislukte upload terwijl hij prima werkte.
+  if (initialFileName) {
+    title.textContent = initialFileName;
+    sub.textContent = 'Klik of sleep om te vervangen';
+    zone.classList.add('has-file');
+  }
 
   const handle = (file) => {
     if (!file) return;
@@ -438,7 +448,8 @@ function buildZoneEditor() {
         state.artworkFile = file || null;
         viewer.setZoneArtwork(zone.id, img, state.artworkTransform);
         buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
-      });
+      },
+      state.hasArtwork ? (state.artworkFile?.name || 'Logo geüpload') : null);
     box.appendChild(dz.zone);
 
     if (state.hasArtwork) {
@@ -475,7 +486,8 @@ function buildZoneEditor() {
         state.logoFile = file || null;
         viewer.setZoneBadge(zone.id, { img });
         buildZoneTabs(); buildZoneEditor(); renderPrice(); save();
-      });
+      },
+      state.hasLogo ? (state.logoFile?.name || 'Logo geüpload') : null);
     box.appendChild(dz.zone);
 
     if (state.hasLogo) {
