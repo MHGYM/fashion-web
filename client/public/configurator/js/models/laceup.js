@@ -79,6 +79,15 @@ export default {
     'back-panel': { hidden: true },
   },
 
+  // De gedeelde artworkGroup in zones.js (['front-panel', 'outer-thumb', ...])
+  // gaat ervan uit dat zone-id 'front-panel' de knokkelzijde is — op dit
+  // model is dat na de omwisseling hierboven niet meer zo (het is nu "Back
+  // Panel"/de vetersluiting-zijde). Zonder deze override zou een geüpload
+  // logo dus op de verkeerde kant (de rug van de hand) belanden i.p.v. op de
+  // palm/knokkelzijde. Zelfde lijst als het origineel, alleen 'front-panel'
+  // vervangen door 'palm' (nu de echte knokkelzijde). Zie scene3d.js.
+  artworkGroupOverride: ['palm', 'outer-thumb', 'inner-thumb', 'thumb-strip', 'thumb'],
+
   bindings: {
     // Bewust omgewisseld t.o.v. de GLB-nodenamen — zie de toelichting
     // bovenaan dit bestand: "Palm" kleurt het slagvlak (Back_Palm), "Front

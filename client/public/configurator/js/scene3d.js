@@ -531,8 +531,13 @@ export function createGloveViewer(canvas, opts = {}) {
       // wat dít model levert (isZoneSupported per lid van artworkGroup) —
       // ontbreekt de duim op een toekomstig model, dan valt dit vanzelf
       // terug op alleen de 'full'-zone zelf.
+      // profile.artworkGroupOverride: sommige modellen wijzen zone-id
+      // 'front-panel' om naar een ANDERE mesh dan zones.js' gedeelde
+      // artworkGroup verwacht (bv. Lace-Up: 'front-panel' bindt daar het
+      // Back Panel-vlak, niet de knokkelzijde — zie models/laceup.js). Zonder
+      // deze override zou een geüpload logo op het verkeerde vlak belanden.
       if (FULL_ZONE_ID) {
-        const groupIds = ZONE_BY_ID[FULL_ZONE_ID].artworkGroup || [FULL_ZONE_ID];
+        const groupIds = profile.artworkGroupOverride || ZONE_BY_ID[FULL_ZONE_ID].artworkGroup || [FULL_ZONE_ID];
         const artworkMeshes = groupIds.map((id) => zones[id]?.mesh).filter(Boolean);
         frontArtwork = buildFrontArtworkDecal(artworkMeshes, frontDir, profile.materialDefaults);
       }
