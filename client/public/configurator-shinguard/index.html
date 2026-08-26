@@ -9,6 +9,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../configurator/css/style.css">
+<style>
+  /* De gedeelde style.css (configurator/css/style.css) stylet alleen
+     #glove-canvas — zonder deze override blijft #shinguard-canvas op zijn
+     HTML-default van 300x150px staan (geen width/height/display:block),
+     waardoor het 3D-model nooit zichtbaar wordt en alleen de lege
+     .stage-inner-achtergrond te zien is. Zelfde fix als #shirt-canvas in
+     configurator-shirt/index.html. */
+  #shinguard-canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #shinguard-canvas:active { cursor: grabbing; }
+</style>
 </head>
 <body>
 
