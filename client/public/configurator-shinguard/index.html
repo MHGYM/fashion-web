@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FightMarketing | Customize je eigen scheenbeschermer</title>
+<meta name="description" content="Ontwerp je eigen scheenbeschermer in 3D. Kies kleuren, upload je logo, zie het model voordat je bestelt.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../configurator/css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/">
+    <svg class="brand-mark" viewBox="0 0 108 62" aria-hidden="true">
+      <path d="M0,0 h41 v13 h-27 v11 h22 v13 h-22 v25 h-14 z"/>
+      <path d="M53,0 h15 l13,26 l13,-26 h15 v62 h-14 v-35 l-11,22 h-6 l-11,-22 v35 h-14 z"/>
+    </svg>
+    <span class="brand-text">FIGHT<em>MARKETING</em></span>
+  </a>
+  <nav class="topnav">
+    <a href="/">Home</a>
+    <a href="/shop">Shop</a>
+    <!-- Expliciet index.html: de Vite-dev-server doet geen directory-index-
+         fallback voor statische pagina's, dus zonder bestandsnaam laadt dit
+         lokaal de React-SPA i.p.v. de bokshandschoen-configurator. -->
+    <a href="/configurator/index.html">Bokshandschoenen</a>
+    <a class="is-active" href="/configurator-shinguard/" aria-current="page">Scheenbeschermer</a>
+    <a href="/configurator-shirt/index.html">T-shirt</a>
+    <a href="/scholen">Scholen</a>
+  </nav>
+  <span class="chip">Made to order</span>
+</header>
+
+<main class="layout">
+
+  <div class="editor-col">
+
+    <nav id="zone-tabs" class="zone-tabs" role="tablist" aria-label="Onderdeel kiezen"></nav>
+
+    <section class="stage">
+      <div class="stage-head">
+        <h1 id="stage-title">Main Front</h1>
+        <p id="stage-hint">Kies een kleur of upload je eigen afbeelding.</p>
+      </div>
+
+      <div class="stage-inner">
+        <canvas id="shinguard-canvas" role="img" aria-label="Draaibare 3D-weergave van je scheenbeschermer"></canvas>
+        <div id="stage-loading" class="stage-loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>3D-model laden…</span>
+        </div>
+        <p id="stage-error" class="stage-error" hidden></p>
+      </div>
+
+      <div class="view-bar" role="group" aria-label="Weergave">
+        <button type="button" data-cam="front" class="is-active" aria-pressed="true">Voor</button>
+        <button type="button" data-cam="back" aria-pressed="false">Achter</button>
+        <button type="button" data-cam="top" aria-pressed="false">Boven</button>
+        <span class="view-sep" aria-hidden="true"></span>
+        <button type="button" id="zoom-out" title="Uitzoomen" aria-label="Uitzoomen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button type="button" id="zoom-in" title="Inzoomen" aria-label="Inzoomen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button type="button" id="cam-reset" title="Beeld herstellen" aria-label="Beeld herstellen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
+        </button>
+      </div>
+      <p class="stage-foot">Sleep om te draaien · scroll om te zoomen</p>
+    </section>
+
+    <section class="card zone-editor-card" id="zone-editor"></section>
+
+  </div>
+
+  <aside class="col-right">
+    <section class="card">
+      <h2 class="card-title">Maat</h2>
+      <div id="size-row" class="chip-row" role="group" aria-label="Maat"></div>
+      <p class="hint" id="size-hint">Kies een maat om te kunnen bestellen.</p>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">Prijsopbouw</h2>
+      <dl id="price-rows" class="price-rows"></dl>
+      <div class="price-total">
+        <span>Totaal</span>
+        <strong id="price-total">€44,95</strong>
+      </div>
+      <button id="add-to-cart" class="btn btn-gold btn-full" type="button">In winkelwagen</button>
+      <p id="cart-msg" class="cart-msg" hidden></p>
+      <button id="save-design" class="btn btn-ghost btn-full" type="button">Ontwerp downloaden</button>
+      <button id="reset" class="btn btn-quiet btn-full" type="button">Opnieuw beginnen</button>
+
+      <span class="field-label share-label">Deel je ontwerp</span>
+      <div class="share-row">
+        <button id="share-copy" class="share-btn" type="button" title="Link kopiëren" aria-label="Link kopiëren">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg>
+        </button>
+        <a id="share-whatsapp" class="share-btn" target="_blank" rel="noopener" title="Delen via WhatsApp" aria-label="Delen via WhatsApp">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 21l2.3-5.3A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+        </a>
+        <a id="share-mail" class="share-btn" title="Delen via e-mail" aria-label="Delen via e-mail">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+        </a>
+      </div>
+    </section>
+  </aside>
+
+</main>
+
+<footer class="trust-bar">
+  <div><strong>Gratis verzending</strong><span>Op alle custom orders</span></div>
+  <div><strong>Made to order</strong><span>3–6 weken levertijd</span></div>
+  <div><strong>Premium kwaliteit</strong><span>Duurzame materialen</span></div>
+  <div><strong>Veilig betalen</strong><span>iDEAL &amp; meer</span></div>
+</footer>
+
+<p class="attribution" id="attribution"></p>
+
+<script type="module" src="js/configurator.js"></script>
+</body>
+</html>

@@ -216,6 +216,17 @@ function buildModelList() {
   shirtLink.style.textDecoration = 'none';
   shirtLink.append(el('span', 'model-name', 'T-shirt'), el('span', 'model-sub', 'Fight Jersey'));
   wrap.appendChild(shirtLink);
+
+  // Zelfde soort tegel-link als T-shirt hierboven: de scheenbeschermer is
+  // een eigen product met eigen zones (Main Front/Back, Piping, Straps,
+  // Velcro, Stitching — geen enkele overlap met deze zones.js), dus een
+  // eigen pagina i.p.v. een derde entry in MODELS die de handschoen-
+  // zone-lijst zou moeten delen.
+  const shinguardLink = el('a', 'model-item');
+  shinguardLink.href = '/configurator-shinguard/index.html';
+  shinguardLink.style.textDecoration = 'none';
+  shinguardLink.append(el('span', 'model-name', 'Scheenbeschermer'), el('span', 'model-sub', 'Protector'));
+  wrap.appendChild(shinguardLink);
 }
 
 /** Wisselt van 3D-model en zet alle instellingen opnieuw toe. */
