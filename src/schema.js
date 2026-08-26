@@ -247,7 +247,14 @@ async function ensureSchema() {
     // waardoor de daadwerkelijk in rekening gebrachte prijs structureel
     // afweek van wat de configurator liet zien.
     await seedCustom('custom-gloves',     'Custom Gloves',      129.95, ['8oz', '10oz', '12oz', '14oz', '16oz'])
-    await seedCustom('custom-shinguards', 'Custom Shin Guards', 49.95, ['S', 'M', 'L', 'XL'])
+    // Scheenbeschermer gebruikt bewust exact dezelfde basisprijs als de
+    // bokshandschoen (129.95, was per ongeluk 49.95) — moet gelijk blijven
+    // aan PRICING.base in client/public/configurator-shinguard/js/zones.js
+    // EN aan CUSTOM_SHINGUARD_PRICING.base in customizerController.js. Deze
+    // slug wordt gedeeld door de 3D-configurator en de oudere SVG-customizer
+    // (client/src/customizer/config.js) — maten hieronder moeten gelijk
+    // blijven aan SIZES in beide.
+    await seedCustom('custom-shinguards', 'Custom Shin Guards', 129.95, ['S', 'M', 'L', 'XL'])
     // 25.95 moet gelijk blijven aan PRICING.base in
     // client/public/configurator-shirt/js/zones.js EN aan
     // CUSTOM_JERSEY_PRICING.base in customizerController.js.

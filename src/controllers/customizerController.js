@@ -22,6 +22,12 @@ const CUSTOM_GLOVE_PRICING = { base: 129.95, customLogo: 12.95, wristName: 12.95
 // CUSTOM_GLOVE_PRICING hierboven (vlakke toeslagen, geen stapeling).
 const CUSTOM_JERSEY_PRICING = { base: 25.95, customLogo: 12.95, name: 10.00 }
 
+// Basisprijs bewust exact gelijk aan CUSTOM_GLOVE_PRICING.base — moet
+// gelijk blijven aan PRICING.base in
+// client/public/configurator-shinguard/js/zones.js EN aan de prijs van
+// 'custom-shinguards' in de seedCustom-aanroep in schema.js.
+const CUSTOM_SHINGUARD_PRICING = { base: 129.95, customLogo: 12.95 }
+
 /** GET /api/customizer/products — de twee custom producten + maten→variant_id + basisprijs */
 const products = wrap(async (req, res) => {
   const out = {}
@@ -80,6 +86,15 @@ const addToCart = wrap(async (req, res) => {
     price = CUSTOM_JERSEY_PRICING.base
       + (hasLogo ? CUSTOM_JERSEY_PRICING.customLogo : 0)
       + (embroidered ? CUSTOM_JERSEY_PRICING.name : 0)
+  } else if (productKey === 'custom-shinguards') {
+    // Deze slug wordt gedeeld door twee configurators: de nieuwe 3D-versie
+    // (client/public/configurator-shinguard/) zet customImage, de oudere
+    // SVG-customizer (client/src/customizer/config.js) zet logo — beide
+    // tellen als "eigen logo gebruikt", zelfde toeslag als custom-gloves.
+    const hasLogo = !!(config?.customImage || config?.logo)
+    price = CUSTOM_SHINGUARD_PRICING.base
+      + (hasLogo ? CUSTOM_SHINGUARD_PRICING.customLogo : 0)
+      + (embroidered ? NAME_EMBROIDERY : 0)
   } else {
     price = product.price + (embroidered ? NAME_EMBROIDERY : 0)
   }

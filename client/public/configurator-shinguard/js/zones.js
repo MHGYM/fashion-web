@@ -71,12 +71,15 @@ export const SIZES = ['S', 'M', 'L', 'XL'];
 
 /**
  * Prijsopbouw — zelfde model als de bokshandschoen-configurator (zie
- * client/public/configurator/js/zones.js PRICING). Placeholder-basisprijs:
- * er is geen prijs voor dit product aangeleverd, dus dit is een redelijke
- * inschatting die later makkelijk aan te passen is (één plek, hier).
+ * client/public/configurator/js/zones.js PRICING). Basisprijs is bewust
+ * gelijk aan de bokshandschoen (129.95) — moet gelijk blijven aan
+ * CUSTOM_SHINGUARD_PRICING.base in src/controllers/customizerController.js
+ * EN aan de prijs van 'custom-shinguards' in de seedCustom-aanroep in
+ * src/schema.js: die twee bepalen samen wat er daadwerkelijk in rekening
+ * wordt gebracht, dit is alleen de weergave in de configurator zelf.
  */
 export const PRICING = {
-  base: 44.95,
+  base: 129.95,
   customLogo: 12.95,
 };
 

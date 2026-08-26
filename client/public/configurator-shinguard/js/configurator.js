@@ -18,7 +18,7 @@ import {
 
 const STORE_KEY = 'fm-shinguard-config-v1';
 const API = '/api/customizer';
-const PRODUCT_KEY = 'custom-shinguard';
+const PRODUCT_KEY = 'custom-shinguards';
 
 const state = {
   colors: defaultColors(),
