@@ -52,17 +52,26 @@ export default {
     top:   { theta: 0,               phi: 0.5 },
   },
 
-  // Zelfde matte afwerking als de bokshandschoen-configurator (zie
-  // models/laceup.js voor de toelichting) — geen scherpe glans-highlight
-  // over een geüpload logo heen. specularIntensity bewust gematigd (niet 0,
-  // niet 1): de GLB zet 'm zelf op 0 (KHR_materials_specular), wat de
-  // meegeleverde normal-map/leerkorrel volledig onzichtbaar maakt — vooral
-  // op donkere kleuren. 0.5 laat de korrel duidelijk zien als zachte
-  // hoogtepuntjes zonder er een glimmend/nat effect van te maken.
+  // De GLB zet specularIntensity zelf op 0 (KHR_materials_specular), wat de
+  // meegeleverde normal-map/leerkorrel volledig onzichtbaar maakt: zonder
+  // specular/omgevingsreflectie hangt structuur-zichtbaarheid alleen af van
+  // diffuse baseColor-variatie, en die is op de gladde panelen (Main Front/
+  // Main Back) juist HEEL subtiel van zichzelf (geverifieerd tegen de
+  // originele, ongecomprimeerde 4096px-textuur: geen kunstmatige afvlakking
+  // door de eigen decimatie/compressie-pipeline, de bron is simpelweg bijna
+  // effen daar). Bij een multiply-tint (color x map) wordt die kleine
+  // variatie bovendien verder uitgedund naarmate de gekozen kleur donkerder/
+  // verzadigder is — vandaar dat de korrel bij bv. rood nauwelijks opviel
+  // terwijl zwart/wit nog wel zichtbaar was.
+  // specularIntensity 0.9 + roughness 0.55 (i.p.v. de matte 0.78 van de
+  // handschoen) zorgt dat de normal-map als lichtreflectie duidelijk
+  // zichtbaar wordt, ONAFHANKELIJK van de gekozen kleur — geverifieerd op
+  // zwart, wit én rood. Bewust niet naar 1.0/nog lager roughness: dat geeft
+  // een té glimmend/nat effect i.p.v. zichtbare leerkorrel.
   materialDefaults: {
-    roughness: 0.78, metalness: 0.0,
+    roughness: 0.55, metalness: 0.0,
     clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
-    specularIntensity: 0.5,
+    specularIntensity: 0.9,
   },
 
   bindings: {
