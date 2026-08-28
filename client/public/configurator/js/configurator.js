@@ -147,6 +147,16 @@ const canvas = $('glove-canvas');
 // zo wordt bij een gedeelde link met een ander model meteen het juiste bestand
 // geladen in plaats van eerst het standaardmodel en dan omwisselen.
 load();
+// Een link vanaf een ander product (T-shirt/Scheenbeschermer, "Model"-rij
+// bovenaan) kan een specifiek model opvragen via ?model=… — dat wint van
+// wat opgeslagen/gedeeld was, zodat "Velcro"/"Lace-Up" vanaf een andere
+// pagina altijd op het juiste model uitkomen i.p.v. het laatst-gebruikte.
+// Puur navigatie: verandert niets aan hoe modellen/kleuren zelf werken.
+const wantedModelParam = new URLSearchParams(location.search).get('model');
+if (wantedModelParam && MODEL_BY_ID[wantedModelParam]) {
+  state.model = wantedModelParam;
+  state.colors = ensureModelColors(wantedModelParam);
+}
 const viewer = createGloveViewer(canvas, { profile: MODEL_BY_ID[state.model] });
 
 // Het naam-op-de-manchet-blok staat vast in de HTML maar hoort inhoudelijk

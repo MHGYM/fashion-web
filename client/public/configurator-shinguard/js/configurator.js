@@ -90,6 +90,34 @@ function el(tag, cls, text) {
   return n;
 }
 
+/* ── Productselector (Model-rij bovenaan) ────────────────────────────────
+   Zelfde 4 tegels als de bokshandschoen-configurator laat zien (buildModelList
+   in configurator/js/configurator.js), maar dan vanaf DEZE pagina: puur
+   navigatie, geen eigen model-switch-logica (dit product heeft er maar één).
+   Bewust een eigen, losstaande kopie i.p.v. een gedeelde module — zelfde
+   architectuurkeuze als de rest van dit bestand (zie kopregel), zodat een
+   wijziging hier nooit de andere producten kan raken. Velcro/Lace-Up linken
+   met ?model=… naar de bokshandschoen-pagina, die dat leest om meteen het
+   juiste model te tonen i.p.v. het laatst-gebruikte. */
+function buildProductNav() {
+  const wrap = $('model-list');
+  if (!wrap) return;
+  const items = [
+    { id: 'velcro', label: 'Velcro', sub: 'Klittenbandsluiting', href: '/configurator/index.html?model=velcro' },
+    { id: 'laceup', label: 'Lace-Up', sub: 'Vetersluiting', href: '/configurator/index.html?model=laceup' },
+    { id: 'shirt', label: 'T-shirt', sub: 'Fight Jersey', href: '/configurator-shirt/index.html' },
+    { id: 'shinguard', label: 'Scheenbeschermer', sub: 'Protector', href: '/configurator-shinguard/index.html', active: true },
+  ];
+  wrap.innerHTML = '';
+  items.forEach((it) => {
+    const node = el(it.active ? 'span' : 'a', 'model-item' + (it.active ? ' is-active' : ''));
+    if (!it.active) { node.href = it.href; node.style.textDecoration = 'none'; }
+    else node.setAttribute('aria-current', 'page');
+    node.append(el('span', 'model-name', it.label), el('span', 'model-sub', it.sub));
+    wrap.appendChild(node);
+  });
+}
+
 /* ── 3D bijwerken ─────────────────────────────────────────────────────── */
 const FULL_ZONE = ZONES.find((z) => z.artwork === 'full');
 
@@ -526,6 +554,7 @@ function showAttribution() {
 /* ── Start ────────────────────────────────────────────────────────────── */
 viewer.ready.then(async () => {
   $('stage-loading').classList.add('is-hidden');
+  buildProductNav();
   buildZoneTabs();
   buildZoneEditor();
   buildSizePanel();
