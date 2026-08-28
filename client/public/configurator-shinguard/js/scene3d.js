@@ -491,6 +491,17 @@ export function createShinguardViewer(canvas, opts = {}) {
         material.clearcoat = d.clearcoat ?? 0;
         material.clearcoatRoughness = d.clearcoatRoughness ?? 1;
         material.envMapIntensity = d.envMapIntensity ?? 0.4;
+        // De GLB zet zelf specularIntensity op 0 (KHR_materials_specular),
+        // wat OK was toen dit materiaal alleen de matte, effen leerkleur
+        // droeg — maar zonder specular/omgevingsreflectie is de normal-map
+        // (leerkorrel/weefstructuur) simpelweg niet te ZIEN: bij een donkere
+        // tint (bv. zwart) verdwijnt ook de diffuse variatie, waardoor het
+        // oppervlak volledig vlak oogt ondanks de correcte textuur/UV's.
+        // Terugzetten naar de neutrale PBR-standaard (1) laat de bestaande
+        // normal/ORM-maps weer als lichtreflectie op de korrel tonen, bij
+        // elke gekozen kleur — geen nieuwe textuur, alleen het kanaal terug
+        // aanzetten waarmee de al-aanwezige bump/korrel zichtbaar wordt.
+        material.specularIntensity = d.specularIntensity ?? 1;
         meshList.forEach((m) => { m.material = material; });
 
         const def = ZONE_BY_ID[zoneId];
@@ -522,6 +533,7 @@ export function createShinguardViewer(canvas, opts = {}) {
         mat.color.set(0x0d0e10);
         mat.roughness = 0.85;
         mat.metalness = 0;
+        mat.specularIntensity = 1; // zie toelichting hierboven bij de zone-materialen
         m.material = mat;
       });
 

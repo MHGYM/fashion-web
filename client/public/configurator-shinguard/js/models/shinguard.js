@@ -54,10 +54,15 @@ export default {
 
   // Zelfde matte afwerking als de bokshandschoen-configurator (zie
   // models/laceup.js voor de toelichting) — geen scherpe glans-highlight
-  // over een geüpload logo heen.
+  // over een geüpload logo heen. specularIntensity bewust gematigd (niet 0,
+  // niet 1): de GLB zet 'm zelf op 0 (KHR_materials_specular), wat de
+  // meegeleverde normal-map/leerkorrel volledig onzichtbaar maakt — vooral
+  // op donkere kleuren. 0.5 laat de korrel duidelijk zien als zachte
+  // hoogtepuntjes zonder er een glimmend/nat effect van te maken.
   materialDefaults: {
     roughness: 0.78, metalness: 0.0,
     clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
+    specularIntensity: 0.5,
   },
 
   bindings: {
