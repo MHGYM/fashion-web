@@ -17,13 +17,16 @@
      - piping: de rand-bies rondom.
      - straps: de vier band-onderdelen (boven/onder, buiten/binnen) samen —
        één kleurkeuze voor de hele sluiting, net als "Straps" in de opdracht.
-     - velcro: de vier klittenband-stukjes samen.
+     - front-foot: het voorste voetgedeelte onderaan (Foot_Front-mesh).
      - stitching: het zichtbare stiksel.
-   Foot_Front/Foot_Back/Elastic_foot/Elastic_heel (de voet-overkapping en
-   elastische banden) zijn geen aparte kleurzone — bewust net als 'lining'
-   bij de handschoen: vast, niet-klantbewerkbaar onderdeel (zie staticNodes
-   in shinguard.js), simpelweg omdat dit niet gevraagd is en anders het
-   aantal tabs onnodig zou opblazen t.o.v. wat de opdracht vraagt.
+   Velcro (voorheen een 'mesh-multi'-zone over Velcro_1..4) is op verzoek
+   verwijderd: niet meer als tab/kleurkeuze getoond. De meshes zelf blijven
+   gewoon in het GLB en in de scene (nu net als de resterende staticNodes op
+   hun vaste, bij het laden toegepaste kleur) — alleen niet meer klant-
+   bewerkbaar.
+   Foot_Back/Elastic_foot/Elastic_heel zijn geen aparte kleurzone — bewust
+   net als 'lining' bij de handschoen: vast, niet-klantbewerkbaar onderdeel
+   (zie staticNodes in shinguard.js), simpelweg omdat dit niet gevraagd is.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export { COLORS, hexOf } from '../../configurator/js/zones.js';
@@ -51,14 +54,14 @@ export const ZONES = [
     hint: 'De banden van de sluiting (boven en onder).',
   },
   {
-    id: 'velcro', label: 'Velcro', group: 'Sluiting',
-    default: 'White', artwork: null,
-    hint: 'Het klittenband van de sluiting.',
-  },
-  {
     id: 'stitching', label: 'Stitching', group: 'Details',
     default: 'White', artwork: null,
     hint: 'Het zichtbare stiksel.',
+  },
+  {
+    id: 'front-foot', label: 'Front Foot', group: 'Voet',
+    default: 'Black', artwork: null,
+    hint: 'Het voorste voetgedeelte, onderaan de scheenbeschermer.',
   },
 ];
 

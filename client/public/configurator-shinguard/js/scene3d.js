@@ -11,7 +11,7 @@
      'mesh'       — één zone, één mesh (zoals bij de handschoen).
      'mesh-multi' — één zone, MEERDERE meshes met één gedeelde canvas-textuur
                     (nieuw t.o.v. de handschoen-versie; bv. de 4 losse
-                    velcro-stukjes die samen de "Velcro"-zone vormen). Alleen
+                    band-onderdelen die samen de "Straps"-zone vormen). Alleen
                     veilig voor een effen kleurvulling, niet voor artwork.
      'mesh-group' — één zone die andere, al bestaande zones aanstuurt (bv.
                     Lace-Up's "Thumb"); hier niet gebruikt maar wel

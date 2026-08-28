@@ -13,21 +13,29 @@
      Main_Back  = de vlakke kuit-zijde met de straps (achterkant) ✓
    Er was dus geen omwisseling nodig, in tegenstelling tot de Lace-Up.
 
-   Straps en Velcro zijn elk 4 losse nodes (boven/onder × buiten/binnen,
-   resp. 4 klittenband-stukjes) die in de opdracht als ÉÉN kleurbare zone
-   gevraagd zijn ("Straps kunnen van kleur veranderen", niet 4 losse
-   tabs). Daarvoor is een nieuw, generiek bindingstype 'mesh-multi'
-   toegevoegd aan scene3d.js (alleen in DEZE kopie, de handschoen-
-   configurator is niet aangeraakt): één gedeelde canvas-textuur, effen
-   gevuld, toegepast op meerdere meshes tegelijk. Dat is veilig voor een
-   platte kleurvulling (in tegenstelling tot een afbeelding) omdat de
-   UV-indeling er dan niet toe doet.
+   Straps zijn 4 losse nodes (boven/onder × buiten/binnen) die in de
+   opdracht als ÉÉN kleurbare zone gevraagd zijn ("Straps kunnen van kleur
+   veranderen", niet 4 losse tabs). Daarvoor is een nieuw, generiek
+   bindingstype 'mesh-multi' toegevoegd aan scene3d.js (alleen in DEZE
+   kopie, de handschoen-configurator is niet aangeraakt): één gedeelde
+   canvas-textuur, effen gevuld, toegepast op meerdere meshes tegelijk. Dat
+   is veilig voor een platte kleurvulling (in tegenstelling tot een
+   afbeelding) omdat de UV-indeling er dan niet toe doet.
 
-   Foot_Front/Foot_Back/Elastic_foot/Elastic_heel (de voet-overkapping en
-   elastische banden) zijn geen eigen zone — niet gevraagd in de opdracht,
-   en zouden de tab-lijst onnodig laten groeien. Ze staan als staticNodes
-   op een neutrale, vaste kleur (zelfde patroon als 'lining' bij de
-   handschoen).
+   Velcro (voorheen ook een 'mesh-multi'-zone, Velcro_1..4) is op verzoek
+   verwijderd als kleurzone/tab. De 4 meshes blijven wél in de scene, nu als
+   staticNodes met een vaste, neutrale kleur (zelfde behandeling als
+   Foot_Back/Elastic_foot/Elastic_heel) — geen losse witte/onbewerkte
+   plekken in het model.
+
+   Foot_Front is op verzoek juist WEL een eigen kleurzone geworden
+   ("Front Foot"): het voorste, zwarte voetgedeelte onderaan. Voorheen was
+   dit een staticNode; nu een gewone 'mesh'-binding, exact zoals Main
+   Front/Main Back/Piping/Stitching.
+
+   Foot_Back/Elastic_foot/Elastic_heel (de achterste voet-overkapping en
+   elastische banden) blijven staticNodes — niet gevraagd, en zouden de
+   tab-lijst onnodig laten groeien.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default {
@@ -57,11 +65,11 @@ export default {
     'main-back':  { type: 'mesh', node: 'Main_Back' },
     'piping':     { type: 'mesh', node: 'Piping' },
     'straps':     { type: 'mesh-multi', nodes: ['Strap_upper', 'Strap_bottom', 'Strapinner_upper', 'Strapinner_bottom'] },
-    'velcro':     { type: 'mesh-multi', nodes: ['Velcro_1', 'Velcro_2', 'Velcro_3', 'Velcro_4'] },
     'stitching':  { type: 'mesh', node: 'Stitches' },
+    'front-foot': { type: 'mesh', node: 'Foot_Front' },
   },
 
-  staticNodes: ['Foot_Front', 'Foot_Back', 'Elastic_foot', 'Elastic_heel'],
+  staticNodes: ['Foot_Back', 'Elastic_foot', 'Elastic_heel', 'Velcro_1', 'Velcro_2', 'Velcro_3', 'Velcro_4'],
 
   // Eigen (klant-aangeleverd) bestand, geen extern CC-gelicentieerd model —
   // attribution() in configurator.js verwacht anders a.authorUrl/a.license
