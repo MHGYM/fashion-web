@@ -9,22 +9,30 @@
    GENERIEKE renderer: kent géén zone- of meshnaam. Alles komt uit het actieve
    model-profiel (js/models/shinguard.js). Bindingstypes per zone:
      'mesh'       — één zone, één mesh (zoals bij de handschoen).
-     'mesh-multi' — één zone, MEERDERE meshes met één gedeelde canvas-textuur
+     'mesh-multi' — één zone, MEERDERE meshes met één gedeeld materiaal
                     (nieuw t.o.v. de handschoen-versie; bv. de 4 losse
-                    band-onderdelen die samen de "Straps"-zone vormen). Alleen
-                    veilig voor een effen kleurvulling, niet voor artwork.
+                    band-onderdelen die samen de "Straps"-zone vormen).
      'mesh-group' — één zone die andere, al bestaande zones aanstuurt (bv.
                     Lace-Up's "Thumb"); hier niet gebruikt maar wel
                     overgenomen zodat dit bestand een volledige kopie blijft.
 
-   Kleur loopt via één canvas-textuur per zone (dekt de eigen UV-ruimte van
-   die zone). De 'volledige afbeelding'-upload (front-panel) is een APARTE
-   laag: een in 3D geprojecteerde decal die over meerdere meshes tegelijk ligt
-   (front-panel + duim), zodat één upload als één ononderbroken ontwerp over
-   het hele paneel én de duim verschijnt — ook al zijn dat losse meshes met
-   elk hun eigen UV. Zonder afbeelding blijven die meshes gewoon hun eigen,
-   los instelbare kleur tonen. Verplaatsen/schalen/roteren werkt hetzelfde
-   voor beide lagen (drawCoverImage), alleen het canvas erachter verschilt.
+   Kleur = TINT over de echte, meegeleverde GLB-textuur (baseColor/normal/
+   ORM van het gedeelde "defaultMat"-materiaal), niet een flat-fill canvas
+   die de textuur vervangt. Elke kleurbare zone krijgt bij het laden een
+   KLOON van dat materiaal (zelfde map/normalMap/metalnessMap — texturen
+   zelf worden nooit gekopieerd, alleen de materiaal-referentie) met een
+   eigen, onafhankelijk instelbare `.color`. Three.js vermenigvuldigt
+   `color × map`, dus de gekozen kleur kleurt de textuur in plaats van 'm te
+   overschrijven — de stof-/lederstructuur en de naden blijven zichtbaar,
+   ook in wit/zwart (color=#fff laat de textuur ongewijzigd doorkomen).
+   Niet-klantbewerkbare (staticNodes) meshes krijgen dezelfde behandeling
+   met een vaste, donkere tint, zodat het hele model — bewerkbaar én vast —
+   met dezelfde echte textuur oogt.
+
+   De 'volledige afbeelding'-upload (front-panel) is een APARTE laag: een in
+   3D geprojecteerde decal die over meerdere meshes tegelijk ligt (met een
+   eigen canvas-textuur, los van de hierboven beschreven kleur-tint), zodat
+   één upload als één ononderbroken ontwerp over het hele paneel verschijnt.
 
    Publieke API (per zone-id uit zones.js):
      viewer.ready                      Promise, resolvet zodra het model staat
@@ -174,23 +182,6 @@ export function createShinguardViewer(canvas, opts = {}) {
     ctx.rotate(((t.rotation ?? 0) * Math.PI) / 180);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
-  }
-
-  /* ── Zone-canvas tekenen (effen kleur) ─────────────────────────────────
-     Alleen de zonekleur. Een geüploade afbeelding voor de 'full'-artwork-
-     zone loopt over MEERDERE meshes heen (zie repaintFrontArtwork) en kan
-     dus niet in dit per-zone-canvas getekend worden — die meshes blijven
-     hun eigen kleur tonen tot de decal (die erbovenop ligt) zichtbaar wordt. */
-  function repaint(zoneId) {
-    const z = zones[zoneId];
-    if (!z) return;
-    const { ctx } = z;
-    const W = TEX_SIZE, H = TEX_SIZE;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = z.color || '#14161A';
-    ctx.fillRect(0, 0, W, H);
-    z.texture.needsUpdate = true;
   }
 
   /* ── Badge (logo + tekst) ─────────────────────────────────────────────
@@ -479,41 +470,32 @@ export function createShinguardViewer(canvas, opts = {}) {
         if (b.type === 'mesh-group') { pendingGroups.push(zoneId); return; }
         if (b.type !== 'mesh' && b.type !== 'mesh-multi') return;
 
-        // 'mesh-multi': één zone, meerdere meshes (bv. 4 losse velcro-stukjes
-        // die als ÉÉN kleurbare "Velcro"-zone horen te werken). Eén gedeelde
-        // canvas/textuur/materiaal op elk van die meshes — voor een effen
-        // kleurvulling (geen afbeelding) maakt de UV-indeling per mesh dan
-        // niet uit, dus dit is voor kleur-only zones altijd veilig.
+        // 'mesh-multi': één zone, meerdere meshes (bv. de 4 losse band-
+        // onderdelen die als ÉÉN kleurbare "Straps"-zone horen te werken).
+        // Eén gedeeld, gekloond materiaal op elk van die meshes, zodat ze
+        // altijd exact dezelfde tint tonen.
         const meshList = b.type === 'mesh-multi'
           ? (b.nodes || []).map((n) => meshByNode[n]).filter(Boolean)
           : (meshByNode[b.node] ? [meshByNode[b.node]] : []);
         if (!meshList.length) { console.warn(`[3D] zone "${zoneId}": geen van de meshes gevonden.`); return; }
 
-        const c = document.createElement('canvas');
-        c.width = c.height = TEX_SIZE;
-        const ctx = c.getContext('2d');
-        const texture = new THREE.CanvasTexture(c);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.flipY = false;           // glTF-UV's zijn niet geflipt
-        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-
-        const material = new THREE.MeshPhysicalMaterial({
-          map: texture,
-          color: 0xffffff,               // wit: de textuur bepaalt de kleur
-          // Matte fallback (zie models/*.js voor de toelichting) — geldt
-          // alleen als een toekomstig model-profiel geen materialDefaults zet.
-          roughness: d.roughness ?? 0.78,
-          metalness: d.metalness ?? 0.0,
-          clearcoat: d.clearcoat ?? 0,
-          clearcoatRoughness: d.clearcoatRoughness ?? 1,
-          envMapIntensity: d.envMapIntensity ?? 0.4,
-        });
+        // Kloon van het ECHTE, door de GLB meegeleverde materiaal (met de
+        // originele baseColor/normal/ORM-textuur van "defaultMat") — geen
+        // nieuw canvas/materiaal dat de textuur vervangt. `.clone()` deelt
+        // de textuur-referenties (geen dure kopie van de afbeeldingen zelf)
+        // en geeft deze zone een eigen, onafhankelijke `.color`-tint.
+        const material = meshList[0].material.clone();
+        material.color.set('#14161A');
+        material.roughness = d.roughness ?? 0.78;
+        material.metalness = d.metalness ?? 0.0;
+        material.clearcoat = d.clearcoat ?? 0;
+        material.clearcoatRoughness = d.clearcoatRoughness ?? 1;
+        material.envMapIntensity = d.envMapIntensity ?? 0.4;
         meshList.forEach((m) => { m.material = material; });
 
         const def = ZONE_BY_ID[zoneId];
-        zones[zoneId] = { material, ctx, texture, mesh: meshList[0], meshes: meshList, color: '#14161A', badge: null };
+        zones[zoneId] = { material, mesh: meshList[0], meshes: meshList, color: '#14161A', badge: null };
         targetColor[zoneId] = new THREE.Color('#14161A');
-        repaint(zoneId);
         if (def && def.artwork === 'badge') pendingBadges.push({ zoneId, mesh: meshList[0] });
       });
 
@@ -529,10 +511,18 @@ export function createShinguardViewer(canvas, opts = {}) {
         zones[zoneId] = { isGroup: true, memberIds, color: '#14161A' };
       });
 
-      // Statische onderdelen (voering e.d.) een eigen, dof materiaal geven
+      // Statische onderdelen (niet-klantbewerkbaar, bv. voering/velcro): ook
+      // een kloon van het echte materiaal met een vaste, donkere tint — in
+      // plaats van een materiaal zonder textuur — zodat ze niet vlak/anders
+      // ogen dan de wél-bewerkbare, getextureerde zones ernaast.
       (profile.staticNodes || []).forEach((n) => {
         const m = meshByNode[n];
-        if (m) m.material = new THREE.MeshPhysicalMaterial({ color: 0x0d0e10, roughness: 0.85, metalness: 0 });
+        if (!m) return;
+        const mat = m.material.clone();
+        mat.color.set(0x0d0e10);
+        mat.roughness = 0.85;
+        mat.metalness = 0;
+        m.material = mat;
       });
 
       scene.add(modelRoot);
@@ -586,13 +576,15 @@ export function createShinguardViewer(canvas, opts = {}) {
     if (!z) return;
     z.color = hex;
     if (z.isGroup) {
-      // Stuurt de gekoppelde zones aan via hun eigen, bestaande materiaal/
-      // canvas — dat blijft dus ongewijzigd werken, ook los van deze groep.
+      // Stuurt de gekoppelde zones aan via hun eigen, bestaande materiaal —
+      // dat blijft dus ongewijzigd werken, ook los van deze groep.
       z.memberIds.forEach((id) => setZoneColor(id, hex));
       return;
     }
     targetColor[zoneId] = new THREE.Color(hex);
-    repaint(zoneId);
+    // Tint over de echte textuur (zie kloon bij het laden hierboven) —
+    // geen canvas-repaint meer nodig voor de basiskleur.
+    z.material.color.set(hex);
   }
 
   /** img=null wist de afbeelding. transform: { x, y, scale, rotation }
