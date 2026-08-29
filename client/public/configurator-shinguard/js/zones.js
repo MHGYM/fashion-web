@@ -90,6 +90,12 @@ export function defaultColors() {
   return Object.fromEntries(ZONES.map((z) => [z.id, z.default]));
 }
 
+/** scale 1 = de afbeelding volledig "cover"-vullend (rand-tot-rand, zie
+ *  drawCoverImage in scene3d.js) — dat liet nooit iets van de eigen
+ *  paneelkleur zien, ook niet nadat de decal transparant werd gemaakt. 0.45
+ *  laat een geüpload logo standaard als logo verschijnen (gecentreerd,
+ *  ruimte voor de kleur eromheen); de bestaande grootte-slider (0.2–3)
+ *  werkt nog gewoon om het net als voorheen te vergroten of te verkleinen. */
 export function defaultArtworkTransform() {
-  return { x: 0, y: 0, scale: 1, rotation: 0 };
+  return { x: 0, y: 0, scale: 0.45, rotation: 0 };
 }

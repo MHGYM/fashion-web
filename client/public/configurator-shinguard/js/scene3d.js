@@ -375,8 +375,16 @@ export function createShinguardViewer(canvas, opts = {}) {
     // is letterlijk het materiaal dat een geüpload logo draagt, dus juist
     // hier is een scherpe glans-highlight het meest schadelijk voor de
     // leesbaarheid.
+    // transparent:true (was false) is de kern van de fix: de canvas wordt bij
+    // elke repaint eerst met clearRect naar volledig transparant gezet en
+    // daarna alleen ín het logo zelf getekend (drawCoverImage) — met
+    // transparent:false werd ook die lege, "gewiste" rand ondoorzichtig
+    // gerenderd, waardoor de eigen kleur van de zone er nooit doorheen kon
+    // schijnen, ook niet als de klant het logo kleiner maakte. depthWrite:
+    // false voorkomt dat deze nu-transparante decal het dieptebuffer
+    // verstoort (zelfde patroon als de badge-decal in de handschoen-versie).
     const material = new THREE.MeshPhysicalMaterial({
-      map: tex, transparent: false, depthTest: true, depthWrite: true,
+      map: tex, transparent: true, depthTest: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2,
       roughness: d.roughness ?? 0.78, metalness: d.metalness ?? 0.0,
       clearcoat: d.clearcoat ?? 0, clearcoatRoughness: d.clearcoatRoughness ?? 1,
