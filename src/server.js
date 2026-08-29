@@ -34,6 +34,15 @@ app.use(helmet({
       // getekend wordt (img-src, niet media-src — dit is geen <video>/<audio>).
       'img-src':   ["'self'", 'data:', 'https:', 'blob:'],
       'media-src': ["'self'", 'data:', 'https:', 'blob:'],
+      // connect-src viel terug op default-src ('self'), wat blob:-fetches
+      // blokkeerde — onopgemerkt zolang de 3D-configuratoren de ingebedde
+      // GLB-textures toch met een eigen canvas overschreven. Nu de
+      // scheenbeschermer-configurator de ECHTE meegeleverde textures
+      // (baseColor/normal/ORM) rechtstreeks gebruikt, decodeert Three.js'
+      // GLTFLoader die intern via fetch() op een blob:-URL (niet via <img>,
+      // dus img-src hierboven dekt dit niet) — zonder connect-src faalt die
+      // fetch stil en blijft bv. de normal-map (leerkorrel) onzichtbaar.
+      'connect-src': ["'self'", 'blob:'],
       // 'wasm-unsafe-eval': staat WebAssembly.instantiate() toe (nodig voor de
       // meshopt-decoder van de 3D-configurator). Dit is NIET hetzelfde als
       // 'unsafe-eval' — het opent geen JS-eval/inline-scripts, alleen WASM.
