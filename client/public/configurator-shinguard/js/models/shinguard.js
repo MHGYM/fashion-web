@@ -52,26 +52,31 @@ export default {
     top:   { theta: 0,               phi: 0.5 },
   },
 
-  // De GLB zet specularIntensity zelf op 0 (KHR_materials_specular), wat de
-  // meegeleverde normal-map/leerkorrel volledig onzichtbaar maakt: zonder
-  // specular/omgevingsreflectie hangt structuur-zichtbaarheid alleen af van
-  // diffuse baseColor-variatie, en die is op de gladde panelen (Main Front/
-  // Main Back) juist HEEL subtiel van zichzelf (geverifieerd tegen de
-  // originele, ongecomprimeerde 4096px-textuur: geen kunstmatige afvlakking
-  // door de eigen decimatie/compressie-pipeline, de bron is simpelweg bijna
-  // effen daar). Bij een multiply-tint (color x map) wordt die kleine
-  // variatie bovendien verder uitgedund naarmate de gekozen kleur donkerder/
-  // verzadigder is — vandaar dat de korrel bij bv. rood nauwelijks opviel
-  // terwijl zwart/wit nog wel zichtbaar was.
-  // specularIntensity 0.9 + roughness 0.55 (i.p.v. de matte 0.78 van de
-  // handschoen) zorgt dat de normal-map als lichtreflectie duidelijk
-  // zichtbaar wordt, ONAFHANKELIJK van de gekozen kleur — geverifieerd op
-  // zwart, wit én rood. Bewust niet naar 1.0/nog lager roughness: dat geeft
-  // een té glimmend/nat effect i.p.v. zichtbare leerkorrel.
+  // Grondig geverifieerd (rechtstreeks in de geladen Three.js-materialen,
+  // niet alleen "aanwezig" aangenomen) dat baseColor/normal/roughness/
+  // metalness-maps stuk voor stuk correct aan elke zone gekoppeld zijn: map
+  // (srgb), normalMap (linear/""), roughnessMap+metalnessMap (linear/"",
+  // gedeelde ORM-textuur) — colorSpace, UV's (niet-ontaard, matcht de
+  // mesh-vorm) en normalScale (±1, overgenomen van normalTexture.scale: -1
+  // in de originele GLB) staan allemaal correct. Ook met MeshNormalMaterial
+  // gecontroleerd dat de normal-map echte, reële data bevat (geen lege/
+  // vlakke kaart) — én met een pixel-steekproef op exact de UV-regio van
+  // Main_Front tegen de ONGECOMPRIMEERDE originele 4096px-bron (dus geen
+  // artefact van de eigen decimatie/compressie-pipeline).
+  //
+  // Wat wél ontbrak: de GLB zet zelf specularIntensity op 0
+  // (KHR_materials_specular), waardoor de normal-map geen enkel render-
+  // kanaal had om zich in te tonen (geen specular, geen bruikbare
+  // omgevingsreflectie) — en de bestaande sterkte (normalScale ±1, zoals de
+  // GLB het zelf aangeeft) bleek op dit model te subtiel om als zichtbare
+  // korrel te lezen, vooral onder een verzadigde kleur-tint. specularIntensity
+  // 0.9 + roughness 0.55 zetten dat kanaal aan; normalScaleMultiplier
+  // vergroot de sterkte van diezelfde, al aanwezige kaart (geen nieuwe
+  // textuur) tot leesbaar niveau. Geverifieerd op zwart, wit én rood.
   materialDefaults: {
     roughness: 0.55, metalness: 0.0,
     clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
-    specularIntensity: 0.9,
+    specularIntensity: 0.9, normalScaleMultiplier: 4,
   },
 
   bindings: {

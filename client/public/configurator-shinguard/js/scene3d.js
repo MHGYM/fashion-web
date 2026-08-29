@@ -491,17 +491,24 @@ export function createShinguardViewer(canvas, opts = {}) {
         material.clearcoat = d.clearcoat ?? 0;
         material.clearcoatRoughness = d.clearcoatRoughness ?? 1;
         material.envMapIntensity = d.envMapIntensity ?? 0.4;
-        // De GLB zet zelf specularIntensity op 0 (KHR_materials_specular),
-        // wat OK was toen dit materiaal alleen de matte, effen leerkleur
-        // droeg — maar zonder specular/omgevingsreflectie is de normal-map
-        // (leerkorrel/weefstructuur) simpelweg niet te ZIEN: bij een donkere
-        // tint (bv. zwart) verdwijnt ook de diffuse variatie, waardoor het
-        // oppervlak volledig vlak oogt ondanks de correcte textuur/UV's.
-        // Terugzetten naar de neutrale PBR-standaard (1) laat de bestaande
-        // normal/ORM-maps weer als lichtreflectie op de korrel tonen, bij
-        // elke gekozen kleur — geen nieuwe textuur, alleen het kanaal terug
-        // aanzetten waarmee de al-aanwezige bump/korrel zichtbaar wordt.
+        // De GLB zet zelf specularIntensity op 0 (KHR_materials_specular) —
+        // zonder specular/omgevingsreflectie draagt de normal-map niets bij
+        // aan het beeld (alleen diffuse shading, en die is op de gladde
+        // panelen van zichzelf al bijna vlak — geverifieerd tegen de
+        // originele, ongecomprimeerde 4096px-bron). Terugzetten naar de
+        // PBR-standaard (1) zet dat kanaal weer aan.
         material.specularIntensity = d.specularIntensity ?? 1;
+        // De echte, meegeleverde normal-map bevat aantoonbaar reële data
+        // (geverifieerd: MeshNormalMaterial-render en pixel-steekproef op
+        // exact de UV-regio van Main_Front tonen duidelijke variatie, geen
+        // vlakke/lege kaart) — maar de door de GLB zelf opgegeven sterkte
+        // (normalTexture.scale: -1, dus normalScale ±1) is op dit model te
+        // subtiel om als zichtbare korrel te lezen, zeker onder een
+        // verzadigde kleur-tint (multiply drukt de resterende diffuse
+        // variatie verder samen). `normalScaleMultiplier` vermenigvuldigt
+        // de AL AANWEZIGE, echte kaart — er wordt niets nieuws gegenereerd,
+        // alleen de bestaande bump-sterkte opgeschaald tot leesbaar niveau.
+        material.normalScale.multiplyScalar(d.normalScaleMultiplier ?? 1);
         meshList.forEach((m) => { m.material = material; });
 
         const def = ZONE_BY_ID[zoneId];
@@ -534,6 +541,7 @@ export function createShinguardViewer(canvas, opts = {}) {
         mat.roughness = 0.85;
         mat.metalness = 0;
         mat.specularIntensity = 1; // zie toelichting hierboven bij de zone-materialen
+        mat.normalScale.multiplyScalar(d.normalScaleMultiplier ?? 1);
         m.material = mat;
       });
 
