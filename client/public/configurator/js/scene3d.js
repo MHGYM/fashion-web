@@ -323,8 +323,16 @@ export function createGloveViewer(canvas, opts = {}) {
     frontArtwork = null;
   }
 
-  function buildFrontArtworkDecal(meshes, frontDir, materialDefaults) {
-    if (!meshes.length) return null;
+  /** Bouwt de decal-meshes voor ÉÉN fysiek cluster (meshes die aan elkaar
+   *  grenzen): één gedeelde projectiedoos (positie/oriëntatie/afmeting) over
+   *  precies dít clustertje, met het gegeven materiaal (canvas/texture zit
+   *  al in dat materiaal — hier alleen geometrie per mesh). Losstaande
+   *  clusters (zie buildFrontArtworkDecal hieronder) krijgen zo elk hun eigen,
+   *  kleinere doos i.p.v. één doos die dwars door het hele model heen moet
+   *  reiken — dat laatste liet het ontwerp op tegenoverliggende, niet-
+   *  aangrenzende onderdelen zichtbaar doorlekken/vervormen. */
+  function buildDecalMeshesForCluster(meshes, frontDir, material) {
+    if (!meshes.length) return [];
 
     // Vlakke projectie loodrecht op de kijkrichting: 'right' en 'up' t.o.v.
     // de camera, niet t.o.v. het model — zo blijft een geüploade afbeelding
@@ -361,6 +369,32 @@ export function createGloveViewer(canvas, opts = {}) {
     orient.position.copy(center);
     orient.lookAt(center.clone().add(frontDir));
 
+    return meshes.map((mesh) => {
+      const geo = new DecalGeometry(mesh, center, orient.rotation, size);
+      const dm = new THREE.Mesh(geo, material);
+      dm.renderOrder = 6;
+      dm.visible = false;
+      scene.add(dm);
+      return dm;
+    });
+  }
+
+  /** `clusters`: array van arrays van meshes. Meshes die fysiek aan elkaar
+   *  grenzen horen in hetzelfde subarray (delen dan één projectiedoos, dus
+   *  één doorlopend ontwerp — het origineel gedrag). Meshes die NIET
+   *  aangrenzen (bv. Front Panel + Outer Thumb op het Velcro-model, twee
+   *  aparte panelen aan weerszijden) horen in aparte subarrays: elk krijgt
+   *  dan zijn eigen, kleinere doos — dezelfde afbeelding verschijnt dan
+   *  onafhankelijk op elk cluster, zonder dat de projectie dwars door het
+   *  model heen naar de andere kant lekt. Alle clusters delen wél hetzelfde
+   *  canvas/texture/materiaal, dus kleur/upload/transform blijven één
+   *  gezamenlijke "artwork"-staat. Bestaande aanroepen die gewoon één platte
+   *  meshlijst doorgeven (via [meshes], zie loadModel hieronder) gedragen
+   *  zich exact als vóór deze wijziging — één cluster, één doos. */
+  function buildFrontArtworkDecal(clusters, frontDir, materialDefaults) {
+    const nonEmptyClusters = clusters.filter((c) => c.length);
+    if (!nonEmptyClusters.length) return null;
+
     const c = document.createElement('canvas');
     c.width = c.height = TEX_SIZE;
     const ctx = c.getContext('2d');
@@ -388,14 +422,8 @@ export function createGloveViewer(canvas, opts = {}) {
       envMapIntensity: d.envMapIntensity ?? 0.4,
     });
 
-    const decalMeshes = meshes.map((mesh) => {
-      const geo = new DecalGeometry(mesh, center, orient.rotation, size);
-      const dm = new THREE.Mesh(geo, material);
-      dm.renderOrder = 6;
-      dm.visible = false;
-      scene.add(dm);
-      return dm;
-    });
+    const decalMeshes = nonEmptyClusters.flatMap((clusterMeshes) =>
+      buildDecalMeshesForCluster(clusterMeshes, frontDir, material));
 
     return { state: null, canvas: c, ctx, texture: tex, material, decalMeshes };
   }
@@ -544,10 +572,21 @@ export function createGloveViewer(canvas, opts = {}) {
       // artworkGroup verwacht (bv. Lace-Up: 'front-panel' bindt daar het
       // Back Panel-vlak, niet de knokkelzijde — zie models/laceup.js). Zonder
       // deze override zou een geüpload logo op het verkeerde vlak belanden.
+      // profile.artworkClusters (optioneel): als het ene ontwerp over MEERDERE,
+      // niet-aangrenzende panelen moet (bv. Velcro: Front Panel + Outer Thumb,
+      // twee losse stukken aan weerszijden van het model), dan zou één gedeelde
+      // projectiedoos over alles heen (het standaardgedrag) dwars door het
+      // model heen moeten reiken en zichtbaar doorlekken naar de andere kant.
+      // artworkClusters groepeert dan expliciet per fysiek-aangrenzend clustertje
+      // (elk zijn eigen, kleinere doos) — zie buildFrontArtworkDecal hierboven.
+      // Zonder dit veld (alle andere modellen) is er precies één cluster, dus
+      // exact hetzelfde gedrag als vóór dit veld bestond.
       if (FULL_ZONE_ID) {
-        const groupIds = profile.artworkGroupOverride || ZONE_BY_ID[FULL_ZONE_ID].artworkGroup || [FULL_ZONE_ID];
-        const artworkMeshes = groupIds.map((id) => zones[id]?.mesh).filter(Boolean);
-        frontArtwork = buildFrontArtworkDecal(artworkMeshes, frontDir, profile.materialDefaults);
+        const toMeshes = (ids) => ids.map((id) => zones[id]?.mesh).filter(Boolean);
+        const clusters = profile.artworkClusters
+          ? profile.artworkClusters.map(toMeshes)
+          : [toMeshes(profile.artworkGroupOverride || ZONE_BY_ID[FULL_ZONE_ID].artworkGroup || [FULL_ZONE_ID])];
+        frontArtwork = buildFrontArtworkDecal(clusters, frontDir, profile.materialDefaults);
       }
 
       modelRoot.scale.setScalar(0.001);

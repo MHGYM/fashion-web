@@ -75,11 +75,19 @@ export default {
     clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
   },
 
-  // Zie toelichting bovenaan: 'front-panel' bindt hier Back_Palm (klopt met
-  // camera-preset 'front'), niet de duim-zijde — daarom wijst dit de
-  // thumb-groepering om naar 'back-panel' i.p.v. 'front-panel'. Zelfde
-  // patroon/reden als Lace-Up's eigen artworkGroupOverride.
-  artworkGroupOverride: ['back-panel', 'outer-thumb', 'inner-thumb', 'thumb-strip', 'thumb'],
+  // Op klantverzoek: een geüpload logo op Front Panel dekt automatisch ook
+  // Outer Thumb — Inner Thumb blijft er bewust buiten (aparte, onafhankelijk
+  // kleurbare zone). Let op: Front Panel bindt hier Back_Palm (camera-
+  // 'front', GEEN duim eraan vast) — de duim zit fysiek aan Front_Palm (nu
+  // 'back-panel'), dus dit zijn TWEE NIET-aangrenzende panelen aan
+  // weerszijden van het model. Eén gedeelde projectiedoos (het gewone
+  // artworkGroupOverride-gedrag) zou daardoor dwars door het model heen
+  // moeten reiken en zichtbaar doorlekken/vervormen op de achterkant
+  // (geconstateerd en lokaal geverifieerd vóór deze fix). artworkClusters
+  // geeft elk paneel daarom zijn EIGEN, kleinere projectiedoos — zelfde
+  // canvas/upload/transform, maar geen lek meer naar de andere kant. Zie
+  // buildFrontArtworkDecal in scene3d.js.
+  artworkClusters: [['front-panel'], ['outer-thumb']],
 
   bindings: {
     'front-panel': { type: 'mesh', node: 'Back_Palm' },

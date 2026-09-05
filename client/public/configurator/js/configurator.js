@@ -212,6 +212,18 @@ function buildModelList() {
     wrap.appendChild(btn);
   });
 
+  // Zelfde soort tegel-link als T-shirt hieronder: de scheenbeschermer is
+  // een eigen product met eigen zones (Main Front/Back, Piping, Straps,
+  // Velcro, Stitching — geen enkele overlap met deze zones.js), dus een
+  // eigen pagina i.p.v. een derde entry in MODELS die de handschoen-
+  // zone-lijst zou moeten delen. Vóór T-shirt op klantverzoek (volgorde:
+  // Velcro, Lace-Up, Scheenbeschermer, T-shirt).
+  const shinguardLink = el('a', 'model-item');
+  shinguardLink.href = '/configurator-shinguard/index.html';
+  shinguardLink.style.textDecoration = 'none';
+  shinguardLink.append(el('span', 'model-name', 'Scheenbeschermer'), el('span', 'model-sub', 'Protector'));
+  wrap.appendChild(shinguardLink);
+
   // T-shirt is geen bokshandschoen-model (ander mesh/zone-systeem, eigen
   // pagina) en kan dus niet via switchModel() ingeladen worden — dit is
   // een gewone link naar /configurator-shirt/, alleen visueel als tegel
@@ -220,23 +232,12 @@ function buildModelList() {
   // anders dan de Express-productieserver, geen directory-index-fallback
   // voor statische pagina's — zonder bestandsnaam laadt dit lokaal de
   // React-SPA i.p.v. de T-shirt-configurator. Werkt met index.html in
-  // beide omgevingen identiek.
+  // beide omgevingen identiek. Op klantverzoek helemaal achteraan.
   const shirtLink = el('a', 'model-item');
   shirtLink.href = '/configurator-shirt/index.html';
   shirtLink.style.textDecoration = 'none';
   shirtLink.append(el('span', 'model-name', 'T-shirt'), el('span', 'model-sub', 'Fight Jersey'));
   wrap.appendChild(shirtLink);
-
-  // Zelfde soort tegel-link als T-shirt hierboven: de scheenbeschermer is
-  // een eigen product met eigen zones (Main Front/Back, Piping, Straps,
-  // Velcro, Stitching — geen enkele overlap met deze zones.js), dus een
-  // eigen pagina i.p.v. een derde entry in MODELS die de handschoen-
-  // zone-lijst zou moeten delen.
-  const shinguardLink = el('a', 'model-item');
-  shinguardLink.href = '/configurator-shinguard/index.html';
-  shinguardLink.style.textDecoration = 'none';
-  shinguardLink.append(el('span', 'model-name', 'Scheenbeschermer'), el('span', 'model-sub', 'Protector'));
-  wrap.appendChild(shinguardLink);
 }
 
 /** Wisselt van 3D-model en zet alle instellingen opnieuw toe. */
@@ -876,7 +877,17 @@ function showAttribution() {
 
 /* ── Start ────────────────────────────────────────────────────────────── */
 viewer.ready.then(async () => {
-  $('stage-loading').classList.add('is-hidden');
+  // De spinner ("3D-model laden…") blijft bewust staan tot ECHT alles klaar
+  // is — ook de webfonts. Hem meteen hier al verbergen (zoals voorheen) liet
+  // op een trage verbinding een misleidend "kapot" moment zien: het 3D-model
+  // stond er al (spinner weg, dus "klaar" ogend), maar de model-rij, zone-
+  // tabs én de hele kleur/upload-sectie (incl. "Eigen logo") waren dan nog
+  // he-le-maal leeg zolang de Google Fonts nog niet binnen waren — op een
+  // snelle verbinding/lokaal onmerkbaar (fonts al ruim op tijd binnen), maar
+  // op een langzame mobiele verbinding kan dat gat meerdere seconden duren.
+  // Bevestigd door de webfont-load kunstmatig te vertragen: exact dat gat
+  // trad dan op. Een pagina-refresh "hielp" alleen omdat de fonts dan al in
+  // de browser-cache zaten, niet omdat er iets structureels anders liep.
   // Wacht op de webfonts, anders tekent het canvas de naam in een fallback.
   if (document.fonts?.ready) { try { await document.fonts.ready; } catch (e) { /* niet kritiek */ } }
   buildModelList();
@@ -889,6 +900,7 @@ viewer.ready.then(async () => {
   showAttribution();
   pushColors();
   pushBadge();
+  $('stage-loading').classList.add('is-hidden');
 }).catch((err) => {
   console.error('[3D] laden mislukt:', err);
   $('stage-loading').classList.add('is-hidden');
