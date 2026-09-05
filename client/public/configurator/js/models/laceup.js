@@ -77,6 +77,11 @@ export default {
     // — twee tabs met identieke naam. Alleen op Lace-Up verborgen; Velcro
     // (waar geen naam-botsing is) toont 'm gewoon zoals altijd.
     'back-panel': { hidden: true },
+    // 'velcro-strap' bestaat niet op dit model (vetersluiting i.p.v.
+    // klittenband) — volledig verborgen i.p.v. grijs "n.v.t.", zelfde
+    // patroon als hierboven bij 'back-panel' en het spiegelbeeld van hoe
+    // Velcro zelf 'laces' verbergt (zie models/velcro.js).
+    'velcro-strap': { hidden: true },
   },
 
   // De gedeelde artworkGroup in zones.js (['front-panel', 'outer-thumb', ...])
@@ -107,6 +112,7 @@ export default {
     'thumb':       { type: 'mesh-group', nodes: ['outer-thumb', 'inner-thumb'] },
     'wrist':       { type: 'mesh', node: 'wrist' },
     'laces':       { type: 'mesh', node: 'laces' },
+    // 'velcro-strap' bewust ongebonden — zie zoneOverrides.hidden hierboven.
     'piping':      { type: 'mesh', node: 'piping' },
     'stitching':   { type: 'mesh', node: 'stitching' },
     // Zone-id 'back-panel' zelf blijft ongebonden (n.v.t., automatisch via

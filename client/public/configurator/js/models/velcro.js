@@ -1,33 +1,49 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    MODEL-PROFIEL — Velcro
    ═══════════════════════════════════════════════════════════════════════════
-   ⚠ PLAATSHOUDER-MODEL — wordt later vervangen door een nieuw Velcro-ontwerp.
-   Dit 3D-model is bewust niet verder gepolijst; de klant heeft expliciet
-   gevraagd om er nu geen tijd in te steken. Wél moet de Velcro-KEUZE zelf
-   in de configurator blijven werken, zodat klanten kunnen wisselen tussen
-   Velcro en Lace-Up.
+   Bron: eigen, klant-aangeleverd bestand ("Glove.glb"), 10 losse meshes, één
+   gedeeld materiaal (defaultMat.001, met ingebakken baseColor/normal/
+   metallic-roughness-textures). Die ingebakken textures worden — net als bij
+   álle modellen in deze configurator — niet gebruikt: scene3d.js vervangt elk
+   gebonden mesh-materiaal door een eigen, effen-gevulde canvas-textuur (zie
+   loadModel()). Alleen de mesh/node-namen zijn dus relevant.
 
-   Vervangen zodra het nieuwe model er is — geen enkele wijziging nodig aan
-   de UI, scene3d.js of model-profile.js:
-     1. Zet het nieuwe .glb in assets/ (bv. assets/fm-glove-velcro.glb
-        overschrijven, of een nieuwe bestandsnaam + modelUrl hieronder).
-     2. Werk `bindings` hieronder bij naar de meshnamen van het nieuwe model
-        (per zone-id uit zones.js: front-panel, palm, outer-thumb,
-        inner-thumb, thumb-strip, wrist, laces, piping, stitching).
-     3. `cameraPresets` / `materialDefaults` / `attribution` naar wens
-        aanpassen aan het nieuwe model/de nieuwe bronlicentie.
-   Dat is alles — dit bestand is het ENIGE aanspreekpunt voor een Velcro-
-   modelwissel.
-
-   Huidig (tijdelijk) model:
-   Gemodelleerde velcro-wedstrijdhandschoen.
-   Bron: Sketchfab "Boxing gloves" van A1905, CC-BY-4.0 → naamsvermelding
-   verplicht bij publicatie (zie `attribution`).
-
-   Omgezet met tools/build-velcro.py: gesplitst op UV-eiland, dus langs de
-   naden die de 3D-artist zelf heeft gelegd. Twee scheidingen zijn
-   geometrisch en niet door de artist gelegd — expliciet vermeld:
-     • outer/inner-thumb  gesplitst op oriëntatie (voorzijde vs palmzijde)
+   Mesh-namen NIET blind op vertrouwd — visueel geverifieerd met geïsoleerde,
+   los-gerenderde meshes (elk mesh apart zichtbaar, rest verborgen) vanuit
+   zowel de voor- als achterkant, zelfde methode als eerder bij de Lace-Up
+   gebruikt (waar de raw source-namen destijds WEL verwisseld bleken):
+     - Front_Palm groepeert visueel met de volledige duim-cluster
+       (Thumb_Outer/Thumb_Inner/Inner_Strip) ernaast → dit is dus de zijde
+       "slagvlak inclusief duim" → zone 'front-panel' (NIET verwisseld,
+       anders dan bij Lace-Up: hier komt de raw naam wél overeen met de
+       zone-betekenis).
+     - Inner_Strip zit — net als bij Lace-Up — als dunne naad tussen duim en
+       palm → zone 'thumb-strip'.
+     - Back_Cuff is los gerenderd een stevig manchet-paneel bij de pols
+       (groot genoeg voor de bestaande wrist-badge/logo-functionaliteit) →
+       zone 'wrist'. NIET 'back-panel' — geometrisch een band om de pols,
+       geen rugpaneel.
+     - Velcro_Strap is los gerenderd een duidelijk zichtbare, substantiële
+       band om de pols → eigen nieuwe zone 'velcro-strap' (toegevoegd aan
+       zones.js, op Lace-Up als 'unsupported' gezet — zelfde patroon als
+       'laces' hier).
+     - Inside_Panel is los gerenderd bijna de VOLLEDIGE mitt-vorm, grotendeels
+       verscholen onder Front_Palm/Back_Palm. Dit is precies de "enige,
+       grootste basismesh van de hele handschoen" die de zone-definitie van
+       'palm' hierboven (zones.js) al voor dit 2e-generatie Velcro-model
+       beschrijft — front/back/duim/manchet liggen er als losse panelen
+       bovenop. Vandaar 'palm' → Inside_Panel (NIET Back_Palm): de kleur is
+       hierdoor grotendeels alleen als dunne naad-lijntjes zichtbaar tussen
+       de andere panelen — bewust zo, op verzoek geaccepteerd.
+     - Back_Palm is de resterende, duim-loze paneelhelft die BOVENOP
+       Inside_Panel ligt → dit is het "volledig aparte, herkleurbare
+       rugpaneel" dat de zone-definitie van 'back-panel' (zones.js) al
+       specifiek voor dit model beschrijft → zone 'back-panel'.
+     - Thumb_Outer/Thumb_Inner: directe zones 'outer-thumb'/'inner-thumb'.
+       Zone 'thumb' bestaat NIET als aparte mesh — het is, net als bij
+       Lace-Up, een mesh-group-gemak-zone die beide tegelijk aanstuurt.
+     - Stitching/Piping: directe naamsmatch, ook visueel bevestigd
+       (stiksel resp. rand-bies).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default {
@@ -57,26 +73,32 @@ export default {
   },
 
   bindings: {
-    'front-panel': { type: 'mesh', node: 'front-panel' },
-    'palm':        { type: 'mesh', node: 'palm' },
-    'outer-thumb': { type: 'mesh', node: 'outer-thumb' },
-    'inner-thumb': { type: 'mesh', node: 'inner-thumb' },
-    'wrist':       { type: 'mesh', node: 'wrist' },
-    'piping':      { type: 'mesh', node: 'piping' },
-    'stitching':   { type: 'mesh', node: 'stitching' },
-    'laces':       { type: 'unsupported', reason: 'Dit model heeft een klittenbandsluiting, geen veters.' },
-    // Dit bronmodel heeft geen los mesh voor de naad tussen duim en palm —
-    // die zit hier vast aan de duim. Niet kunstmatig gesplitst: de klant
-    // heeft expliciet gevraagd dit placeholder-model niet te bewerken.
-    'thumb-strip': { type: 'unsupported', reason: 'Dit onderdeel is op dit model niet als losse geometrie beschikbaar.' },
+    'front-panel': { type: 'mesh', node: 'Front_Palm' },
+    'palm':        { type: 'mesh', node: 'Inside_Panel' },
+    'back-panel':  { type: 'mesh', node: 'Back_Palm' },
+    'outer-thumb': { type: 'mesh', node: 'Thumb_Outer' },
+    'inner-thumb': { type: 'mesh', node: 'Thumb_Inner' },
+    'thumb-strip': { type: 'mesh', node: 'Inner_Strip' },
+    'thumb':       { type: 'mesh-group', nodes: ['outer-thumb', 'inner-thumb'] },
+    'wrist':       { type: 'mesh', node: 'Back_Cuff' },
+    'velcro-strap':{ type: 'mesh', node: 'Velcro_Strap' },
+    'piping':      { type: 'mesh', node: 'Piping' },
+    'stitching':   { type: 'mesh', node: 'Stitching' },
   },
 
-  staticNodes: ['lining'],
-
-  attribution: {
-    title: 'Boxing gloves', author: 'A1905',
-    authorUrl: 'https://sketchfab.com/al1905',
-    source: 'https://sketchfab.com/3d-models/boxing-gloves-3c85b09870a04253ba40472f5db55500',
-    license: 'CC-BY-4.0', licenseUrl: 'http://creativecommons.org/licenses/by/4.0/',
+  // 'laces' bestaat niet op dit model (klittenband i.p.v. veters) — volledig
+  // verborgen i.p.v. grijs "n.v.t.", zelfde patroon als 'back-panel' bij
+  // Lace-Up (zie models/laceup.js). Andere modellen (Lace-Up) houden hun
+  // eigen 'laces'-optie gewoon — dit raakt alleen de Velcro-tab-lijst.
+  zoneOverrides: {
+    'laces': { hidden: true },
   },
+
+  staticNodes: [],
+
+  // Eigen (klant-aangeleverd) bestand, geen extern CC-gelicentieerd model —
+  // attribution() in configurator.js verwacht anders a.authorUrl/a.license
+  // e.d. en zou die als "undefined" tonen. `null` laat de regel leeg. Zelfde
+  // patroon als models/shinguard.js.
+  attribution: null,
 };

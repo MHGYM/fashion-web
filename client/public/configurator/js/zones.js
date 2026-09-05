@@ -115,6 +115,14 @@ export const ZONES = [
     hint: 'De veters. Alleen bij het lace-up model.',
   },
   {
+    // Alleen bij Velcro (zie models/velcro.js) — bij Lace-Up bestaat dit
+    // onderdeel niet en staat de zone op 'unsupported', analoog aan hoe
+    // 'laces' hierboven bij Velcro als 'unsupported' geldt.
+    id: 'velcro-strap', label: 'Velcro Strap', group: 'Sluiting',
+    default: 'Black', artwork: null,
+    hint: 'De klittenband-sluitingsband om de pols. Alleen bij het velcro-model.',
+  },
+  {
     id: 'piping', label: 'Piping', group: 'Details',
     default: 'Gold', artwork: null,
     hint: 'De bies langs de naden.',
