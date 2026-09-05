@@ -13,10 +13,19 @@
    zowel de voor- als achterkant, zelfde methode als eerder bij de Lace-Up
    gebruikt (waar de raw source-namen destijds WEL verwisseld bleken):
      - Front_Palm groepeert visueel met de volledige duim-cluster
-       (Thumb_Outer/Thumb_Inner/Inner_Strip) ernaast → dit is dus de zijde
-       "slagvlak inclusief duim" → zone 'front-panel' (NIET verwisseld,
-       anders dan bij Lace-Up: hier komt de raw naam wél overeen met de
-       zone-betekenis).
+       (Thumb_Outer/Thumb_Inner/Inner_Strip) ernaast, MAAR staat qua
+       camera-oriëntatie aan de kant van het 'back'-camerapreset, niet
+       'front' — bevestigd doordat het kleuren van de toenmalige
+       'front-panel'-zone zichtbaar werd op het model bij het 'back'-preset
+       i.p.v. 'front' (en andersom voor Back_Palm). Daarom NU gekoppeld aan
+       zone 'back-panel' (was eerst 'front-panel', voor de camera-correctie
+       hieronder rechtgezet).
+     - Back_Palm is de duim-loze paneelhelft, camera-oriëntatie klopt met
+       'front' → zone 'front-panel' (was eerst 'back-panel').
+       artworkGroupOverride hieronder is nodig omdat de gedeelde
+       artworkGroup in zones.js aanneemt dat 'front-panel' de duim-zijde is
+       — hier is dat na de omwisseling juist 'back-panel' (Front_Palm) —
+       exact hetzelfde patroon als Lace-Up's eigen artworkGroupOverride.
      - Inner_Strip zit — net als bij Lace-Up — als dunne naad tussen duim en
        palm → zone 'thumb-strip'.
      - Back_Cuff is los gerenderd een stevig manchet-paneel bij de pols
@@ -28,17 +37,11 @@
        zones.js, op Lace-Up als 'unsupported' gezet — zelfde patroon als
        'laces' hier).
      - Inside_Panel is los gerenderd bijna de VOLLEDIGE mitt-vorm, grotendeels
-       verscholen onder Front_Palm/Back_Palm. Dit is precies de "enige,
-       grootste basismesh van de hele handschoen" die de zone-definitie van
-       'palm' hierboven (zones.js) al voor dit 2e-generatie Velcro-model
-       beschrijft — front/back/duim/manchet liggen er als losse panelen
-       bovenop. Vandaar 'palm' → Inside_Panel (NIET Back_Palm): de kleur is
-       hierdoor grotendeels alleen als dunne naad-lijntjes zichtbaar tussen
-       de andere panelen — bewust zo, op verzoek geaccepteerd.
-     - Back_Palm is de resterende, duim-loze paneelhelft die BOVENOP
-       Inside_Panel ligt → dit is het "volledig aparte, herkleurbare
-       rugpaneel" dat de zone-definitie van 'back-panel' (zones.js) al
-       specifiek voor dit model beschrijft → zone 'back-panel'.
+       verscholen onder Front_Palm/Back_Palm — de "enige, grootste basismesh"
+       die de zone-definitie van 'palm' voor dit 2e-generatie Velcro-model
+       beschrijft. Op klantverzoek volledig verborgen (zoneOverrides hieronder)
+       i.p.v. als kleurbare tab getoond — alleen de dunne naad-lijntjes zijn
+       toch al nauwelijks een bruikbare kleurkeuze voor de klant.
      - Thumb_Outer/Thumb_Inner: directe zones 'outer-thumb'/'inner-thumb'.
        Zone 'thumb' bestaat NIET als aparte mesh — het is, net als bij
        Lace-Up, een mesh-group-gemak-zone die beide tegelijk aanstuurt.
@@ -72,10 +75,16 @@ export default {
     clearcoat: 0, clearcoatRoughness: 1, envMapIntensity: 0.4,
   },
 
+  // Zie toelichting bovenaan: 'front-panel' bindt hier Back_Palm (klopt met
+  // camera-preset 'front'), niet de duim-zijde — daarom wijst dit de
+  // thumb-groepering om naar 'back-panel' i.p.v. 'front-panel'. Zelfde
+  // patroon/reden als Lace-Up's eigen artworkGroupOverride.
+  artworkGroupOverride: ['back-panel', 'outer-thumb', 'inner-thumb', 'thumb-strip', 'thumb'],
+
   bindings: {
-    'front-panel': { type: 'mesh', node: 'Front_Palm' },
+    'front-panel': { type: 'mesh', node: 'Back_Palm' },
+    'back-panel':  { type: 'mesh', node: 'Front_Palm' },
     'palm':        { type: 'mesh', node: 'Inside_Panel' },
-    'back-panel':  { type: 'mesh', node: 'Back_Palm' },
     'outer-thumb': { type: 'mesh', node: 'Thumb_Outer' },
     'inner-thumb': { type: 'mesh', node: 'Thumb_Inner' },
     'thumb-strip': { type: 'mesh', node: 'Inner_Strip' },
@@ -90,8 +99,11 @@ export default {
   // verborgen i.p.v. grijs "n.v.t.", zelfde patroon als 'back-panel' bij
   // Lace-Up (zie models/laceup.js). Andere modellen (Lace-Up) houden hun
   // eigen 'laces'-optie gewoon — dit raakt alleen de Velcro-tab-lijst.
+  // 'palm' (Inside_Panel) op klantverzoek ook verborgen — alleen bij dit
+  // model, Lace-Up heeft geen 'palm'-override en toont 'm gewoon.
   zoneOverrides: {
     'laces': { hidden: true },
+    'palm': { hidden: true },
   },
 
   staticNodes: [],
